@@ -13,7 +13,16 @@ double offsetY = 0;
 double zoom = .4;
 int cursorPositionX = 0;
 int cursorPositionY = 0;
+int pixelSize = 100;
 int shiftMultiplier = 5;
+
+struct layer {
+  unsigned char *pixels;
+  int width;
+  int height;
+};
+
+struct layer layers[9];
 
 /*
  * Callback for keyboard events
@@ -112,6 +121,27 @@ gboolean drawCallback(GtkWidget *widget, cairo_t *cr, gpointer data) {
   cairo_restore(cr);
 
   /*
+   * Draw all of the pixels for the given layer
+   */
+  for (int x = 0; x < layers[0].width; x++) {
+    for (int y = 0; y < layers[0].height; y++) {
+      int index = (x + y * layers[0].width) * 4;
+      double r = layers[0].pixels[index + 0] / 255.;
+      double g = layers[0].pixels[index + 1] / 255.;
+      double b = layers[0].pixels[index + 2] / 255.;
+      unsigned char a = layers[0].pixels[index + 3];
+      if (a) {
+        cairo_save(cr);
+        cairo_translate(cr, x * pixelSize * zoom, y * pixelSize * zoom);
+        cairo_rectangle(cr, 0, 0, pixelSize * zoom, pixelSize * zoom);
+        cairo_set_source_rgba(cr, r, g, b, 1);
+        cairo_fill(cr);
+        cairo_restore(cr);
+      }
+    }
+  }
+
+  /*
    * Draw modeline
    */
   char buf[256];
@@ -125,15 +155,23 @@ gboolean drawCallback(GtkWidget *widget, cairo_t *cr, gpointer data) {
   /*
    * Draw cursor
    */
-  int asdf = 100;
-  cairo_translate(cr, cursorPositionX * asdf * zoom, cursorPositionY * asdf * zoom);
-  cairo_rectangle(cr, 0, 0, asdf * zoom, asdf * zoom);
+  cairo_save(cr);
+  cairo_set_source_rgba(cr, 1, 0, 0, 1);
+  cairo_translate(cr, cursorPositionX * pixelSize * zoom,
+                  cursorPositionY * pixelSize * zoom);
+  cairo_rectangle(cr, 0, 0, pixelSize * zoom, pixelSize * zoom);
   cairo_set_line_width(cr, 2);
   cairo_stroke(cr);
+  cairo_restore(cr);
 }
 
 int main(int argc, char *argv[]) {
   gtk_init(&argc, &argv);
+
+  layers[0].width = 100;
+  layers[0].height = 100;
+  layers[0].pixels = malloc(layers[0].width * layers[0].height * 4);
+  bzero(layers[0].pixels, layers[0].width * layers[0].height * 4);
 
   /*
    * Initialize the widgets and load the background image
