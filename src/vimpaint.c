@@ -10,7 +10,10 @@ cairo_surface_t *backgroundImage;
 double fontSize = 20;
 double offsetX = 0;
 double offsetY = 0;
-double zoom = .1;
+double zoom = .4;
+int cursorPositionX = 0;
+int cursorPositionY = 0;
+int shiftMultiplier = 5;
 
 /*
  * Callback for keyboard events
@@ -23,6 +26,52 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
    */
   if (event->keyval == GDK_KEY_Escape) {
     exit(EXIT_SUCCESS);
+    return TRUE;
+  }
+
+  else if (event->keyval == GDK_KEY_minus) {
+    zoom /= 1.1;
+    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
+    return TRUE;
+  } else if (event->keyval == GDK_KEY_plus) {
+    zoom *= 1.1;
+    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
+    return TRUE;
+  }
+
+  else if (event->keyval == GDK_KEY_H) {
+    cursorPositionX -= shiftMultiplier;
+    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
+    return TRUE;
+  } else if (event->keyval == GDK_KEY_J) {
+    cursorPositionY += shiftMultiplier;
+    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
+    return TRUE;
+  } else if (event->keyval == GDK_KEY_K) {
+    cursorPositionY -= shiftMultiplier;
+    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
+    return TRUE;
+  } else if (event->keyval == GDK_KEY_L) {
+    cursorPositionX += shiftMultiplier;
+    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
+    return TRUE;
+  }
+
+  else if (event->keyval == GDK_KEY_h) {
+    cursorPositionX--;
+    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
+    return TRUE;
+  } else if (event->keyval == GDK_KEY_j) {
+    cursorPositionY++;
+    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
+    return TRUE;
+  } else if (event->keyval == GDK_KEY_k) {
+    cursorPositionY--;
+    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
+    return TRUE;
+  } else if (event->keyval == GDK_KEY_l) {
+    cursorPositionX++;
+    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
     return TRUE;
   }
 
@@ -72,6 +121,15 @@ gboolean drawCallback(GtkWidget *widget, cairo_t *cr, gpointer data) {
   cairo_set_source_rgba(cr, 1, 0, 0, 1);
   cairo_show_text(cr, buf);
   cairo_fill(cr);
+
+  /*
+   * Draw cursor
+   */
+  int asdf = 100;
+  cairo_translate(cr, cursorPositionX * asdf * zoom, cursorPositionY * asdf * zoom);
+  cairo_rectangle(cr, 0, 0, asdf * zoom, asdf * zoom);
+  cairo_set_line_width(cr, 2);
+  cairo_stroke(cr);
 }
 
 int main(int argc, char *argv[]) {
@@ -98,7 +156,7 @@ int main(int argc, char *argv[]) {
    * Configure window properties
    */
   gtk_window_set_position(GTK_WINDOW(mainWindow), GTK_WIN_POS_CENTER);
-  gtk_window_set_title(GTK_WINDOW(mainWindow), "Hello, World!");
+  gtk_window_set_title(GTK_WINDOW(mainWindow), "vimpaint");
   gtk_widget_set_size_request(drawingArea, 2000, 2000);
 
   /*
