@@ -11,6 +11,7 @@ double fontSize = 20;
 double offsetX = 0;
 double offsetY = 0;
 double zoom = .4;
+int currentLayer = 0;
 int cursorPositionX = 0;
 int cursorPositionY = 0;
 int pixelSize = 100;
@@ -23,6 +24,29 @@ struct layer {
 };
 
 struct layer layers[9];
+
+/*
+ * Set a pixel at a location on the specified layer to some color
+ */
+int setPixel(struct layer layer, int x, int y, int r, int g, int b, int a) {
+  if (x < 0 || y < 0 || x > layer.width || y > layer.width) {
+    return -1;
+  }
+  int index = (cursorPositionX + cursorPositionY * layer.width) * 4;
+  layer.pixels[index + 0] = r;
+  layer.pixels[index + 1] = g;
+  layer.pixels[index + 2] = b;
+  layer.pixels[index + 3] = a;
+
+  return 0;
+}
+
+/*
+ * Clear a pixel on the buffer
+ */
+int clearPixel(struct layer layer, int x, int y) {
+  return setPixel(layer, x, y, 0, 0, 0, 0);
+}
 
 /*
  * Callback for keyboard events
@@ -123,20 +147,22 @@ gboolean drawCallback(GtkWidget *widget, cairo_t *cr, gpointer data) {
   /*
    * Draw all of the pixels for the given layer
    */
-  for (int x = 0; x < layers[0].width; x++) {
-    for (int y = 0; y < layers[0].height; y++) {
-      int index = (x + y * layers[0].width) * 4;
-      double r = layers[0].pixels[index + 0] / 255.;
-      double g = layers[0].pixels[index + 1] / 255.;
-      double b = layers[0].pixels[index + 2] / 255.;
-      unsigned char a = layers[0].pixels[index + 3];
-      if (a) {
-        cairo_save(cr);
-        cairo_translate(cr, x * pixelSize * zoom, y * pixelSize * zoom);
-        cairo_rectangle(cr, 0, 0, pixelSize * zoom, pixelSize * zoom);
-        cairo_set_source_rgba(cr, r, g, b, 1);
-        cairo_fill(cr);
-        cairo_restore(cr);
+  for (int i = 0; i < 9; i++) {
+    for (int x = 0; x < layers[i].width; x++) {
+      for (int y = 0; y < layers[i].height; y++) {
+        int index = (x + y * layers[i].width) * 4;
+        double r = layers[i].pixels[index + 0] / 255.;
+        double g = layers[i].pixels[index + 1] / 255.;
+        double b = layers[i].pixels[index + 2] / 255.;
+        unsigned char a = layers[i].pixels[index + 3];
+        if (a) {
+          cairo_save(cr);
+          cairo_translate(cr, x * pixelSize * zoom, y * pixelSize * zoom);
+          cairo_rectangle(cr, 0, 0, pixelSize * zoom, pixelSize * zoom);
+          cairo_set_source_rgba(cr, r, g, b, 1);
+          cairo_fill(cr);
+          cairo_restore(cr);
+        }
       }
     }
   }
@@ -168,10 +194,12 @@ gboolean drawCallback(GtkWidget *widget, cairo_t *cr, gpointer data) {
 int main(int argc, char *argv[]) {
   gtk_init(&argc, &argv);
 
-  layers[0].width = 100;
-  layers[0].height = 100;
-  layers[0].pixels = malloc(layers[0].width * layers[0].height * 4);
-  bzero(layers[0].pixels, layers[0].width * layers[0].height * 4);
+  for (int i = 0; i < 9; i++) {
+    layers[i].width = 100;
+    layers[i].height = 100;
+    layers[i].pixels = malloc(layers[i].width * layers[i].height * 4);
+    bzero(layers[i].pixels, layers[i].width * layers[i].height * 4);
+  }
 
   /*
    * Initialize the widgets and load the background image
