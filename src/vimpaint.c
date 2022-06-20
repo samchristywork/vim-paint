@@ -32,6 +32,8 @@ struct color *palette[9];
 
 struct layer {
   unsigned char *pixels;
+  cairo_surface_t *surface;
+  cairo_t *cr;
   int width;
   int height;
 };
@@ -256,6 +258,10 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < 9; i++) {
     layers[i].width = 100;
     layers[i].height = 100;
+    layers[i].surface = cairo_image_surface_create(
+        CAIRO_FORMAT_ARGB32, layers[i].width * pixelSize,
+        layers[i].height * pixelSize);
+    layers[i].cr = cairo_create(layers[i].surface);
     layers[i].pixels = malloc(layers[i].width * layers[i].height * 4);
     bzero(layers[i].pixels, layers[i].width * layers[i].height * 4);
   }
