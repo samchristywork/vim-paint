@@ -17,6 +17,15 @@ int cursorPositionY = 0;
 int pixelSize = 100;
 int shiftMultiplier = 5;
 
+struct color {
+  unsigned char r;
+  unsigned char g;
+  unsigned char b;
+  unsigned char a;
+};
+
+struct color *palette[9];
+
 struct layer {
   unsigned char *pixels;
   int width;
@@ -200,6 +209,19 @@ int main(int argc, char *argv[]) {
     layers[i].pixels = malloc(layers[i].width * layers[i].height * 4);
     bzero(layers[i].pixels, layers[i].width * layers[i].height * 4);
   }
+
+  /*
+   * Default color palette
+   */
+  palette[0] = newColor(0, 0, 0, 255);
+  palette[1] = newColor(255, 0, 0, 255);
+  palette[2] = newColor(0, 255, 0, 255);
+  palette[3] = newColor(0, 0, 255, 255);
+  palette[4] = newColor(255, 255, 0, 255);
+  palette[5] = newColor(0, 255, 255, 255);
+  palette[6] = newColor(255, 0, 255, 255);
+  palette[7] = newColor(255, 255, 255, 255);
+  palette[8] = newColor(0, 0, 0, 255);
 
   /*
    * Initialize the widgets and load the background image
