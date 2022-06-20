@@ -18,6 +18,9 @@ int pixelSize = 100;
 int shiftMultiplier = 5;
 char *currentFile = "res/test.png";
 
+enum { MODE_NORMAL, MODE_COLOR_SELECTION };
+int mode = MODE_COLOR_SELECTION;
+
 struct color {
   unsigned char r;
   unsigned char g;
@@ -200,6 +203,41 @@ gboolean drawCallback(GtkWidget *widget, cairo_t *cr, gpointer data) {
   cairo_set_line_width(cr, 2);
   cairo_stroke(cr);
   cairo_restore(cr);
+
+  /*
+   * Draw menu
+   */
+  if (mode == MODE_COLOR_SELECTION) {
+    cairo_set_source_rgba(cr, .1, .1, .1, 1);
+    cairo_rectangle(cr, width / 2 - 100, height / 2 - 50, 200, 100);
+    cairo_fill(cr);
+    cairo_set_source_rgba(cr, .25, .25, .5, 1);
+    cairo_rectangle(cr, width / 2 - 100, height / 2 - 50, 200, 100);
+    cairo_stroke(cr);
+    for (int x = 0; x < 3; x++) {
+      for (int y = 0; y < 3; y++) {
+        cairo_set_source_rgba(cr, (float)palette[x + 3 * y]->r / 255.,
+                              (float)palette[x + 3 * y]->g / 255.,
+                              (float)palette[x + 3 * y]->b / 255., 1);
+        int xp = width / 2 + (x - 1) * 50 - 25;
+        int yp = height / 2 + (y - 1) * 25 - 12;
+        cairo_rectangle(cr, xp, yp, 50, 25);
+        cairo_fill(cr);
+
+        char buf[256];
+        snprintf(buf, 255, "%d", x + y * 3 + 1);
+        cairo_set_font_size(cr, 20);
+        cairo_text_extents_t extents;
+        cairo_text_extents(cr, buf, &extents);
+        cairo_move_to(cr, xp - extents.width / 2 + 25, yp + 20);
+        cairo_set_source_rgba(cr, 1. - (float)palette[x + 3 * y]->r / 255.,
+                              1. - (float)palette[x + 3 * y]->g / 255.,
+                              1. - (float)palette[x + 3 * y]->b / 255., 1);
+        cairo_show_text(cr, buf);
+        cairo_fill(cr);
+      }
+    }
+  }
 }
 
 int main(int argc, char *argv[]) {
