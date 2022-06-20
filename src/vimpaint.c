@@ -16,6 +16,7 @@ int cursorPositionX = 0;
 int cursorPositionY = 0;
 int pixelSize = 100;
 int shiftMultiplier = 5;
+char *currentFile = "res/test.png";
 
 struct color {
   unsigned char r;
@@ -177,10 +178,11 @@ gboolean drawCallback(GtkWidget *widget, cairo_t *cr, gpointer data) {
   }
 
   /*
-   * Draw modeline
+   * Draw statusline
    */
   char buf[256];
-  snprintf(buf, 255, "This is where the modeline will be.");
+  snprintf(buf, 255, "%s, (%d, %d), %f", currentFile, cursorPositionX,
+           cursorPositionY, zoom);
   cairo_move_to(cr, 10, height - 10);
   cairo_set_font_size(cr, fontSize);
   cairo_set_source_rgba(cr, 1, 0, 0, 1);
@@ -227,7 +229,7 @@ int main(int argc, char *argv[]) {
    * Initialize the widgets and load the background image
    */
   mainWindow = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-  backgroundImage = cairo_image_surface_create_from_png("res/test.png");
+  backgroundImage = cairo_image_surface_create_from_png(currentFile);
   box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   drawingArea = gtk_drawing_area_new();
 
