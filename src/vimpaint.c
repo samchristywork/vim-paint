@@ -38,6 +38,16 @@ struct layer {
 
 struct layer layers[9];
 
+struct color *newColor(unsigned char r, unsigned char g, unsigned char b,
+                       unsigned char a) {
+  struct color *c = malloc(sizeof(struct color));
+  c->r = r;
+  c->g = g;
+  c->b = b;
+  c->a = a;
+  return c;
+}
+
 /*
  * Set a pixel at a location on the specified layer to some color
  */
