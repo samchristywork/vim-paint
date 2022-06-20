@@ -169,15 +169,25 @@ gboolean drawCallback(GtkWidget *widget, cairo_t *cr, gpointer data) {
         double b = layers[i].pixels[index + 2] / 255.;
         unsigned char a = layers[i].pixels[index + 3];
         if (a) {
-          cairo_save(cr);
-          cairo_translate(cr, x * pixelSize * zoom, y * pixelSize * zoom);
-          cairo_rectangle(cr, 0, 0, pixelSize * zoom, pixelSize * zoom);
-          cairo_set_source_rgba(cr, r, g, b, 1);
-          cairo_fill(cr);
-          cairo_restore(cr);
+          cairo_save(layers[i].cr);
+          cairo_translate(layers[i].cr, x * pixelSize * zoom,
+                          y * pixelSize * zoom);
+          cairo_rectangle(layers[i].cr, 0, 0, pixelSize * zoom,
+                          pixelSize * zoom);
+          cairo_set_source_rgba(layers[i].cr, r, g, b, 1);
+          cairo_fill(layers[i].cr);
+          cairo_restore(layers[i].cr);
         }
       }
     }
+  }
+
+  /*
+   * Composite all the layers together
+   */
+  for (int i = 0; i < 9; i++) {
+    cairo_set_source_surface(cr, layers[i].surface, 0, 0);
+    cairo_paint(cr);
   }
 
   /*
