@@ -89,54 +89,42 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
 
   else if (event->keyval == GDK_KEY_minus) {
     zoom /= 1.1;
-    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
-    return TRUE;
   } else if (event->keyval == GDK_KEY_plus) {
     zoom *= 1.1;
-    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
-    return TRUE;
+  }
+
+  else if (event->keyval == GDK_KEY_space) {
+    setPixel(layers[currentLayer], cursorPositionX, cursorPositionY, 255, 0, 0,
+             255);
   }
 
   else if (event->keyval == GDK_KEY_H) {
     cursorPositionX -= shiftMultiplier;
-    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
-    return TRUE;
   } else if (event->keyval == GDK_KEY_J) {
     cursorPositionY += shiftMultiplier;
-    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
-    return TRUE;
   } else if (event->keyval == GDK_KEY_K) {
     cursorPositionY -= shiftMultiplier;
-    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
-    return TRUE;
   } else if (event->keyval == GDK_KEY_L) {
     cursorPositionX += shiftMultiplier;
-    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
-    return TRUE;
   }
 
   else if (event->keyval == GDK_KEY_h) {
     cursorPositionX--;
-    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
-    return TRUE;
   } else if (event->keyval == GDK_KEY_j) {
     cursorPositionY++;
-    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
-    return TRUE;
   } else if (event->keyval == GDK_KEY_k) {
     cursorPositionY--;
-    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
-    return TRUE;
   } else if (event->keyval == GDK_KEY_l) {
     cursorPositionX++;
-    gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
-    return TRUE;
   }
 
   else {
     printf("%d\n", event->keyval);
+    return FALSE;
   }
-  return FALSE;
+
+  gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
+  return TRUE;
 }
 
 /*
