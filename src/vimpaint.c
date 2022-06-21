@@ -83,8 +83,12 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
    * Exit when the user presses Escape
    */
   if (event->keyval == GDK_KEY_Escape) {
-    exit(EXIT_SUCCESS);
-    return TRUE;
+    if (mode == MODE_COLOR_SELECTION) {
+      mode = MODE_NORMAL;
+    } else {
+      exit(EXIT_SUCCESS);
+      return TRUE;
+    }
   }
 
   else if (event->keyval == GDK_KEY_minus) {
