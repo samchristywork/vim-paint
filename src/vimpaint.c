@@ -74,6 +74,27 @@ int clearPixel(struct layer layer, int x, int y) {
 }
 
 /*
+ * Move the cursor with bounds detection
+ */
+
+void moveCursor(int dx, int dy) {
+  cursorPositionX += dx;
+  cursorPositionY += dy;
+  if (cursorPositionX < 0) {
+    cursorPositionX = 0;
+  }
+  if (cursorPositionY < 0) {
+    cursorPositionY = 0;
+  }
+  if (cursorPositionX > layers[currentLayer].width) {
+    cursorPositionX = layers[currentLayer].width;
+  }
+  if (cursorPositionY > layers[currentLayer].height) {
+    cursorPositionY = layers[currentLayer].height;
+  }
+}
+
+/*
  * Callback for keyboard events
  */
 gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
@@ -103,23 +124,23 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
   }
 
   else if (event->keyval == GDK_KEY_H) {
-    cursorPositionX -= shiftMultiplier;
+    moveCursor(-1, 0);
   } else if (event->keyval == GDK_KEY_J) {
-    cursorPositionY += shiftMultiplier;
+    moveCursor(0, 1);
   } else if (event->keyval == GDK_KEY_K) {
-    cursorPositionY -= shiftMultiplier;
+    moveCursor(0, -1);
   } else if (event->keyval == GDK_KEY_L) {
-    cursorPositionX += shiftMultiplier;
+    moveCursor(-1, 0);
   }
 
   else if (event->keyval == GDK_KEY_h) {
-    cursorPositionX--;
+    moveCursor(-shiftMultiplier, 0);
   } else if (event->keyval == GDK_KEY_j) {
-    cursorPositionY++;
+    moveCursor(0, shiftMultiplier);
   } else if (event->keyval == GDK_KEY_k) {
-    cursorPositionY--;
+    moveCursor(0, -shiftMultiplier);
   } else if (event->keyval == GDK_KEY_l) {
-    cursorPositionX++;
+    moveCursor(-shiftMultiplier, 0);
   }
 
   else {
