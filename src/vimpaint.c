@@ -123,24 +123,24 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
              255);
   }
 
-  else if (event->keyval == GDK_KEY_H) {
+  else if (event->keyval == GDK_KEY_h) {
     moveCursor(-1, 0);
-  } else if (event->keyval == GDK_KEY_J) {
+  } else if (event->keyval == GDK_KEY_j) {
     moveCursor(0, 1);
-  } else if (event->keyval == GDK_KEY_K) {
+  } else if (event->keyval == GDK_KEY_k) {
     moveCursor(0, -1);
-  } else if (event->keyval == GDK_KEY_L) {
-    moveCursor(-1, 0);
+  } else if (event->keyval == GDK_KEY_l) {
+    moveCursor(1, 0);
   }
 
-  else if (event->keyval == GDK_KEY_h) {
+  else if (event->keyval == GDK_KEY_H) {
     moveCursor(-shiftMultiplier, 0);
-  } else if (event->keyval == GDK_KEY_j) {
+  } else if (event->keyval == GDK_KEY_J) {
     moveCursor(0, shiftMultiplier);
-  } else if (event->keyval == GDK_KEY_k) {
+  } else if (event->keyval == GDK_KEY_K) {
     moveCursor(0, -shiftMultiplier);
-  } else if (event->keyval == GDK_KEY_l) {
-    moveCursor(-shiftMultiplier, 0);
+  } else if (event->keyval == GDK_KEY_L) {
+    moveCursor(shiftMultiplier, 0);
   }
 
   else {
