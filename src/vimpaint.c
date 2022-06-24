@@ -82,19 +82,21 @@ int clearPixel(struct layer layer, int x, int y) {
  */
 
 void moveCursor(int dx, int dy) {
-  cursorPositionX += dx;
-  cursorPositionY += dy;
-  if (cursorPositionX < 0) {
-    cursorPositionX = 0;
-  }
-  if (cursorPositionY < 0) {
-    cursorPositionY = 0;
-  }
-  if (cursorPositionX > layers[currentLayer].width) {
-    cursorPositionX = layers[currentLayer].width;
-  }
-  if (cursorPositionY > layers[currentLayer].height) {
-    cursorPositionY = layers[currentLayer].height;
+  if (mode == MODE_NORMAL) {
+    cursorPositionX += dx;
+    cursorPositionY += dy;
+    if (cursorPositionX < 0) {
+      cursorPositionX = 0;
+    }
+    if (cursorPositionY < 0) {
+      cursorPositionY = 0;
+    }
+    if (cursorPositionX > layers[currentLayer].width) {
+      cursorPositionX = layers[currentLayer].width;
+    }
+    if (cursorPositionY > layers[currentLayer].height) {
+      cursorPositionY = layers[currentLayer].height;
+    }
   }
 }
 
