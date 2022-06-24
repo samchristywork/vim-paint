@@ -19,7 +19,10 @@ int shiftMultiplier = 5;
 char *currentFile = "res/test.png";
 
 enum { MODE_NORMAL, MODE_COLOR_SELECTION };
-int mode = MODE_COLOR_SELECTION;
+int mode = MODE_NORMAL;
+
+enum { ACTION_NONE = 0, ACTION_REPLACE };
+int action = ACTION_NONE;
 
 struct color {
   unsigned char r;
@@ -106,9 +109,19 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
   if (event->keyval == GDK_KEY_Escape) {
     if (mode == MODE_COLOR_SELECTION) {
       mode = MODE_NORMAL;
+      action = ACTION_NONE;
     } else {
       exit(EXIT_SUCCESS);
-      return TRUE;
+    }
+  }
+
+  /*
+   * Replace mode
+   */
+  if (event->keyval == GDK_KEY_r) {
+    if (mode == MODE_NORMAL) {
+      mode = MODE_COLOR_SELECTION;
+      action = ACTION_REPLACE;
     }
   }
 
