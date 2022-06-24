@@ -32,6 +32,7 @@ struct color {
 };
 
 struct color *palette[9];
+struct color currentColor;
 
 struct layer {
   unsigned char *pixels;
@@ -135,8 +136,10 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
   }
 
   else if (event->keyval == GDK_KEY_space) {
-    setPixel(layers[currentLayer], cursorPositionX, cursorPositionY, 255, 0, 0,
-             255);
+    if (mode == MODE_NORMAL) {
+      setPixel(layers[currentLayer], cursorPositionX, cursorPositionY,
+               currentColor.r, currentColor.g, currentColor.b, currentColor.a);
+    }
   }
 
   else if (event->keyval == GDK_KEY_h) {
@@ -157,6 +160,24 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
     moveCursor(0, -shiftMultiplier);
   } else if (event->keyval == GDK_KEY_L) {
     moveCursor(shiftMultiplier, 0);
+  }
+
+  else if (event->keyval == GDK_KEY_1) {
+    if (mode == MODE_COLOR_SELECTION) {
+      mode = MODE_NORMAL;
+      currentColor.r = palette[0]->r;
+      currentColor.g = palette[0]->g;
+      currentColor.b = palette[0]->b;
+      currentColor.a = palette[0]->a;
+    }
+  } else if (event->keyval == GDK_KEY_2) {
+    if (mode == MODE_COLOR_SELECTION) {
+      mode = MODE_NORMAL;
+      currentColor.r = palette[1]->r;
+      currentColor.g = palette[1]->g;
+      currentColor.b = palette[1]->b;
+      currentColor.a = palette[1]->a;
+    }
   }
 
   else {
