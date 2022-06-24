@@ -112,6 +112,9 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
     }
   }
 
+  /*
+   * Control the zoom level
+   */
   else if (event->keyval == GDK_KEY_minus) {
     zoom /= 1.1;
   } else if (event->keyval == GDK_KEY_plus) {
