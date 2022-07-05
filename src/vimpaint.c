@@ -32,10 +32,10 @@ typedef struct color {
   unsigned char g;
   unsigned char b;
   unsigned char a;
-};
+} color;
 
-struct color *palette[9];
-struct color currentColor;
+color *palette[9];
+color currentColor;
 
 struct layer {
   unsigned char *pixels;
@@ -47,9 +47,9 @@ struct layer {
 
 struct layer layers[9];
 
-struct color *newColor(unsigned char r, unsigned char g, unsigned char b,
+color *newColor(unsigned char r, unsigned char g, unsigned char b,
                        unsigned char a) {
-  struct color *c = malloc(sizeof(struct color));
+  color *c = malloc(sizeof(color));
   c->r = r;
   c->g = g;
   c->b = b;
@@ -60,15 +60,15 @@ struct color *newColor(unsigned char r, unsigned char g, unsigned char b,
 /*
  * Set a pixel at a location on the specified layer to some color
  */
-int setPixel(struct layer layer, int x, int y, int r, int g, int b, int a) {
+int setPixel(struct layer layer, int x, int y, color c) {
   if (x < 0 || y < 0 || x > layer.width || y > layer.width) {
     return -1;
   }
   int index = (cursorPositionX + cursorPositionY * layer.width) * 4;
-  layer.pixels[index + 0] = r;
-  layer.pixels[index + 1] = g;
-  layer.pixels[index + 2] = b;
-  layer.pixels[index + 3] = a;
+  layer.pixels[index + 0] = c.r;
+  layer.pixels[index + 1] = c.g;
+  layer.pixels[index + 2] = c.b;
+  layer.pixels[index + 3] = c.a;
 
   return 0;
 }
@@ -77,13 +77,13 @@ int setPixel(struct layer layer, int x, int y, int r, int g, int b, int a) {
  * Clear a pixel on the buffer
  */
 int clearPixel(struct layer layer, int x, int y) {
-  return setPixel(layer, x, y, 0, 0, 0, 0);
+  color clear = {0};
+  return setPixel(layer, x, y, clear);
 }
 
 /*
  * Move the cursor with bounds detection
  */
-
 void moveCursor(int dx, int dy) {
   if (mode == MODE_NORMAL) {
     cursorPositionX += dx;
