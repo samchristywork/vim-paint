@@ -24,7 +24,10 @@ int mode = MODE_NORMAL;
 enum { ACTION_NONE = 0, ACTION_REPLACE };
 int action = ACTION_NONE;
 
-struct color {
+enum { MOTION_NONE = 0, MOTION_PIXEL };
+int motion = MOTION_NONE;
+
+typedef struct color {
   unsigned char r;
   unsigned char g;
   unsigned char b;
@@ -118,41 +121,27 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
     }
   }
 
-  /*
-   * Replace mode
-   */
-  if (event->keyval == GDK_KEY_r) {
-    if (mode == MODE_NORMAL) {
-      mode = MODE_COLOR_SELECTION;
+  if (action != ACTION_NONE) {
+    if (event->keyval == GDK_KEY_p) {
+      if(action==ACTION_REPLACE) {
+        printf("Replace in pixel\n");
+        currentColor.r=255;
+        currentColor.a=1;
+        setPixel(layers[currentLayer], cursorPositionX, cursorPositionY, currentColor);
+        gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
+      }
+    }
+    action = ACTION_NONE;
+  }
+
+  if (action == ACTION_NONE) {
+    if (0) {
+
+    /*
+     * Replace mode
+     */
+    } else if (event->keyval == GDK_KEY_r) {
       action = ACTION_REPLACE;
-    }
-  }
-
-  /*
-   * Control the zoom level
-   */
-  else if (event->keyval == GDK_KEY_minus) {
-    zoom /= 1.1;
-  } else if (event->keyval == GDK_KEY_plus) {
-    zoom *= 1.1;
-  }
-
-  else if (event->keyval == GDK_KEY_space) {
-    if (mode == MODE_NORMAL) {
-      setPixel(layers[currentLayer], cursorPositionX, cursorPositionY,
-               currentColor.r, currentColor.g, currentColor.b, currentColor.a);
-    }
-  }
-
-  else if (event->keyval == GDK_KEY_h) {
-    moveCursor(-1, 0);
-  } else if (event->keyval == GDK_KEY_j) {
-    moveCursor(0, 1);
-  } else if (event->keyval == GDK_KEY_k) {
-    moveCursor(0, -1);
-  } else if (event->keyval == GDK_KEY_l) {
-    moveCursor(1, 0);
-  }
 
   else if (event->keyval == GDK_KEY_H) {
     moveCursor(-shiftMultiplier, 0);
@@ -180,7 +169,6 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
       currentColor.b = palette[1]->b;
       currentColor.a = palette[1]->a;
     }
-  }
 
   else {
     printf("%d\n", event->keyval);
@@ -258,8 +246,13 @@ gboolean drawCallback(GtkWidget *widget, cairo_t *cr, gpointer data) {
    * Draw statusline
    */
   char buf[256];
-  snprintf(buf, 255, "%s, (%d, %d), %f", currentFile, cursorPositionX,
-           cursorPositionY, zoom);
+
+  char *actionStr = "None";
+  if(action==ACTION_REPLACE){
+    actionStr="Replace";
+  }
+  snprintf(buf, 255, "%s, (%d, %d), %f, %s", currentFile, cursorPositionX,
+           cursorPositionY, zoom, actionStr);
   cairo_move_to(cr, 10, height - 10);
   cairo_set_font_size(cr, fontSize);
   cairo_set_source_rgba(cr, 1, 0, 0, 1);
