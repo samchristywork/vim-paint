@@ -110,9 +110,9 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
                           gpointer data) {
 
   /*
-   * Exit when the user presses Escape
+   * Exit when the user presses Escape or q.
    */
-  if (event->keyval == GDK_KEY_Escape) {
+  if (event->keyval == GDK_KEY_Escape || event->keyval == GDK_KEY_q) {
     if (mode == MODE_COLOR_SELECTION) {
       mode = MODE_NORMAL;
       action = ACTION_NONE;
@@ -143,36 +143,70 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
     } else if (event->keyval == GDK_KEY_r) {
       action = ACTION_REPLACE;
 
-  else if (event->keyval == GDK_KEY_H) {
-    moveCursor(-shiftMultiplier, 0);
-  } else if (event->keyval == GDK_KEY_J) {
-    moveCursor(0, shiftMultiplier);
-  } else if (event->keyval == GDK_KEY_K) {
-    moveCursor(0, -shiftMultiplier);
-  } else if (event->keyval == GDK_KEY_L) {
-    moveCursor(shiftMultiplier, 0);
-  }
-
-  else if (event->keyval == GDK_KEY_1) {
-    if (mode == MODE_COLOR_SELECTION) {
-      mode = MODE_NORMAL;
-      currentColor.r = palette[0]->r;
-      currentColor.g = palette[0]->g;
-      currentColor.b = palette[0]->b;
-      currentColor.a = palette[0]->a;
-    }
-  } else if (event->keyval == GDK_KEY_2) {
-    if (mode == MODE_COLOR_SELECTION) {
-      mode = MODE_NORMAL;
-      currentColor.r = palette[1]->r;
-      currentColor.g = palette[1]->g;
-      currentColor.b = palette[1]->b;
-      currentColor.a = palette[1]->a;
+    /*
+     * Control the zoom level
+     */
+    } else if (event->keyval == GDK_KEY_minus) {
+      zoom /= 1.1;
+    } else if (event->keyval == GDK_KEY_plus) {
+      zoom *= 1.1;
     }
 
-  else {
-    printf("%d\n", event->keyval);
-    return FALSE;
+    //else if (event->keyval == GDK_KEY_space) {
+    //  if (mode == MODE_NORMAL) {
+    //    setPixel(layers[currentLayer], cursorPositionX, cursorPositionY,
+    //             currentColor.r, currentColor.g, currentColor.b, currentColor.a);
+    //  }
+    //}
+
+    /*
+     * Cursor movement.
+     */
+    else if (event->keyval == GDK_KEY_h) {
+      moveCursor(-1, 0);
+    } else if (event->keyval == GDK_KEY_j) {
+      moveCursor(0, 1);
+    } else if (event->keyval == GDK_KEY_k) {
+      moveCursor(0, -1);
+    } else if (event->keyval == GDK_KEY_l) {
+      moveCursor(1, 0);
+    }
+
+    /*
+     * Accelerated cursor movement.
+     */
+    else if (event->keyval == GDK_KEY_H) {
+      moveCursor(-shiftMultiplier, 0);
+    } else if (event->keyval == GDK_KEY_J) {
+      moveCursor(0, shiftMultiplier);
+    } else if (event->keyval == GDK_KEY_K) {
+      moveCursor(0, -shiftMultiplier);
+    } else if (event->keyval == GDK_KEY_L) {
+      moveCursor(shiftMultiplier, 0);
+    }
+
+    //else if (event->keyval == GDK_KEY_1) {
+    //  if (mode == MODE_COLOR_SELECTION) {
+    //    mode = MODE_NORMAL;
+    //    currentColor.r = palette[0]->r;
+    //    currentColor.g = palette[0]->g;
+    //    currentColor.b = palette[0]->b;
+    //    currentColor.a = palette[0]->a;
+    //  }
+    //} else if (event->keyval == GDK_KEY_2) {
+    //  if (mode == MODE_COLOR_SELECTION) {
+    //    mode = MODE_NORMAL;
+    //    currentColor.r = palette[1]->r;
+    //    currentColor.g = palette[1]->g;
+    //    currentColor.b = palette[1]->b;
+    //    currentColor.a = palette[1]->a;
+    //  }
+    //}
+
+    else {
+      printf("%d\n", event->keyval);
+      return FALSE;
+    }
   }
 
   gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
