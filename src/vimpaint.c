@@ -64,11 +64,27 @@ int setPixel(struct layer layer, int x, int y, color c) {
   if (x < 0 || y < 0 || x > layer.width || y > layer.width) {
     return -1;
   }
-  int index = (cursorPositionX + cursorPositionY * layer.width) * 4;
+  int index = (x + y * layer.width) * 4;
   layer.pixels[index + 0] = c.r;
   layer.pixels[index + 1] = c.g;
   layer.pixels[index + 2] = c.b;
   layer.pixels[index + 3] = c.a;
+
+  return 0;
+}
+
+/*
+ * Set a the color of a layer
+ */
+int setLayer(struct layer layer, color c) {
+  for (int x = 0; x < layer.width; x++) {
+    for (int y = 0; y < layer.height; y++) {
+      setPixel(layer, x, y, c);
+      //if(!ret){
+      //  return ret;
+      //}
+    }
+  }
 
   return 0;
 }
@@ -128,6 +144,19 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
         currentColor.r=255;
         currentColor.a=1;
         setPixel(layers[currentLayer], cursorPositionX, cursorPositionY, currentColor);
+        gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
+      }
+    }
+
+    /*
+     * Layer Motion
+     */
+    if (event->keyval == GDK_KEY_l) {
+      if (action == ACTION_REPLACE) {
+        printf("Replace in Layer.\n");
+        currentColor.r = 255;
+        currentColor.a = 1;
+        setLayer(layers[currentLayer], currentColor);
         gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
       }
     }
