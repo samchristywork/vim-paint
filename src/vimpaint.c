@@ -18,13 +18,16 @@ int pixelSize = 100;
 int shiftMultiplier = 5;
 char *currentFile = "res/test.png";
 
-enum { MODE_NORMAL, MODE_COLOR_SELECTION };
+enum { MODE_NORMAL,
+       MODE_COLOR_SELECTION };
 int mode = MODE_NORMAL;
 
-enum { ACTION_NONE = 0, ACTION_REPLACE };
+enum { ACTION_NONE = 0,
+       ACTION_REPLACE };
 int action = ACTION_NONE;
 
-enum { MOTION_NONE = 0, MOTION_PIXEL };
+enum { MOTION_NONE = 0,
+       MOTION_PIXEL };
 int motion = MOTION_NONE;
 
 typedef struct color {
@@ -48,7 +51,7 @@ struct layer {
 struct layer layers[9];
 
 color *newColor(unsigned char r, unsigned char g, unsigned char b,
-                       unsigned char a) {
+                unsigned char a) {
   color *c = malloc(sizeof(color));
   c->r = r;
   c->g = g;
@@ -138,11 +141,15 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
   }
 
   if (action != ACTION_NONE) {
+
+    /*
+     * Pixel Motion
+     */
     if (event->keyval == GDK_KEY_p) {
-      if(action==ACTION_REPLACE) {
-        printf("Replace in pixel\n");
-        currentColor.r=255;
-        currentColor.a=1;
+      if (action == ACTION_REPLACE) {
+        printf("Replace in pixel.\n");
+        currentColor.r = 255;
+        currentColor.a = 1;
         setPixel(layers[currentLayer], cursorPositionX, cursorPositionY, currentColor);
         gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
       }
@@ -166,15 +173,15 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
   if (action == ACTION_NONE) {
     if (0) {
 
-    /*
-     * Replace mode
-     */
+      /*
+       * Replace mode
+       */
     } else if (event->keyval == GDK_KEY_r) {
       action = ACTION_REPLACE;
 
-    /*
-     * Control the zoom level
-     */
+      /*
+       * Control the zoom level
+       */
     } else if (event->keyval == GDK_KEY_minus) {
       zoom /= 1.1;
     } else if (event->keyval == GDK_KEY_plus) {
@@ -311,8 +318,8 @@ gboolean drawCallback(GtkWidget *widget, cairo_t *cr, gpointer data) {
   char buf[256];
 
   char *actionStr = "None";
-  if(action==ACTION_REPLACE){
-    actionStr="Replace";
+  if (action == ACTION_REPLACE) {
+    actionStr = "Replace";
   }
   snprintf(buf, 255, "%s, (%d, %d), %f, %s", currentFile, cursorPositionX,
            cursorPositionY, zoom, actionStr);
