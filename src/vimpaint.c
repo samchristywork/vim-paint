@@ -228,12 +228,10 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
       zoom *= 1.1;
     }
 
-    //else if (event->keyval == GDK_KEY_space) {
-    //  if (mode == MODE_NORMAL) {
-    //    setPixel(layers[currentLayer], cursorPositionX, cursorPositionY,
-    //             currentColor.r, currentColor.g, currentColor.b, currentColor.a);
-    //  }
-    //}
+    else if (event->keyval == GDK_KEY_space) {
+      setPixel(layers[currentLayer], cursorPositionX, cursorPositionY,
+               currentColor);
+    }
 
     /*
      * Cursor movement.
