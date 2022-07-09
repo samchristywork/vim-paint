@@ -27,10 +27,6 @@ enum { ACTION_NONE = 0,
        ACTION_CLEAR };
 int action = ACTION_NONE;
 
-enum { MOTION_NONE = 0,
-       MOTION_PIXEL };
-int motion = MOTION_NONE;
-
 typedef struct color {
   unsigned char r;
   unsigned char g;
