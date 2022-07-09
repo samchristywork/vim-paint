@@ -58,6 +58,21 @@ color *newColor(unsigned char r, unsigned char g, unsigned char b,
 }
 
 /*
+ * Get the color value of the pixel at a specified location
+ */
+color getPixel(struct layer layer, int x, int y) {
+  color c = {0};
+
+  int index = (x + y * layer.width) * 4;
+  c.r = layer.pixels[index + 0];
+  c.g = layer.pixels[index + 1];
+  c.b = layer.pixels[index + 2];
+  c.a = layer.pixels[index + 3];
+
+  return c;
+}
+
+/*
  * Set a pixel at a location on the specified layer to some color
  */
 int setPixel(struct layer layer, int x, int y, color c) {
