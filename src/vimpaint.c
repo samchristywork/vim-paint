@@ -23,7 +23,8 @@ enum { MODE_NORMAL,
 int mode = MODE_NORMAL;
 
 enum { ACTION_NONE = 0,
-       ACTION_REPLACE };
+       ACTION_REPLACE,
+       ACTION_CLEAR };
 int action = ACTION_NONE;
 
 enum { MOTION_NONE = 0,
@@ -149,7 +150,18 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
       if (action == ACTION_REPLACE) {
         printf("Replace in pixel.\n");
         currentColor.r = 255;
-        currentColor.a = 1;
+        currentColor.g = 0;
+        currentColor.b = 0;
+        currentColor.a = 255;
+        setPixel(layers[currentLayer], cursorPositionX, cursorPositionY, currentColor);
+        gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
+      }
+      if (action == ACTION_CLEAR) {
+        printf("Clear in pixel.\n");
+        currentColor.r = 0;
+        currentColor.g = 0;
+        currentColor.b = 0;
+        currentColor.a = 0;
         setPixel(layers[currentLayer], cursorPositionX, cursorPositionY, currentColor);
         gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
       }
@@ -162,7 +174,18 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
       if (action == ACTION_REPLACE) {
         printf("Replace in Layer.\n");
         currentColor.r = 255;
-        currentColor.a = 1;
+        currentColor.g = 0;
+        currentColor.b = 0;
+        currentColor.a = 255;
+        setLayer(layers[currentLayer], currentColor);
+        gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
+      }
+      if (action == ACTION_CLEAR) {
+        printf("Clear in Layer.\n");
+        currentColor.r = 0;
+        currentColor.g = 0;
+        currentColor.b = 0;
+        currentColor.a = 0;
         setLayer(layers[currentLayer], currentColor);
         gdk_window_invalidate_rect(gtk_widget_get_window(drawingArea), NULL, TRUE);
       }
@@ -178,6 +201,12 @@ gboolean keyPressCallback(GtkWidget *widget, GdkEventKey *event,
        */
     } else if (event->keyval == GDK_KEY_r) {
       action = ACTION_REPLACE;
+
+      /*
+       * Clear mode
+       */
+    } else if (event->keyval == GDK_KEY_c) {
+      action = ACTION_CLEAR;
 
       /*
        * Control the zoom level
@@ -321,8 +350,12 @@ gboolean drawCallback(GtkWidget *widget, cairo_t *cr, gpointer data) {
   if (action == ACTION_REPLACE) {
     actionStr = "Replace";
   }
-  snprintf(buf, 255, "%s, (%d, %d), %f, %s", currentFile, cursorPositionX,
-           cursorPositionY, zoom, actionStr);
+  if (action == ACTION_CLEAR) {
+    actionStr = "Clear";
+  }
+  struct color c = getPixel(layers[currentLayer], cursorPositionX, cursorPositionY);
+  snprintf(buf, 255, "%s, (%d, %d), (%d, %d, %d, %d), %f, %s", currentFile,
+           cursorPositionX, cursorPositionY, c.r, c.g, c.b, c.a, zoom, actionStr);
   cairo_move_to(cr, 10, height - 10);
   cairo_set_font_size(cr, fontSize);
   cairo_set_source_rgba(cr, 1, 0, 0, 1);
