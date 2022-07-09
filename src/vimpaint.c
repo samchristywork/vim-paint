@@ -336,14 +336,14 @@ gboolean drawCallback(GtkWidget *widget, cairo_t *cr, gpointer data) {
         double r = layers[i].pixels[index + 0] / 255.;
         double g = layers[i].pixels[index + 1] / 255.;
         double b = layers[i].pixels[index + 2] / 255.;
-        unsigned char a = layers[i].pixels[index + 3];
-        if (a) {
+        double a = layers[i].pixels[index + 3] / 255.;
+        if (a != 0) {
           cairo_save(layers[i].cr);
           cairo_translate(layers[i].cr, x * pixelSize * zoom,
                           y * pixelSize * zoom);
           cairo_rectangle(layers[i].cr, 0, 0, pixelSize * zoom,
                           pixelSize * zoom);
-          cairo_set_source_rgba(layers[i].cr, r, g, b, 1);
+          cairo_set_source_rgba(layers[i].cr, r, g, b, a);
           cairo_fill(layers[i].cr);
           cairo_restore(layers[i].cr);
         }
