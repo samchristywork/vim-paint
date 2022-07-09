@@ -317,10 +317,19 @@ gboolean drawCallback(GtkWidget *widget, cairo_t *cr, gpointer data) {
   cairo_paint(cr);
   cairo_restore(cr);
 
-  /*
-   * Draw all of the pixels for the given layer
-   */
   for (int i = 0; i < 9; i++) {
+    /*
+     * Clear the layer first
+     */
+    cairo_save(layers[i].cr);
+    cairo_set_source_rgba(layers[i].cr, 0, 0, 0, 0);
+    cairo_set_operator(layers[i].cr, CAIRO_OPERATOR_SOURCE);
+    cairo_paint(layers[i].cr);
+    cairo_restore(layers[i].cr);
+
+    /*
+     * Draw all of the pixels for the given layer
+     */
     for (int x = 0; x < layers[i].width; x++) {
       for (int y = 0; y < layers[i].height; y++) {
         int index = (x + y * layers[i].width) * 4;
