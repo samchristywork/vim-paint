@@ -1,5 +1,4 @@
 CC := gcc
-
 CFLAGS := $(shell pkg-config --cflags gtk+-3.0)
 LIBS := $(shell pkg-config --libs gtk+-3.0)
 
@@ -11,3 +10,5 @@ build/vimpaint: src/vimpaint.c
 
 clean:
 	rm -rf build/
+
+.PHONY: clean
