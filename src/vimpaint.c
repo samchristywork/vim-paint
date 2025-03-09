@@ -1,18 +1,79 @@
 #include <gtk/gtk.h>
+#include <string.h>
+
+#define CANVAS_W 80
+#define CANVAS_H 40
+#define CELL_SIZE 12
+
+static guchar pixels[CANVAS_H][CANVAS_W];  /* 0 = white, 1 = black */
+static int cursor_x = 0;
+static int cursor_y = 0;
+
+static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
+    for (int y = 0; y < CANVAS_H; y++) {
+        for (int x = 0; x < CANVAS_W; x++) {
+            if (pixels[y][x]) {
+                cairo_set_source_rgb(cr, 0, 0, 0);
+            } else {
+                cairo_set_source_rgb(cr, 1, 1, 1);
+            }
+            cairo_rectangle(cr, x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            cairo_fill(cr);
+        }
+    }
+
+    /* Draw cursor */
+    cairo_set_source_rgba(cr, 1, 0, 0, 0.6);
+    cairo_rectangle(cr, cursor_x * CELL_SIZE, cursor_y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    cairo_fill(cr);
+
+    return FALSE;
+}
+
+static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
+    switch (event->keyval) {
+    case GDK_KEY_h:
+        if (cursor_x > 0) cursor_x--;
+        break;
+    case GDK_KEY_l:
+        if (cursor_x < CANVAS_W - 1) cursor_x++;
+        break;
+    case GDK_KEY_k:
+        if (cursor_y > 0) cursor_y--;
+        break;
+    case GDK_KEY_j:
+        if (cursor_y < CANVAS_H - 1) cursor_y++;
+        break;
+    case GDK_KEY_r:
+        pixels[cursor_y][cursor_x] = 1;
+        break;
+    default:
+        return FALSE;
+    }
+
+    gtk_widget_queue_draw(widget);
+    return TRUE;
+}
 
 int main(int argc, char *argv[]) {
-  gtk_init(&argc, &argv);
+    memset(pixels, 0, sizeof(pixels));
 
-  GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-  gtk_window_set_title(GTK_WINDOW(window), "Hello, World!");
-  gtk_window_set_default_size(GTK_WINDOW(window), 400, 300);
-  g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
+    gtk_init(&argc, &argv);
 
-  GtkWidget *label = gtk_label_new("Hello, World!");
-  gtk_container_add(GTK_CONTAINER(window), label);
+    GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    gtk_window_set_title(GTK_WINDOW(window), "vim-paint");
+    gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
+    g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
 
-  gtk_widget_show_all(window);
-  gtk_main();
+    GtkWidget *canvas = gtk_drawing_area_new();
+    gtk_widget_set_size_request(canvas, CANVAS_W * CELL_SIZE, CANVAS_H * CELL_SIZE);
+    gtk_container_add(GTK_CONTAINER(window), canvas);
 
-  return 0;
+    g_signal_connect(canvas, "draw", G_CALLBACK(on_draw), NULL);
+    g_signal_connect(window, "key-press-event", G_CALLBACK(on_key_press), canvas);
+
+    gtk_widget_show_all(window);
+    gtk_main();
+
+    return 0;
 }
