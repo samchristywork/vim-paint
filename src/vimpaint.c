@@ -51,15 +51,30 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
 
 static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     static gboolean pending_g = FALSE;
+    static int count = 0;
 
     if (pending_g) {
         pending_g = FALSE;
         if (event->keyval == GDK_KEY_g) {
             cursor_y = 0;
+            count = 0;
             gtk_widget_queue_draw(GTK_WIDGET(data));
             return TRUE;
         }
     }
+
+    /* Accumulate numeric prefix; treat 0 as line-start only when count is 0 */
+    if (event->keyval >= GDK_KEY_1 && event->keyval <= GDK_KEY_9) {
+        count = count * 10 + (event->keyval - GDK_KEY_0);
+        return TRUE;
+    }
+    if (event->keyval == GDK_KEY_0 && count > 0) {
+        count = count * 10;
+        return TRUE;
+    }
+
+    int n = count > 0 ? count : 1;
+    count = 0;
 
     if (event->keyval == GDK_KEY_g) {
         pending_g = TRUE;
@@ -68,16 +83,16 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
 
     switch (event->keyval) {
     case GDK_KEY_h:
-        if (cursor_x > 0) cursor_x--;
+        cursor_x = MAX(cursor_x - n, 0);
         break;
     case GDK_KEY_l:
-        if (cursor_x < CANVAS_W - 1) cursor_x++;
+        cursor_x = MIN(cursor_x + n, CANVAS_W - 1);
         break;
     case GDK_KEY_k:
-        if (cursor_y > 0) cursor_y--;
+        cursor_y = MAX(cursor_y - n, 0);
         break;
     case GDK_KEY_j:
-        if (cursor_y < CANVAS_H - 1) cursor_y++;
+        cursor_y = MIN(cursor_y + n, CANVAS_H - 1);
         break;
     case GDK_KEY_G:
         cursor_y = CANVAS_H - 1;
@@ -89,10 +104,10 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         cursor_x = CANVAS_W - 1;
         break;
     case GDK_KEY_w:
-        cursor_x = MIN(cursor_x + 5, CANVAS_W - 1);
+        cursor_x = MIN(cursor_x + 5 * n, CANVAS_W - 1);
         break;
     case GDK_KEY_b:
-        cursor_x = MAX(cursor_x - 5, 0);
+        cursor_x = MAX(cursor_x - 5 * n, 0);
         break;
     case GDK_KEY_r:
         pixels[cursor_y][cursor_x] = 1;
