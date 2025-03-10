@@ -22,6 +22,19 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
         }
     }
 
+    /* Draw grid lines */
+    cairo_set_source_rgba(cr, 0.8, 0.8, 0.8, 1.0);
+    cairo_set_line_width(cr, 0.5);
+    for (int x = 0; x <= CANVAS_W; x++) {
+        cairo_move_to(cr, x * CELL_SIZE, 0);
+        cairo_line_to(cr, x * CELL_SIZE, CANVAS_H * CELL_SIZE);
+    }
+    for (int y = 0; y <= CANVAS_H; y++) {
+        cairo_move_to(cr, 0, y * CELL_SIZE);
+        cairo_line_to(cr, CANVAS_W * CELL_SIZE, y * CELL_SIZE);
+    }
+    cairo_stroke(cr);
+
     /* Draw cursor */
     cairo_set_source_rgba(cr, 1, 0, 0, 0.6);
     cairo_rectangle(cr, cursor_x * CELL_SIZE, cursor_y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
