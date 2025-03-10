@@ -109,6 +109,14 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     case GDK_KEY_b:
         cursor_x = MAX(cursor_x - 5 * n, 0);
         break;
+    case GDK_KEY_f:
+        for (int fx = cursor_x + 1; fx < CANVAS_W; fx++) {
+            if (pixels[cursor_y][fx]) {
+                cursor_x = fx;
+                break;
+            }
+        }
+        break;
     case GDK_KEY_r:
         pixels[cursor_y][cursor_x] = 1;
         break;
