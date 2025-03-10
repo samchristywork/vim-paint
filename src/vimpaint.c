@@ -35,10 +35,16 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
     }
     cairo_stroke(cr);
 
-    /* Draw cursor */
-    cairo_set_source_rgba(cr, 1, 0, 0, 0.6);
-    cairo_rectangle(cr, cursor_x * CELL_SIZE, cursor_y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-    cairo_fill(cr);
+    /* Draw cursor as an outline that contrasts with the underlying pixel */
+    if (pixels[cursor_y][cursor_x]) {
+        cairo_set_source_rgb(cr, 1, 1, 1);
+    } else {
+        cairo_set_source_rgb(cr, 1, 0, 0);
+    }
+    cairo_set_line_width(cr, 2.0);
+    cairo_rectangle(cr, cursor_x * CELL_SIZE + 1, cursor_y * CELL_SIZE + 1,
+                    CELL_SIZE - 2, CELL_SIZE - 2);
+    cairo_stroke(cr);
 
     return FALSE;
 }
