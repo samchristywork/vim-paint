@@ -50,6 +50,22 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
 }
 
 static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
+    static gboolean pending_g = FALSE;
+
+    if (pending_g) {
+        pending_g = FALSE;
+        if (event->keyval == GDK_KEY_g) {
+            cursor_y = 0;
+            gtk_widget_queue_draw(GTK_WIDGET(data));
+            return TRUE;
+        }
+    }
+
+    if (event->keyval == GDK_KEY_g) {
+        pending_g = TRUE;
+        return TRUE;
+    }
+
     switch (event->keyval) {
     case GDK_KEY_h:
         if (cursor_x > 0) cursor_x--;
@@ -62,6 +78,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         break;
     case GDK_KEY_j:
         if (cursor_y < CANVAS_H - 1) cursor_y++;
+        break;
+    case GDK_KEY_G:
+        cursor_y = CANVAS_H - 1;
         break;
     case GDK_KEY_0:
         cursor_x = 0;
