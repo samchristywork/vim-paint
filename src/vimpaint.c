@@ -47,11 +47,14 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     case GDK_KEY_r:
         pixels[cursor_y][cursor_x] = 1;
         break;
+    case GDK_KEY_x:
+        pixels[cursor_y][cursor_x] = 0;
+        break;
     default:
         return FALSE;
     }
 
-    gtk_widget_queue_draw(widget);
+    gtk_widget_queue_draw(GTK_WIDGET(data));
     return TRUE;
 }
 
