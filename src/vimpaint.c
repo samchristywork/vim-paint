@@ -63,6 +63,12 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     case GDK_KEY_j:
         if (cursor_y < CANVAS_H - 1) cursor_y++;
         break;
+    case GDK_KEY_0:
+        cursor_x = 0;
+        break;
+    case GDK_KEY_dollar:
+        cursor_x = CANVAS_W - 1;
+        break;
     case GDK_KEY_w:
         cursor_x = MIN(cursor_x + 5, CANVAS_W - 1);
         break;
