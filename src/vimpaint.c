@@ -8,6 +8,9 @@
 static guchar pixels[CANVAS_H][CANVAS_W];  /* 0 = white, 1 = black */
 static int cursor_x = 0;
 static int cursor_y = 0;
+static gboolean visual_mode = FALSE;
+static int visual_anchor_x = 0;
+static int visual_anchor_y = 0;
 
 #define UNDO_MAX 256
 typedef struct { int x, y; guchar old_val; } UndoEntry;
@@ -47,6 +50,18 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
         cairo_line_to(cr, CANVAS_W * CELL_SIZE, y * CELL_SIZE);
     }
     cairo_stroke(cr);
+
+    /* Draw visual selection highlight */
+    if (visual_mode) {
+        int x0 = MIN(cursor_x, visual_anchor_x);
+        int x1 = MAX(cursor_x, visual_anchor_x);
+        int y0 = MIN(cursor_y, visual_anchor_y);
+        int y1 = MAX(cursor_y, visual_anchor_y);
+        cairo_set_source_rgba(cr, 0.2, 0.4, 1.0, 0.35);
+        cairo_rectangle(cr, x0 * CELL_SIZE, y0 * CELL_SIZE,
+                        (x1 - x0 + 1) * CELL_SIZE, (y1 - y0 + 1) * CELL_SIZE);
+        cairo_fill(cr);
+    }
 
     /* Draw cursor as an outline that contrasts with the underlying pixel */
     if (pixels[cursor_y][cursor_x]) {
@@ -125,6 +140,37 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
 
     int n = count > 0 ? count : 1;
     count = 0;
+
+    if (event->keyval == GDK_KEY_v && (event->state & GDK_CONTROL_MASK)) {
+        visual_mode = !visual_mode;
+        visual_anchor_x = cursor_x;
+        visual_anchor_y = cursor_y;
+        gtk_widget_queue_draw(GTK_WIDGET(data));
+        return TRUE;
+    }
+
+    if (visual_mode && event->keyval == GDK_KEY_Escape) {
+        visual_mode = FALSE;
+        gtk_widget_queue_draw(GTK_WIDGET(data));
+        return TRUE;
+    }
+
+    if (visual_mode && (event->keyval == GDK_KEY_r || event->keyval == GDK_KEY_x)) {
+        int x0 = MIN(cursor_x, visual_anchor_x);
+        int x1 = MAX(cursor_x, visual_anchor_x);
+        int y0 = MIN(cursor_y, visual_anchor_y);
+        int y1 = MAX(cursor_y, visual_anchor_y);
+        guchar val = (event->keyval == GDK_KEY_r) ? 1 : 0;
+        for (int ey = y0; ey <= y1; ey++)
+            for (int ex = x0; ex <= x1; ex++) {
+                push_undo(ex, ey);
+                pixels[ey][ex] = val;
+            }
+        last_action = event->keyval;
+        visual_mode = FALSE;
+        gtk_widget_queue_draw(GTK_WIDGET(data));
+        return TRUE;
+    }
 
     if (event->keyval == GDK_KEY_r && (event->state & GDK_CONTROL_MASK)) {
         if (redo_top > 0) {
