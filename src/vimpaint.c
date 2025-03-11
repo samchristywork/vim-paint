@@ -13,10 +13,13 @@ static int cursor_y = 0;
 typedef struct { int x, y; guchar old_val; } UndoEntry;
 static UndoEntry undo_stack[UNDO_MAX];
 static int undo_top = 0;
+static UndoEntry redo_stack[UNDO_MAX];
+static int redo_top = 0;
 
 static void push_undo(int x, int y) {
     undo_stack[undo_top % UNDO_MAX] = (UndoEntry){x, y, pixels[y][x]};
     undo_top++;
+    redo_top = 0;
 }
 
 static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
@@ -86,6 +89,20 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     int n = count > 0 ? count : 1;
     count = 0;
 
+    if (event->keyval == GDK_KEY_r && (event->state & GDK_CONTROL_MASK)) {
+        if (redo_top > 0) {
+            redo_top--;
+            UndoEntry e = redo_stack[redo_top % UNDO_MAX];
+            undo_stack[undo_top % UNDO_MAX] = (UndoEntry){e.x, e.y, pixels[e.y][e.x]};
+            undo_top++;
+            pixels[e.y][e.x] = e.old_val;
+            cursor_x = e.x;
+            cursor_y = e.y;
+            gtk_widget_queue_draw(GTK_WIDGET(data));
+        }
+        return TRUE;
+    }
+
     if (event->keyval == GDK_KEY_g) {
         pending_g = TRUE;
         return TRUE;
@@ -139,6 +156,8 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         if (undo_top > 0) {
             undo_top--;
             UndoEntry e = undo_stack[undo_top % UNDO_MAX];
+            redo_stack[redo_top % UNDO_MAX] = (UndoEntry){e.x, e.y, pixels[e.y][e.x]};
+            redo_top++;
             pixels[e.y][e.x] = e.old_val;
             cursor_x = e.x;
             cursor_y = e.y;
