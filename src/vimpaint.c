@@ -64,6 +64,8 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
 
 static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     static gboolean pending_g = FALSE;
+    static gboolean pending_d = FALSE;
+    static int d_count = 1;
     static int count = 0;
     static guint last_action = 0;
 
@@ -75,6 +77,40 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
             gtk_widget_queue_draw(GTK_WIDGET(data));
             return TRUE;
         }
+    }
+
+    if (pending_d) {
+        pending_d = FALSE;
+        int x0 = cursor_x, x1 = cursor_x;
+        int y0 = cursor_y, y1 = cursor_y;
+        gboolean whole_row = FALSE;
+        switch (event->keyval) {
+        case GDK_KEY_d: whole_row = TRUE; break;
+        case GDK_KEY_h: x0 = MAX(cursor_x - d_count, 0); break;
+        case GDK_KEY_l: x1 = MIN(cursor_x + d_count, CANVAS_W - 1); break;
+        case GDK_KEY_w: x1 = MIN(cursor_x + 5 * d_count, CANVAS_W - 1); break;
+        case GDK_KEY_b: x0 = MAX(cursor_x - 5 * d_count, 0); break;
+        case GDK_KEY_0: x0 = 0; break;
+        case GDK_KEY_dollar: x1 = CANVAS_W - 1; break;
+        case GDK_KEY_j: whole_row = TRUE; y1 = MIN(cursor_y + d_count, CANVAS_H - 1); break;
+        case GDK_KEY_k: whole_row = TRUE; y0 = MAX(cursor_y - d_count, 0); break;
+        default: return TRUE;
+        }
+        if (whole_row) {
+            for (int ey = y0; ey <= y1; ey++)
+                for (int ex = 0; ex < CANVAS_W; ex++) {
+                    push_undo(ex, ey);
+                    pixels[ey][ex] = 0;
+                }
+        } else {
+            for (int ex = x0; ex <= x1; ex++) {
+                push_undo(ex, cursor_y);
+                pixels[cursor_y][ex] = 0;
+            }
+        }
+        last_action = GDK_KEY_x;
+        gtk_widget_queue_draw(GTK_WIDGET(data));
+        return TRUE;
     }
 
     /* Accumulate numeric prefix; treat 0 as line-start only when count is 0 */
@@ -145,6 +181,10 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
             }
         }
         break;
+    case GDK_KEY_d:
+        pending_d = TRUE;
+        d_count = n;
+        return TRUE;
     case GDK_KEY_r:
         push_undo(cursor_x, cursor_y);
         pixels[cursor_y][cursor_x] = 1;
