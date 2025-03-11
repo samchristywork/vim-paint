@@ -9,6 +9,16 @@ static guchar pixels[CANVAS_H][CANVAS_W];  /* 0 = white, 1 = black */
 static int cursor_x = 0;
 static int cursor_y = 0;
 
+#define UNDO_MAX 256
+typedef struct { int x, y; guchar old_val; } UndoEntry;
+static UndoEntry undo_stack[UNDO_MAX];
+static int undo_top = 0;
+
+static void push_undo(int x, int y) {
+    undo_stack[undo_top % UNDO_MAX] = (UndoEntry){x, y, pixels[y][x]};
+    undo_top++;
+}
+
 static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
     for (int y = 0; y < CANVAS_H; y++) {
         for (int x = 0; x < CANVAS_W; x++) {
@@ -118,10 +128,21 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         }
         break;
     case GDK_KEY_r:
+        push_undo(cursor_x, cursor_y);
         pixels[cursor_y][cursor_x] = 1;
         break;
     case GDK_KEY_x:
+        push_undo(cursor_x, cursor_y);
         pixels[cursor_y][cursor_x] = 0;
+        break;
+    case GDK_KEY_u:
+        if (undo_top > 0) {
+            undo_top--;
+            UndoEntry e = undo_stack[undo_top % UNDO_MAX];
+            pixels[e.y][e.x] = e.old_val;
+            cursor_x = e.x;
+            cursor_y = e.y;
+        }
         break;
     default:
         return FALSE;
