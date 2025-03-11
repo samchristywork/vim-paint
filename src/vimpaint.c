@@ -65,6 +65,7 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
 static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     static gboolean pending_g = FALSE;
     static int count = 0;
+    static guint last_action = 0;
 
     if (pending_g) {
         pending_g = FALSE;
@@ -147,10 +148,18 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     case GDK_KEY_r:
         push_undo(cursor_x, cursor_y);
         pixels[cursor_y][cursor_x] = 1;
+        last_action = GDK_KEY_r;
         break;
     case GDK_KEY_x:
         push_undo(cursor_x, cursor_y);
         pixels[cursor_y][cursor_x] = 0;
+        last_action = GDK_KEY_x;
+        break;
+    case GDK_KEY_period:
+        if (last_action == GDK_KEY_r || last_action == GDK_KEY_x) {
+            push_undo(cursor_x, cursor_y);
+            pixels[cursor_y][cursor_x] = (last_action == GDK_KEY_r) ? 1 : 0;
+        }
         break;
     case GDK_KEY_u:
         if (undo_top > 0) {
