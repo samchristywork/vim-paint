@@ -13,6 +13,77 @@ static int visual_anchor_x = 0;
 static int visual_anchor_y = 0;
 static gboolean insert_mode = FALSE;
 
+static gboolean cmd_mode = FALSE;
+static char cmd_buf[256];
+static int cmd_len = 0;
+static GtkWidget *cmd_label = NULL;
+static GtkWidget *main_canvas = NULL;
+
+static void cmd_set(const char *text) {
+    gtk_label_set_text(GTK_LABEL(cmd_label), text);
+}
+
+static void cmd_execute(void) {
+    char *arg = cmd_buf + 1;
+    while (*arg == ' ') arg++;
+
+    if (strcmp(cmd_buf, ":q") == 0 || strcmp(cmd_buf, ":wq") == 0) {
+        if (cmd_buf[1] == 'w' && strlen(arg) > 0) goto do_write;
+        gtk_main_quit();
+        return;
+    }
+
+    if (cmd_buf[1] == 'w' && strlen(arg) > 0) {
+    do_write:;
+        cairo_surface_t *surf = cairo_image_surface_create(CAIRO_FORMAT_RGB24,
+                                                           CANVAS_W, CANVAS_H);
+        guchar *d = cairo_image_surface_get_data(surf);
+        int stride = cairo_image_surface_get_stride(surf);
+        for (int y = 0; y < CANVAS_H; y++)
+            for (int x = 0; x < CANVAS_W; x++) {
+                guchar v = pixels[y][x] ? 0 : 255;
+                d[y * stride + x * 4 + 0] = v;
+                d[y * stride + x * 4 + 1] = v;
+                d[y * stride + x * 4 + 2] = v;
+            }
+        cairo_surface_mark_dirty(surf);
+        if (cairo_surface_write_to_png(surf, arg) == CAIRO_STATUS_SUCCESS)
+            cmd_set("Written.");
+        else
+            cmd_set("Write failed.");
+        cairo_surface_destroy(surf);
+        if (cmd_buf[1] == 'w' && cmd_buf[2] == 'q') gtk_main_quit();
+        return;
+    }
+
+    if (cmd_buf[1] == 'e' && strlen(arg) > 0) {
+        cairo_surface_t *surf = cairo_image_surface_create_from_png(arg);
+        if (cairo_surface_status(surf) != CAIRO_STATUS_SUCCESS) {
+            cmd_set("Open failed.");
+            cairo_surface_destroy(surf);
+            return;
+        }
+        guchar *d = cairo_image_surface_get_data(surf);
+        int stride = cairo_image_surface_get_stride(surf);
+        int w = MIN(cairo_image_surface_get_width(surf), CANVAS_W);
+        int h = MIN(cairo_image_surface_get_height(surf), CANVAS_H);
+        memset(pixels, 0, sizeof(pixels));
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++) {
+                int r = d[y * stride + x * 4 + 2];
+                int g = d[y * stride + x * 4 + 1];
+                int b = d[y * stride + x * 4 + 0];
+                pixels[y][x] = ((r + g + b) / 3 < 128) ? 1 : 0;
+            }
+        cairo_surface_destroy(surf);
+        gtk_widget_queue_draw(main_canvas);
+        cmd_set("");
+        return;
+    }
+
+    cmd_set("Unknown command.");
+}
+
 #define UNDO_MAX 256
 typedef struct { int x, y; guchar old_val; } UndoEntry;
 static UndoEntry undo_stack[UNDO_MAX];
@@ -86,6 +157,30 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
 }
 
 static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
+    if (cmd_mode) {
+        if (event->keyval == GDK_KEY_Escape) {
+            cmd_mode = FALSE;
+            cmd_set("");
+        } else if (event->keyval == GDK_KEY_Return) {
+            cmd_mode = FALSE;
+            cmd_execute();
+        } else if (event->keyval == GDK_KEY_BackSpace) {
+            if (cmd_len > 1) { cmd_buf[--cmd_len] = '\0'; cmd_set(cmd_buf); }
+        } else if (event->length == 1 && cmd_len < 254) {
+            cmd_buf[cmd_len++] = event->string[0];
+            cmd_buf[cmd_len] = '\0';
+            cmd_set(cmd_buf);
+        }
+        return TRUE;
+    }
+
+    if (event->keyval == GDK_KEY_colon) {
+        cmd_mode = TRUE;
+        cmd_buf[0] = ':'; cmd_buf[1] = '\0'; cmd_len = 1;
+        cmd_set(cmd_buf);
+        return TRUE;
+    }
+
     static gboolean pending_g = FALSE;
     static gboolean pending_d = FALSE;
     static int d_count = 1;
@@ -292,12 +387,20 @@ int main(int argc, char *argv[]) {
     gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
     g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
 
-    GtkWidget *canvas = gtk_drawing_area_new();
-    gtk_widget_set_size_request(canvas, CANVAS_W * CELL_SIZE, CANVAS_H * CELL_SIZE);
-    gtk_container_add(GTK_CONTAINER(window), canvas);
+    GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_container_add(GTK_CONTAINER(window), vbox);
 
-    g_signal_connect(canvas, "draw", G_CALLBACK(on_draw), NULL);
-    g_signal_connect(window, "key-press-event", G_CALLBACK(on_key_press), canvas);
+    main_canvas = gtk_drawing_area_new();
+    gtk_widget_set_size_request(main_canvas, CANVAS_W * CELL_SIZE, CANVAS_H * CELL_SIZE);
+    gtk_box_pack_start(GTK_BOX(vbox), main_canvas, FALSE, FALSE, 0);
+
+    cmd_label = gtk_label_new("");
+    gtk_label_set_xalign(GTK_LABEL(cmd_label), 0.0);
+    gtk_widget_set_size_request(cmd_label, CANVAS_W * CELL_SIZE, 20);
+    gtk_box_pack_start(GTK_BOX(vbox), cmd_label, FALSE, FALSE, 0);
+
+    g_signal_connect(main_canvas, "draw", G_CALLBACK(on_draw), NULL);
+    g_signal_connect(window, "key-press-event", G_CALLBACK(on_key_press), main_canvas);
 
     gtk_widget_show_all(window);
     gtk_main();
