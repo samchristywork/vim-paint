@@ -1,8 +1,9 @@
 #include <gtk/gtk.h>
 #include <string.h>
+#include <stdlib.h>
 
-#define CANVAS_W 80
-#define CANVAS_H 40
+static int CANVAS_W = 80;
+static int CANVAS_H = 40;
 #define CELL_SIZE 12
 
 /* palette: index 0 = background (white), 1..N = foreground colors */
@@ -18,8 +19,10 @@ static const double palette[][3] = {
 };
 #define PALETTE_SIZE ((int)(sizeof(palette)/sizeof(palette[0])))
 
-static guchar pixels[CANVAS_H][CANVAS_W];  /* 0 = background, 1..7 = palette index */
-static guchar fg_color = 1;                /* current foreground color index */
+static guchar *pixels = NULL;  /* flat [y * CANVAS_W + x], 0=background 1..7=palette */
+static guchar fg_color = 1;   /* current foreground color index */
+
+#define PX(y, x) pixels[(y) * CANVAS_W + (x)]
 static int cursor_x = 0;
 static int cursor_y = 0;
 static gboolean visual_mode = FALSE;
@@ -87,7 +90,7 @@ static void cmd_execute(void) {
         int stride = cairo_image_surface_get_stride(surf);
         for (int y = 0; y < CANVAS_H; y++)
             for (int x = 0; x < CANVAS_W; x++) {
-                guchar v = pixels[y][x] ? 0 : 255;
+                guchar v = PX(y, x) ? 0 : 255;
                 d[y * stride + x * 4 + 0] = v;
                 d[y * stride + x * 4 + 1] = v;
                 d[y * stride + x * 4 + 2] = v;
@@ -113,13 +116,13 @@ static void cmd_execute(void) {
         int stride = cairo_image_surface_get_stride(surf);
         int w = MIN(cairo_image_surface_get_width(surf), CANVAS_W);
         int h = MIN(cairo_image_surface_get_height(surf), CANVAS_H);
-        memset(pixels, 0, sizeof(pixels));
+        memset(pixels, 0, CANVAS_W * CANVAS_H);
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++) {
                 int r = d[y * stride + x * 4 + 2];
                 int g = d[y * stride + x * 4 + 1];
                 int b = d[y * stride + x * 4 + 0];
-                pixels[y][x] = ((r + g + b) / 3 < 128) ? 1 : 0;
+                PX(y, x) = ((r + g + b) / 3 < 128) ? 1 : 0;
             }
         cairo_surface_destroy(surf);
         gtk_widget_queue_draw(main_canvas);
@@ -154,7 +157,7 @@ static UndoEntry redo_stack[UNDO_MAX];
 static int redo_top = 0;
 
 static void push_undo(int x, int y) {
-    undo_stack[undo_top % UNDO_MAX] = (UndoEntry){x, y, pixels[y][x]};
+    undo_stack[undo_top % UNDO_MAX] = (UndoEntry){x, y, PX(y, x)};
     undo_top++;
     redo_top = 0;
 }
@@ -162,7 +165,7 @@ static void push_undo(int x, int y) {
 static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
     for (int y = 0; y < CANVAS_H; y++) {
         for (int x = 0; x < CANVAS_W; x++) {
-            int idx = pixels[y][x];
+            int idx = PX(y, x);
             cairo_set_source_rgb(cr, palette[idx][0], palette[idx][1], palette[idx][2]);
             cairo_rectangle(cr, x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
             cairo_fill(cr);
@@ -203,7 +206,7 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
                         CELL_SIZE, CELL_SIZE);
         cairo_fill(cr);
     } else {
-        if (pixels[cursor_y][cursor_x]) {
+        if (PX(cursor_y, cursor_x)) {
             cairo_set_source_rgb(cr, 1, 1, 1);
         } else {
             cairo_set_source_rgb(cr, 1, 0, 0);
@@ -281,12 +284,12 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
             for (int ey = y0; ey <= y1; ey++)
                 for (int ex = 0; ex < CANVAS_W; ex++) {
                     push_undo(ex, ey);
-                    pixels[ey][ex] = 0;
+                    PX(ey, ex) = 0;
                 }
         } else {
             for (int ex = x0; ex <= x1; ex++) {
                 push_undo(ex, cursor_y);
-                pixels[cursor_y][ex] = 0;
+                PX(cursor_y, ex) = 0;
             }
         }
         last_action = GDK_KEY_x;
@@ -334,7 +337,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         for (int ey = y0; ey <= y1; ey++)
             for (int ex = x0; ex <= x1; ex++) {
                 push_undo(ex, ey);
-                pixels[ey][ex] = val;
+                PX(ey, ex) = val;
             }
         last_action = event->keyval;
         visual_mode = FALSE;
@@ -347,9 +350,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         if (redo_top > 0) {
             redo_top--;
             UndoEntry e = redo_stack[redo_top % UNDO_MAX];
-            undo_stack[undo_top % UNDO_MAX] = (UndoEntry){e.x, e.y, pixels[e.y][e.x]};
+            undo_stack[undo_top % UNDO_MAX] = (UndoEntry){e.x, e.y, PX(e.y, e.x)};
             undo_top++;
-            pixels[e.y][e.x] = e.old_val;
+            PX(e.y, e.x) = e.old_val;
             cursor_x = e.x;
             cursor_y = e.y;
             status_update();
@@ -369,19 +372,19 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         break;
     case GDK_KEY_h:
         cursor_x = MAX(cursor_x - n, 0);
-        if (insert_mode) { push_undo(cursor_x, cursor_y); pixels[cursor_y][cursor_x] = fg_color; }
+        if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
         break;
     case GDK_KEY_l:
         cursor_x = MIN(cursor_x + n, CANVAS_W - 1);
-        if (insert_mode) { push_undo(cursor_x, cursor_y); pixels[cursor_y][cursor_x] = fg_color; }
+        if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
         break;
     case GDK_KEY_k:
         cursor_y = MAX(cursor_y - n, 0);
-        if (insert_mode) { push_undo(cursor_x, cursor_y); pixels[cursor_y][cursor_x] = fg_color; }
+        if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
         break;
     case GDK_KEY_j:
         cursor_y = MIN(cursor_y + n, CANVAS_H - 1);
-        if (insert_mode) { push_undo(cursor_x, cursor_y); pixels[cursor_y][cursor_x] = fg_color; }
+        if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
         break;
     case GDK_KEY_G:
         cursor_y = CANVAS_H - 1;
@@ -400,7 +403,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         break;
     case GDK_KEY_f:
         for (int fx = cursor_x + 1; fx < CANVAS_W; fx++) {
-            if (pixels[cursor_y][fx]) {
+            if (PX(cursor_y, fx)) {
                 cursor_x = fx;
                 break;
             }
@@ -416,27 +419,27 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         break;
     case GDK_KEY_r:
         push_undo(cursor_x, cursor_y);
-        pixels[cursor_y][cursor_x] = fg_color;
+        PX(cursor_y, cursor_x) = fg_color;
         last_action = GDK_KEY_r;
         break;
     case GDK_KEY_x:
         push_undo(cursor_x, cursor_y);
-        pixels[cursor_y][cursor_x] = 0;
+        PX(cursor_y, cursor_x) = 0;
         last_action = GDK_KEY_x;
         break;
     case GDK_KEY_period:
         if (last_action == GDK_KEY_r || last_action == GDK_KEY_x) {
             push_undo(cursor_x, cursor_y);
-            pixels[cursor_y][cursor_x] = (last_action == GDK_KEY_r) ? fg_color : 0;
+            PX(cursor_y, cursor_x) = (last_action == GDK_KEY_r) ? fg_color : 0;
         }
         break;
     case GDK_KEY_u:
         if (undo_top > 0) {
             undo_top--;
             UndoEntry e = undo_stack[undo_top % UNDO_MAX];
-            redo_stack[redo_top % UNDO_MAX] = (UndoEntry){e.x, e.y, pixels[e.y][e.x]};
+            redo_stack[redo_top % UNDO_MAX] = (UndoEntry){e.x, e.y, PX(e.y, e.x)};
             redo_top++;
-            pixels[e.y][e.x] = e.old_val;
+            PX(e.y, e.x) = e.old_val;
             cursor_x = e.x;
             cursor_y = e.y;
         }
@@ -451,7 +454,11 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
 }
 
 int main(int argc, char *argv[]) {
-    memset(pixels, 0, sizeof(pixels));
+    /* Parse optional: vimpaint [width [height]] */
+    if (argc >= 2) CANVAS_W = MAX(1, atoi(argv[1]));
+    if (argc >= 3) CANVAS_H = MAX(1, atoi(argv[2]));
+
+    pixels = calloc(CANVAS_W * CANVAS_H, 1);
 
     gtk_init(&argc, &argv);
 
