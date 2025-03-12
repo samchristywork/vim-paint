@@ -5,7 +5,21 @@
 #define CANVAS_H 40
 #define CELL_SIZE 12
 
-static guchar pixels[CANVAS_H][CANVAS_W];  /* 0 = white, 1 = black */
+/* palette: index 0 = background (white), 1..N = foreground colors */
+static const double palette[][3] = {
+    {1.0, 1.0, 1.0},  /* 0 white  (background) */
+    {0.0, 0.0, 0.0},  /* 1 black  */
+    {0.8, 0.1, 0.1},  /* 2 red    */
+    {0.1, 0.7, 0.1},  /* 3 green  */
+    {0.1, 0.3, 0.9},  /* 4 blue   */
+    {0.9, 0.8, 0.0},  /* 5 yellow */
+    {0.0, 0.7, 0.8},  /* 6 cyan   */
+    {0.7, 0.0, 0.8},  /* 7 magenta*/
+};
+#define PALETTE_SIZE ((int)(sizeof(palette)/sizeof(palette[0])))
+
+static guchar pixels[CANVAS_H][CANVAS_W];  /* 0 = background, 1..7 = palette index */
+static guchar fg_color = 1;                /* current foreground color index */
 static int cursor_x = 0;
 static int cursor_y = 0;
 static gboolean visual_mode = FALSE;
@@ -117,11 +131,8 @@ static void push_undo(int x, int y) {
 static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
     for (int y = 0; y < CANVAS_H; y++) {
         for (int x = 0; x < CANVAS_W; x++) {
-            if (pixels[y][x]) {
-                cairo_set_source_rgb(cr, 0, 0, 0);
-            } else {
-                cairo_set_source_rgb(cr, 1, 1, 1);
-            }
+            int idx = pixels[y][x];
+            cairo_set_source_rgb(cr, palette[idx][0], palette[idx][1], palette[idx][2]);
             cairo_rectangle(cr, x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
             cairo_fill(cr);
         }
@@ -283,7 +294,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         int x1 = MAX(cursor_x, visual_anchor_x);
         int y0 = MIN(cursor_y, visual_anchor_y);
         int y1 = MAX(cursor_y, visual_anchor_y);
-        guchar val = (event->keyval == GDK_KEY_r) ? 1 : 0;
+        guchar val = (event->keyval == GDK_KEY_r) ? fg_color : 0;
         for (int ey = y0; ey <= y1; ey++)
             for (int ex = x0; ex <= x1; ex++) {
                 push_undo(ex, ey);
@@ -320,19 +331,19 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         break;
     case GDK_KEY_h:
         cursor_x = MAX(cursor_x - n, 0);
-        if (insert_mode) { push_undo(cursor_x, cursor_y); pixels[cursor_y][cursor_x] = 1; }
+        if (insert_mode) { push_undo(cursor_x, cursor_y); pixels[cursor_y][cursor_x] = fg_color; }
         break;
     case GDK_KEY_l:
         cursor_x = MIN(cursor_x + n, CANVAS_W - 1);
-        if (insert_mode) { push_undo(cursor_x, cursor_y); pixels[cursor_y][cursor_x] = 1; }
+        if (insert_mode) { push_undo(cursor_x, cursor_y); pixels[cursor_y][cursor_x] = fg_color; }
         break;
     case GDK_KEY_k:
         cursor_y = MAX(cursor_y - n, 0);
-        if (insert_mode) { push_undo(cursor_x, cursor_y); pixels[cursor_y][cursor_x] = 1; }
+        if (insert_mode) { push_undo(cursor_x, cursor_y); pixels[cursor_y][cursor_x] = fg_color; }
         break;
     case GDK_KEY_j:
         cursor_y = MIN(cursor_y + n, CANVAS_H - 1);
-        if (insert_mode) { push_undo(cursor_x, cursor_y); pixels[cursor_y][cursor_x] = 1; }
+        if (insert_mode) { push_undo(cursor_x, cursor_y); pixels[cursor_y][cursor_x] = fg_color; }
         break;
     case GDK_KEY_G:
         cursor_y = CANVAS_H - 1;
@@ -361,9 +372,12 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         pending_d = TRUE;
         d_count = n;
         return TRUE;
+    case GDK_KEY_c:
+        fg_color = (fg_color % (PALETTE_SIZE - 1)) + 1;
+        break;
     case GDK_KEY_r:
         push_undo(cursor_x, cursor_y);
-        pixels[cursor_y][cursor_x] = 1;
+        pixels[cursor_y][cursor_x] = fg_color;
         last_action = GDK_KEY_r;
         break;
     case GDK_KEY_x:
@@ -374,7 +388,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     case GDK_KEY_period:
         if (last_action == GDK_KEY_r || last_action == GDK_KEY_x) {
             push_undo(cursor_x, cursor_y);
-            pixels[cursor_y][cursor_x] = (last_action == GDK_KEY_r) ? 1 : 0;
+            pixels[cursor_y][cursor_x] = (last_action == GDK_KEY_r) ? fg_color : 0;
         }
         break;
     case GDK_KEY_u:
