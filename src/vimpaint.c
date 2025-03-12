@@ -367,6 +367,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     }
 
     switch (event->keyval) {
+    case GDK_KEY_q:
+        gtk_main_quit();
+        return TRUE;
     case GDK_KEY_i:
         insert_mode = TRUE;
         break;
