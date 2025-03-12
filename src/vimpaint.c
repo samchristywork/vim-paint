@@ -11,6 +11,7 @@ static int cursor_y = 0;
 static gboolean visual_mode = FALSE;
 static int visual_anchor_x = 0;
 static int visual_anchor_y = 0;
+static gboolean insert_mode = FALSE;
 
 #define UNDO_MAX 256
 typedef struct { int x, y; guchar old_val; } UndoEntry;
@@ -63,16 +64,23 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
         cairo_fill(cr);
     }
 
-    /* Draw cursor as an outline that contrasts with the underlying pixel */
-    if (pixels[cursor_y][cursor_x]) {
-        cairo_set_source_rgb(cr, 1, 1, 1);
+    /* Draw cursor: filled green in insert mode, outlined red/white in normal mode */
+    if (insert_mode) {
+        cairo_set_source_rgba(cr, 0.0, 0.85, 0.3, 0.55);
+        cairo_rectangle(cr, cursor_x * CELL_SIZE, cursor_y * CELL_SIZE,
+                        CELL_SIZE, CELL_SIZE);
+        cairo_fill(cr);
     } else {
-        cairo_set_source_rgb(cr, 1, 0, 0);
+        if (pixels[cursor_y][cursor_x]) {
+            cairo_set_source_rgb(cr, 1, 1, 1);
+        } else {
+            cairo_set_source_rgb(cr, 1, 0, 0);
+        }
+        cairo_set_line_width(cr, 2.0);
+        cairo_rectangle(cr, cursor_x * CELL_SIZE + 1, cursor_y * CELL_SIZE + 1,
+                        CELL_SIZE - 2, CELL_SIZE - 2);
+        cairo_stroke(cr);
     }
-    cairo_set_line_width(cr, 2.0);
-    cairo_rectangle(cr, cursor_x * CELL_SIZE + 1, cursor_y * CELL_SIZE + 1,
-                    CELL_SIZE - 2, CELL_SIZE - 2);
-    cairo_stroke(cr);
 
     return FALSE;
 }
@@ -149,8 +157,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         return TRUE;
     }
 
-    if (visual_mode && event->keyval == GDK_KEY_Escape) {
+    if (event->keyval == GDK_KEY_Escape) {
         visual_mode = FALSE;
+        insert_mode = FALSE;
         gtk_widget_queue_draw(GTK_WIDGET(data));
         return TRUE;
     }
@@ -192,17 +201,24 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     }
 
     switch (event->keyval) {
+    case GDK_KEY_i:
+        insert_mode = TRUE;
+        break;
     case GDK_KEY_h:
         cursor_x = MAX(cursor_x - n, 0);
+        if (insert_mode) { push_undo(cursor_x, cursor_y); pixels[cursor_y][cursor_x] = 1; }
         break;
     case GDK_KEY_l:
         cursor_x = MIN(cursor_x + n, CANVAS_W - 1);
+        if (insert_mode) { push_undo(cursor_x, cursor_y); pixels[cursor_y][cursor_x] = 1; }
         break;
     case GDK_KEY_k:
         cursor_y = MAX(cursor_y - n, 0);
+        if (insert_mode) { push_undo(cursor_x, cursor_y); pixels[cursor_y][cursor_x] = 1; }
         break;
     case GDK_KEY_j:
         cursor_y = MIN(cursor_y + n, CANVAS_H - 1);
+        if (insert_mode) { push_undo(cursor_x, cursor_y); pixels[cursor_y][cursor_x] = 1; }
         break;
     case GDK_KEY_G:
         cursor_y = CANVAS_H - 1;
