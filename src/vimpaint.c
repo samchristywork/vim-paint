@@ -12,6 +12,7 @@ static gboolean visual_mode = FALSE;
 static int visual_anchor_x = 0;
 static int visual_anchor_y = 0;
 static gboolean insert_mode = FALSE;
+static gboolean show_grid = TRUE;
 
 static gboolean cmd_mode = FALSE;
 static char cmd_buf[256];
@@ -81,6 +82,22 @@ static void cmd_execute(void) {
         return;
     }
 
+    if (strncmp(cmd_buf, ":set ", 5) == 0) {
+        const char *opt = cmd_buf + 5;
+        if (strcmp(opt, "grid") == 0) {
+            show_grid = TRUE;
+            gtk_widget_queue_draw(main_canvas);
+            cmd_set("");
+        } else if (strcmp(opt, "nogrid") == 0) {
+            show_grid = FALSE;
+            gtk_widget_queue_draw(main_canvas);
+            cmd_set("");
+        } else {
+            cmd_set("Unknown option.");
+        }
+        return;
+    }
+
     cmd_set("Unknown command.");
 }
 
@@ -111,17 +128,19 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
     }
 
     /* Draw grid lines */
-    cairo_set_source_rgba(cr, 0.8, 0.8, 0.8, 1.0);
-    cairo_set_line_width(cr, 0.5);
-    for (int x = 0; x <= CANVAS_W; x++) {
-        cairo_move_to(cr, x * CELL_SIZE, 0);
-        cairo_line_to(cr, x * CELL_SIZE, CANVAS_H * CELL_SIZE);
+    if (show_grid) {
+        cairo_set_source_rgba(cr, 0.8, 0.8, 0.8, 1.0);
+        cairo_set_line_width(cr, 0.5);
+        for (int x = 0; x <= CANVAS_W; x++) {
+            cairo_move_to(cr, x * CELL_SIZE, 0);
+            cairo_line_to(cr, x * CELL_SIZE, CANVAS_H * CELL_SIZE);
+        }
+        for (int y = 0; y <= CANVAS_H; y++) {
+            cairo_move_to(cr, 0, y * CELL_SIZE);
+            cairo_line_to(cr, CANVAS_W * CELL_SIZE, y * CELL_SIZE);
+        }
+        cairo_stroke(cr);
     }
-    for (int y = 0; y <= CANVAS_H; y++) {
-        cairo_move_to(cr, 0, y * CELL_SIZE);
-        cairo_line_to(cr, CANVAS_W * CELL_SIZE, y * CELL_SIZE);
-    }
-    cairo_stroke(cr);
 
     /* Draw visual selection highlight */
     if (visual_mode) {
