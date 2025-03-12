@@ -33,6 +33,29 @@ static char cmd_buf[256];
 static int cmd_len = 0;
 static GtkWidget *cmd_label = NULL;
 static GtkWidget *main_canvas = NULL;
+static GtkWidget *palette_bar = NULL;
+
+#define SWATCH_W 24
+#define SWATCH_H 20
+
+static gboolean on_palette_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
+    for (int i = 0; i < PALETTE_SIZE; i++) {
+        cairo_set_source_rgb(cr, palette[i][0], palette[i][1], palette[i][2]);
+        cairo_rectangle(cr, i * SWATCH_W, 0, SWATCH_W, SWATCH_H);
+        cairo_fill(cr);
+        if (i == fg_color) {
+            cairo_set_source_rgb(cr, 1.0, 0.0, 0.0);
+            cairo_set_line_width(cr, 2.0);
+            cairo_rectangle(cr, i * SWATCH_W + 1, 1, SWATCH_W - 2, SWATCH_H - 2);
+            cairo_stroke(cr);
+        }
+    }
+    /* Fill remaining space with a neutral background */
+    cairo_set_source_rgb(cr, 0.85, 0.85, 0.85);
+    cairo_rectangle(cr, PALETTE_SIZE * SWATCH_W, 0, CANVAS_W * CELL_SIZE, SWATCH_H);
+    cairo_fill(cr);
+    return FALSE;
+}
 
 static void cmd_set(const char *text) {
     gtk_label_set_text(GTK_LABEL(cmd_label), text);
@@ -374,6 +397,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         return TRUE;
     case GDK_KEY_c:
         fg_color = (fg_color % (PALETTE_SIZE - 1)) + 1;
+        gtk_widget_queue_draw(palette_bar);
         break;
     case GDK_KEY_r:
         push_undo(cursor_x, cursor_y);
@@ -427,12 +451,17 @@ int main(int argc, char *argv[]) {
     gtk_widget_set_size_request(main_canvas, CANVAS_W * CELL_SIZE, CANVAS_H * CELL_SIZE);
     gtk_box_pack_start(GTK_BOX(vbox), main_canvas, FALSE, FALSE, 0);
 
+    palette_bar = gtk_drawing_area_new();
+    gtk_widget_set_size_request(palette_bar, CANVAS_W * CELL_SIZE, SWATCH_H);
+    gtk_box_pack_start(GTK_BOX(vbox), palette_bar, FALSE, FALSE, 0);
+
     cmd_label = gtk_label_new("");
     gtk_label_set_xalign(GTK_LABEL(cmd_label), 0.0);
     gtk_widget_set_size_request(cmd_label, CANVAS_W * CELL_SIZE, 20);
     gtk_box_pack_start(GTK_BOX(vbox), cmd_label, FALSE, FALSE, 0);
 
     g_signal_connect(main_canvas, "draw", G_CALLBACK(on_draw), NULL);
+    g_signal_connect(palette_bar, "draw", G_CALLBACK(on_palette_draw), NULL);
     g_signal_connect(window, "key-press-event", G_CALLBACK(on_key_press), main_canvas);
 
     gtk_widget_show_all(window);
