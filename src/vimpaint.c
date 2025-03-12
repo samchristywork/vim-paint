@@ -61,6 +61,14 @@ static void cmd_set(const char *text) {
     gtk_label_set_text(GTK_LABEL(cmd_label), text);
 }
 
+static void status_update(void) {
+    if (cmd_mode) return;
+    char buf[64];
+    const char *mode = visual_mode ? "VISUAL" : insert_mode ? "INSERT" : "NORMAL";
+    snprintf(buf, sizeof(buf), " %s  col: %d  row: %d", mode, cursor_x + 1, cursor_y + 1);
+    gtk_label_set_text(GTK_LABEL(cmd_label), buf);
+}
+
 static void cmd_execute(void) {
     char *arg = cmd_buf + 1;
     while (*arg == ' ') arg++;
@@ -217,6 +225,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         } else if (event->keyval == GDK_KEY_Return) {
             cmd_mode = FALSE;
             cmd_execute();
+            status_update();
         } else if (event->keyval == GDK_KEY_BackSpace) {
             if (cmd_len > 1) { cmd_buf[--cmd_len] = '\0'; cmd_set(cmd_buf); }
         } else if (event->length == 1 && cmd_len < 254) {
@@ -245,6 +254,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         if (event->keyval == GDK_KEY_g) {
             cursor_y = 0;
             count = 0;
+            status_update();
             gtk_widget_queue_draw(GTK_WIDGET(data));
             return TRUE;
         }
@@ -280,6 +290,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
             }
         }
         last_action = GDK_KEY_x;
+        status_update();
         gtk_widget_queue_draw(GTK_WIDGET(data));
         return TRUE;
     }
@@ -301,6 +312,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         visual_mode = !visual_mode;
         visual_anchor_x = cursor_x;
         visual_anchor_y = cursor_y;
+        status_update();
         gtk_widget_queue_draw(GTK_WIDGET(data));
         return TRUE;
     }
@@ -308,6 +320,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     if (event->keyval == GDK_KEY_Escape) {
         visual_mode = FALSE;
         insert_mode = FALSE;
+        status_update();
         gtk_widget_queue_draw(GTK_WIDGET(data));
         return TRUE;
     }
@@ -325,6 +338,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
             }
         last_action = event->keyval;
         visual_mode = FALSE;
+        status_update();
         gtk_widget_queue_draw(GTK_WIDGET(data));
         return TRUE;
     }
@@ -338,6 +352,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
             pixels[e.y][e.x] = e.old_val;
             cursor_x = e.x;
             cursor_y = e.y;
+            status_update();
             gtk_widget_queue_draw(GTK_WIDGET(data));
         }
         return TRUE;
@@ -430,6 +445,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         return FALSE;
     }
 
+    status_update();
     gtk_widget_queue_draw(GTK_WIDGET(data));
     return TRUE;
 }
@@ -465,6 +481,7 @@ int main(int argc, char *argv[]) {
     g_signal_connect(window, "key-press-event", G_CALLBACK(on_key_press), main_canvas);
 
     gtk_widget_show_all(window);
+    status_update();
     gtk_main();
 
     return 0;
