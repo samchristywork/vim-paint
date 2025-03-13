@@ -80,6 +80,20 @@ static void status_update(void) {
     gtk_label_set_text(GTK_LABEL(cmd_label), buf);
 }
 
+static guint flash_timer_id = 0;
+
+static gboolean on_flash_expire(gpointer data) {
+    flash_timer_id = 0;
+    status_update();
+    return G_SOURCE_REMOVE;
+}
+
+static void cmd_flash(const char *text) {
+    cmd_set(text);
+    if (flash_timer_id) g_source_remove(flash_timer_id);
+    flash_timer_id = g_timeout_add(2000, on_flash_expire, NULL);
+}
+
 static void cmd_write(const char *filename) {
     cairo_surface_t *surf = cairo_image_surface_create(CAIRO_FORMAT_RGB24,
                                                        CANVAS_W, CANVAS_H);
@@ -94,9 +108,9 @@ static void cmd_write(const char *filename) {
         }
     cairo_surface_mark_dirty(surf);
     if (cairo_surface_write_to_png(surf, filename) == CAIRO_STATUS_SUCCESS)
-        cmd_set("Written.");
+        cmd_flash("Written.");
     else
-        cmd_set("Write failed.");
+        cmd_flash("Write failed.");
     cairo_surface_destroy(surf);
 }
 
@@ -132,7 +146,7 @@ static void cmd_execute(void) {
     if (strncmp(cmd_buf, ":e ", 3) == 0 && *arg) {
         cairo_surface_t *surf = cairo_image_surface_create_from_png(arg);
         if (cairo_surface_status(surf) != CAIRO_STATUS_SUCCESS) {
-            cmd_set("Open failed.");
+            cmd_flash("Open failed.");
             cairo_surface_destroy(surf);
             return;
         }
@@ -165,12 +179,12 @@ static void cmd_execute(void) {
             gtk_widget_queue_draw(main_canvas);
             cmd_set("");
         } else {
-            cmd_set("Unknown option.");
+            cmd_flash("Unknown option.");
         }
         return;
     }
 
-    cmd_set("Unknown command.");
+    cmd_flash("Unknown command.");
 }
 
 #define UNDO_MAX 256
@@ -252,7 +266,6 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         } else if (event->keyval == GDK_KEY_Return) {
             cmd_mode = FALSE;
             cmd_execute();
-            status_update();
         } else if (event->keyval == GDK_KEY_BackSpace) {
             if (cmd_len > 1) { cmd_buf[--cmd_len] = '\0'; cmd_set(cmd_buf); }
         } else if (event->length == 1 && cmd_len < 254) {
