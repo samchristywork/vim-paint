@@ -456,6 +456,16 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     return TRUE;
 }
 
+static gboolean on_button_press(GtkWidget *widget, GdkEventButton *event, gpointer data) {
+    int cx = (int)(event->x / CELL_SIZE);
+    int cy = (int)(event->y / CELL_SIZE);
+    cursor_x = CLAMP(cx, 0, CANVAS_W - 1);
+    cursor_y = CLAMP(cy, 0, CANVAS_H - 1);
+    status_update();
+    gtk_widget_queue_draw(widget);
+    return TRUE;
+}
+
 int main(int argc, char *argv[]) {
     /* Parse optional: vimpaint [width [height]] */
     if (argc >= 2) CANVAS_W = MAX(1, atoi(argv[1]));
@@ -486,7 +496,9 @@ int main(int argc, char *argv[]) {
     gtk_widget_set_size_request(cmd_label, CANVAS_W * CELL_SIZE, 20);
     gtk_box_pack_start(GTK_BOX(vbox), cmd_label, FALSE, FALSE, 0);
 
+    gtk_widget_add_events(main_canvas, GDK_BUTTON_PRESS_MASK);
     g_signal_connect(main_canvas, "draw", G_CALLBACK(on_draw), NULL);
+    g_signal_connect(main_canvas, "button-press-event", G_CALLBACK(on_button_press), NULL);
     g_signal_connect(palette_bar, "draw", G_CALLBACK(on_palette_draw), NULL);
     g_signal_connect(window, "key-press-event", G_CALLBACK(on_key_press), main_canvas);
 
