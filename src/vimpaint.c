@@ -101,10 +101,10 @@ static void cmd_write(const char *filename) {
     int stride = cairo_image_surface_get_stride(surf);
     for (int y = 0; y < CANVAS_H; y++)
         for (int x = 0; x < CANVAS_W; x++) {
-            guchar v = PX(y, x) ? 0 : 255;
-            d[y * stride + x * 4 + 0] = v;
-            d[y * stride + x * 4 + 1] = v;
-            d[y * stride + x * 4 + 2] = v;
+            int idx = PX(y, x);
+            d[y * stride + x * 4 + 0] = (guchar)(palette[idx][2] * 255);
+            d[y * stride + x * 4 + 1] = (guchar)(palette[idx][1] * 255);
+            d[y * stride + x * 4 + 2] = (guchar)(palette[idx][0] * 255);
         }
     cairo_surface_mark_dirty(surf);
     if (cairo_surface_write_to_png(surf, filename) == CAIRO_STATUS_SUCCESS)
