@@ -514,6 +514,10 @@ static gboolean on_button_press(GtkWidget *widget, GdkEventButton *event, gpoint
     int cy = (int)(event->y / CELL_SIZE);
     cursor_x = CLAMP(cx, 0, CANVAS_W - 1);
     cursor_y = CLAMP(cy, 0, CANVAS_H - 1);
+    if (insert_mode) {
+        push_undo(cursor_x, cursor_y);
+        PX(cursor_y, cursor_x) = fg_color;
+    }
     status_update();
     gtk_widget_queue_draw(widget);
     return TRUE;
