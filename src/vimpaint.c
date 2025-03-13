@@ -157,10 +157,19 @@ static void cmd_execute(void) {
         memset(pixels, 0, CANVAS_W * CANVAS_H);
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++) {
-                int r = d[y * stride + x * 4 + 2];
-                int g = d[y * stride + x * 4 + 1];
-                int b = d[y * stride + x * 4 + 0];
-                PX(y, x) = ((r + g + b) / 3 < 128) ? 1 : 0;
+                double pr = d[y * stride + x * 4 + 2] / 255.0;
+                double pg = d[y * stride + x * 4 + 1] / 255.0;
+                double pb = d[y * stride + x * 4 + 0] / 255.0;
+                int best = 0;
+                double best_dist = 1e9;
+                for (int i = 0; i < PALETTE_SIZE; i++) {
+                    double dr = pr - palette[i][0];
+                    double dg = pg - palette[i][1];
+                    double db = pb - palette[i][2];
+                    double dist = dr*dr + dg*dg + db*db;
+                    if (dist < best_dist) { best_dist = dist; best = i; }
+                }
+                PX(y, x) = best;
             }
         cairo_surface_destroy(surf);
         gtk_widget_queue_draw(main_canvas);
