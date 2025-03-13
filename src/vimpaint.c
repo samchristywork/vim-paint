@@ -80,40 +80,56 @@ static void status_update(void) {
     gtk_label_set_text(GTK_LABEL(cmd_label), buf);
 }
 
-static void cmd_execute(void) {
-    char *arg = cmd_buf + 1;
-    while (*arg == ' ') arg++;
+static void cmd_write(const char *filename) {
+    cairo_surface_t *surf = cairo_image_surface_create(CAIRO_FORMAT_RGB24,
+                                                       CANVAS_W, CANVAS_H);
+    guchar *d = cairo_image_surface_get_data(surf);
+    int stride = cairo_image_surface_get_stride(surf);
+    for (int y = 0; y < CANVAS_H; y++)
+        for (int x = 0; x < CANVAS_W; x++) {
+            guchar v = PX(y, x) ? 0 : 255;
+            d[y * stride + x * 4 + 0] = v;
+            d[y * stride + x * 4 + 1] = v;
+            d[y * stride + x * 4 + 2] = v;
+        }
+    cairo_surface_mark_dirty(surf);
+    if (cairo_surface_write_to_png(surf, filename) == CAIRO_STATUS_SUCCESS)
+        cmd_set("Written.");
+    else
+        cmd_set("Write failed.");
+    cairo_surface_destroy(surf);
+}
 
-    if (strcmp(cmd_buf, ":q") == 0 || strcmp(cmd_buf, ":wq") == 0) {
-        if (cmd_buf[1] == 'w' && strlen(arg) > 0) goto do_write;
+static void cmd_execute(void) {
+    /* Extract argument: text after the command verb, leading spaces stripped */
+    const char *p = cmd_buf + 1;
+    while (*p && *p != ' ') p++;
+    while (*p == ' ') p++;
+    const char *arg = p;
+
+    if (strcmp(cmd_buf, ":q") == 0) {
         gtk_main_quit();
         return;
     }
 
-    if (cmd_buf[1] == 'w' && strlen(arg) > 0) {
-    do_write:;
-        cairo_surface_t *surf = cairo_image_surface_create(CAIRO_FORMAT_RGB24,
-                                                           CANVAS_W, CANVAS_H);
-        guchar *d = cairo_image_surface_get_data(surf);
-        int stride = cairo_image_surface_get_stride(surf);
-        for (int y = 0; y < CANVAS_H; y++)
-            for (int x = 0; x < CANVAS_W; x++) {
-                guchar v = PX(y, x) ? 0 : 255;
-                d[y * stride + x * 4 + 0] = v;
-                d[y * stride + x * 4 + 1] = v;
-                d[y * stride + x * 4 + 2] = v;
-            }
-        cairo_surface_mark_dirty(surf);
-        if (cairo_surface_write_to_png(surf, arg) == CAIRO_STATUS_SUCCESS)
-            cmd_set("Written.");
-        else
-            cmd_set("Write failed.");
-        cairo_surface_destroy(surf);
-        if (cmd_buf[1] == 'w' && cmd_buf[2] == 'q') gtk_main_quit();
+    if (strcmp(cmd_buf, ":wq") == 0) {
+        if (*arg) { cmd_write(arg); }
+        gtk_main_quit();
         return;
     }
 
-    if (cmd_buf[1] == 'e' && strlen(arg) > 0) {
+    if (strncmp(cmd_buf, ":w ", 3) == 0 && *arg) {
+        cmd_write(arg);
+        return;
+    }
+
+    if (strncmp(cmd_buf, ":wq ", 4) == 0 && *arg) {
+        cmd_write(arg);
+        gtk_main_quit();
+        return;
+    }
+
+    if (strncmp(cmd_buf, ":e ", 3) == 0 && *arg) {
         cairo_surface_t *surf = cairo_image_surface_create_from_png(arg);
         if (cairo_surface_status(surf) != CAIRO_STATUS_SUCCESS) {
             cmd_set("Open failed.");
