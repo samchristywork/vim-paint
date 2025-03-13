@@ -262,7 +262,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     if (cmd_mode) {
         if (event->keyval == GDK_KEY_Escape) {
             cmd_mode = FALSE;
-            cmd_set("");
+            status_update();
         } else if (event->keyval == GDK_KEY_Return) {
             cmd_mode = FALSE;
             cmd_execute();
