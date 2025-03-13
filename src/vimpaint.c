@@ -4,7 +4,7 @@
 
 static int CANVAS_W = 80;
 static int CANVAS_H = 40;
-#define CELL_SIZE 12
+static int CELL_SIZE = 12;
 
 /* palette: index 0 = background (white), 1..N = foreground colors */
 static const double palette[][3] = {
@@ -37,9 +37,17 @@ static int cmd_len = 0;
 static GtkWidget *cmd_label = NULL;
 static GtkWidget *main_canvas = NULL;
 static GtkWidget *palette_bar = NULL;
+static GtkWidget *main_window = NULL;
 
 #define SWATCH_W 24
 #define SWATCH_H 20
+
+static void zoom_resize(void) {
+    gtk_widget_set_size_request(main_canvas, CANVAS_W * CELL_SIZE, CANVAS_H * CELL_SIZE);
+    gtk_widget_set_size_request(palette_bar, CANVAS_W * CELL_SIZE, SWATCH_H);
+    gtk_widget_set_size_request(cmd_label,   CANVAS_W * CELL_SIZE, 20);
+    gtk_window_resize(GTK_WINDOW(main_window), 1, 1);
+}
 
 static gboolean on_palette_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
     for (int i = 0; i < PALETTE_SIZE; i++) {
@@ -370,6 +378,13 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     case GDK_KEY_q:
         gtk_main_quit();
         return TRUE;
+    case GDK_KEY_plus:
+    case GDK_KEY_equal:
+        if (CELL_SIZE < 32) { CELL_SIZE += 2; zoom_resize(); }
+        break;
+    case GDK_KEY_minus:
+        if (CELL_SIZE > 4) { CELL_SIZE -= 2; zoom_resize(); }
+        break;
     case GDK_KEY_i:
         insert_mode = TRUE;
         break;
@@ -475,7 +490,8 @@ int main(int argc, char *argv[]) {
 
     gtk_init(&argc, &argv);
 
-    GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    main_window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    GtkWidget *window = main_window;
     gtk_window_set_title(GTK_WINDOW(window), "vim-paint");
     gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
     g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
