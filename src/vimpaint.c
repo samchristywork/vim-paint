@@ -434,16 +434,32 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     case GDK_KEY_i:
         insert_mode = TRUE;
         break;
+    case GDK_KEY_H:
+        cursor_x = MAX(cursor_x - 5 * n, 0);
+        if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
+        break;
     case GDK_KEY_h:
         cursor_x = MAX(cursor_x - n, 0);
+        if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
+        break;
+    case GDK_KEY_L:
+        cursor_x = MIN(cursor_x + 5 * n, CANVAS_W - 1);
         if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
         break;
     case GDK_KEY_l:
         cursor_x = MIN(cursor_x + n, CANVAS_W - 1);
         if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
         break;
+    case GDK_KEY_K:
+        cursor_y = MAX(cursor_y - 5 * n, 0);
+        if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
+        break;
     case GDK_KEY_k:
         cursor_y = MAX(cursor_y - n, 0);
+        if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
+        break;
+    case GDK_KEY_J:
+        cursor_y = MIN(cursor_y + 5 * n, CANVAS_H - 1);
         if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
         break;
     case GDK_KEY_j:
