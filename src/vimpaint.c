@@ -258,9 +258,11 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
         } else {
             cairo_set_source_rgb(cr, 1, 0, 0);
         }
-        cairo_set_line_width(cr, 2.0);
-        cairo_rectangle(cr, cursor_x * CELL_SIZE + 1, cursor_y * CELL_SIZE + 1,
-                        CELL_SIZE - 2, CELL_SIZE - 2);
+        double lw = CLAMP(CELL_SIZE * 0.2, 1.0, 2.0);
+        int inset = MAX(1, CELL_SIZE / 8);
+        cairo_set_line_width(cr, lw);
+        cairo_rectangle(cr, cursor_x * CELL_SIZE + inset, cursor_y * CELL_SIZE + inset,
+                        CELL_SIZE - 2 * inset, CELL_SIZE - 2 * inset);
         cairo_stroke(cr);
     }
 
