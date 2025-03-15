@@ -561,6 +561,18 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
             PX(cursor_y, cursor_x) = (last_action == GDK_KEY_r) ? fg_color : 0;
         }
         break;
+    case GDK_KEY_p:
+        if (yank_buf) {
+            for (int ey = 0; ey < yank_h; ey++)
+                for (int ex = 0; ex < yank_w; ex++) {
+                    int px = cursor_x + ex, py = cursor_y + ey;
+                    if (px < CANVAS_W && py < CANVAS_H) {
+                        push_undo(px, py);
+                        PX(py, px) = yank_buf[ey * yank_w + ex];
+                    }
+                }
+        }
+        break;
     case GDK_KEY_u:
         if (undo_count > 0) {
             undo_top--;
