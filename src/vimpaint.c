@@ -196,6 +196,10 @@ static void cmd_execute(void) {
     cmd_flash("Unknown command.");
 }
 
+static guchar *yank_buf = NULL;
+static int yank_w = 0;
+static int yank_h = 0;
+
 #define UNDO_MAX 256
 typedef struct { int x, y; guchar old_val; } UndoEntry;
 static UndoEntry undo_stack[UNDO_MAX];
@@ -379,6 +383,24 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     if (event->keyval == GDK_KEY_Escape) {
         visual_mode = FALSE;
         insert_mode = FALSE;
+        status_update();
+        gtk_widget_queue_draw(GTK_WIDGET(data));
+        return TRUE;
+    }
+
+    if (visual_mode && event->keyval == GDK_KEY_y) {
+        int x0 = MIN(cursor_x, visual_anchor_x);
+        int x1 = MAX(cursor_x, visual_anchor_x);
+        int y0 = MIN(cursor_y, visual_anchor_y);
+        int y1 = MAX(cursor_y, visual_anchor_y);
+        yank_w = x1 - x0 + 1;
+        yank_h = y1 - y0 + 1;
+        free(yank_buf);
+        yank_buf = malloc(yank_w * yank_h);
+        for (int ey = 0; ey < yank_h; ey++)
+            for (int ex = 0; ex < yank_w; ex++)
+                yank_buf[ey * yank_w + ex] = PX(y0 + ey, x0 + ex);
+        visual_mode = FALSE;
         status_update();
         gtk_widget_queue_draw(GTK_WIDGET(data));
         return TRUE;
