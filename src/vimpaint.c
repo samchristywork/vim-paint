@@ -283,10 +283,13 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
             cmd_execute();
         } else if (event->keyval == GDK_KEY_BackSpace) {
             if (cmd_len > 1) { cmd_buf[--cmd_len] = '\0'; cmd_set(cmd_buf); }
-        } else if (event->length == 1 && cmd_len < 254) {
-            cmd_buf[cmd_len++] = event->string[0];
-            cmd_buf[cmd_len] = '\0';
-            cmd_set(cmd_buf);
+        } else {
+            guint32 uc = gdk_keyval_to_unicode(event->keyval);
+            if (uc >= 0x20 && uc < 0x7f && cmd_len < 254) {
+                cmd_buf[cmd_len++] = (char)uc;
+                cmd_buf[cmd_len] = '\0';
+                cmd_set(cmd_buf);
+            }
         }
         return TRUE;
     }
