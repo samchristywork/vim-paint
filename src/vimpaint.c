@@ -486,10 +486,12 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         break;
     case GDK_KEY_f:
         for (int fx = cursor_x + 1; fx < CANVAS_W; fx++) {
-            if (PX(cursor_y, fx)) {
-                cursor_x = fx;
-                break;
-            }
+            if (PX(cursor_y, fx)) { cursor_x = fx; break; }
+        }
+        break;
+    case GDK_KEY_F:
+        for (int fx = cursor_x - 1; fx >= 0; fx--) {
+            if (PX(cursor_y, fx)) { cursor_x = fx; break; }
         }
         break;
     case GDK_KEY_d:
