@@ -34,6 +34,7 @@ static gboolean show_grid = TRUE;
 static gboolean cmd_mode = FALSE;
 static char cmd_buf[256];
 static int cmd_len = 0;
+static char last_filename[256] = "";
 static GtkWidget *cmd_label = NULL;
 static GtkWidget *main_canvas = NULL;
 static GtkWidget *palette_bar = NULL;
@@ -95,6 +96,7 @@ static void cmd_flash(const char *text) {
 }
 
 static void cmd_write(const char *filename) {
+    snprintf(last_filename, sizeof(last_filename), "%s", filename);
     cairo_surface_t *surf = cairo_image_surface_create(CAIRO_FORMAT_RGB24,
                                                        CANVAS_W, CANVAS_H);
     guchar *d = cairo_image_surface_get_data(surf);
@@ -172,6 +174,7 @@ static void cmd_execute(void) {
                 PX(y, x) = best;
             }
         cairo_surface_destroy(surf);
+        snprintf(last_filename, sizeof(last_filename), "%s", arg);
         gtk_widget_queue_draw(main_canvas);
         cmd_set("");
         return;
@@ -421,6 +424,12 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         visual_mode = FALSE;
         status_update();
         gtk_widget_queue_draw(GTK_WIDGET(data));
+        return TRUE;
+    }
+
+    if (event->keyval == GDK_KEY_s && (event->state & GDK_CONTROL_MASK)) {
+        if (*last_filename) cmd_write(last_filename);
+        else cmd_flash("No filename. Use :w filename");
         return TRUE;
     }
 
