@@ -306,6 +306,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     static int d_count = 1;
     static int count = 0;
     static guint last_action = 0;
+    static int last_find_dir = 0;  /* +1 = forward (f), -1 = backward (F), 0 = none */
 
     if (pending_g) {
         pending_g = FALSE;
@@ -485,13 +486,33 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         cursor_x = MAX(cursor_x - 5 * n, 0);
         break;
     case GDK_KEY_f:
+        last_find_dir = 1;
         for (int fx = cursor_x + 1; fx < CANVAS_W; fx++) {
             if (PX(cursor_y, fx)) { cursor_x = fx; break; }
         }
         break;
     case GDK_KEY_F:
+        last_find_dir = -1;
         for (int fx = cursor_x - 1; fx >= 0; fx--) {
             if (PX(cursor_y, fx)) { cursor_x = fx; break; }
+        }
+        break;
+    case GDK_KEY_n:
+        if (last_find_dir > 0) {
+            for (int fx = cursor_x + 1; fx < CANVAS_W; fx++)
+                if (PX(cursor_y, fx)) { cursor_x = fx; break; }
+        } else if (last_find_dir < 0) {
+            for (int fx = cursor_x - 1; fx >= 0; fx--)
+                if (PX(cursor_y, fx)) { cursor_x = fx; break; }
+        }
+        break;
+    case GDK_KEY_N:
+        if (last_find_dir > 0) {
+            for (int fx = cursor_x - 1; fx >= 0; fx--)
+                if (PX(cursor_y, fx)) { cursor_x = fx; break; }
+        } else if (last_find_dir < 0) {
+            for (int fx = cursor_x + 1; fx < CANVAS_W; fx++)
+                if (PX(cursor_y, fx)) { cursor_x = fx; break; }
         }
         break;
     case GDK_KEY_d:
