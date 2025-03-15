@@ -575,6 +575,22 @@ static gboolean on_button_press(GtkWidget *widget, GdkEventButton *event, gpoint
     return TRUE;
 }
 
+static gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event, gpointer data) {
+    if (!(event->state & GDK_BUTTON1_MASK)) return TRUE;
+    int cx = CLAMP((int)(event->x / CELL_SIZE), 0, CANVAS_W - 1);
+    int cy = CLAMP((int)(event->y / CELL_SIZE), 0, CANVAS_H - 1);
+    if (cx == cursor_x && cy == cursor_y) return TRUE;
+    cursor_x = cx;
+    cursor_y = cy;
+    if (insert_mode) {
+        push_undo(cursor_x, cursor_y);
+        PX(cursor_y, cursor_x) = fg_color;
+    }
+    status_update();
+    gtk_widget_queue_draw(widget);
+    return TRUE;
+}
+
 int main(int argc, char *argv[]) {
     /* Parse optional: vimpaint [width [height]] */
     if (argc >= 2) CANVAS_W = MAX(1, atoi(argv[1]));
@@ -606,9 +622,10 @@ int main(int argc, char *argv[]) {
     gtk_widget_set_size_request(cmd_label, CANVAS_W * CELL_SIZE, 20);
     gtk_box_pack_start(GTK_BOX(vbox), cmd_label, FALSE, FALSE, 0);
 
-    gtk_widget_add_events(main_canvas, GDK_BUTTON_PRESS_MASK);
+    gtk_widget_add_events(main_canvas, GDK_BUTTON_PRESS_MASK | GDK_BUTTON1_MOTION_MASK);
     g_signal_connect(main_canvas, "draw", G_CALLBACK(on_draw), NULL);
     g_signal_connect(main_canvas, "button-press-event", G_CALLBACK(on_button_press), NULL);
+    g_signal_connect(main_canvas, "motion-notify-event", G_CALLBACK(on_motion_notify), NULL);
     g_signal_connect(palette_bar, "draw", G_CALLBACK(on_palette_draw), NULL);
     g_signal_connect(window, "key-press-event", G_CALLBACK(on_key_press), main_canvas);
 
