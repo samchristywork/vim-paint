@@ -95,8 +95,7 @@ static void cmd_flash(const char *text) {
     flash_timer_id = g_timeout_add(2000, on_flash_expire, NULL);
 }
 
-static void cmd_write(const char *filename) {
-    snprintf(last_filename, sizeof(last_filename), "%s", filename);
+static gboolean cmd_write(const char *filename) {
     cairo_surface_t *surf = cairo_image_surface_create(CAIRO_FORMAT_RGB24,
                                                        CANVAS_W, CANVAS_H);
     guchar *d = cairo_image_surface_get_data(surf);
@@ -109,11 +108,13 @@ static void cmd_write(const char *filename) {
             d[y * stride + x * 4 + 2] = (guchar)(palette[idx][0] * 255);
         }
     cairo_surface_mark_dirty(surf);
-    if (cairo_surface_write_to_png(surf, filename) == CAIRO_STATUS_SUCCESS)
+    gboolean ok = cairo_surface_write_to_png(surf, filename) == CAIRO_STATUS_SUCCESS;
+    cairo_surface_destroy(surf);
+    if (ok)
         cmd_flash("Written.");
     else
         cmd_flash("Write failed.");
-    cairo_surface_destroy(surf);
+    return ok;
 }
 
 static void cmd_execute(void) {
@@ -129,18 +130,20 @@ static void cmd_execute(void) {
     }
 
     if (strcmp(cmd_buf, ":wq") == 0) {
-        if (*arg) { cmd_write(arg); }
+        if (*last_filename) cmd_write(last_filename);
         gtk_main_quit();
         return;
     }
 
     if (strncmp(cmd_buf, ":w ", 3) == 0 && *arg) {
-        cmd_write(arg);
+        if (cmd_write(arg))
+            snprintf(last_filename, sizeof(last_filename), "%s", arg);
         return;
     }
 
     if (strncmp(cmd_buf, ":wq ", 4) == 0 && *arg) {
-        cmd_write(arg);
+        if (cmd_write(arg))
+            snprintf(last_filename, sizeof(last_filename), "%s", arg);
         gtk_main_quit();
         return;
     }
