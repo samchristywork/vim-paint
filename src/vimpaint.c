@@ -52,6 +52,12 @@ static void zoom_resize(void) {
     gtk_window_resize(GTK_WINDOW(main_window), 1, 1);
 }
 
+static void update_title(const char *filename) {
+    char buf[300];
+    snprintf(buf, sizeof(buf), "vim-paint - %s", filename);
+    gtk_window_set_title(GTK_WINDOW(main_window), buf);
+}
+
 static gboolean on_palette_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
     for (int i = 0; i < PALETTE_SIZE; i++) {
         cairo_set_source_rgb(cr, palette[i][0], palette[i][1], palette[i][2]);
@@ -138,14 +144,18 @@ static void cmd_execute(void) {
     }
 
     if (strncmp(cmd_buf, ":w ", 3) == 0 && *arg) {
-        if (cmd_write(arg))
+        if (cmd_write(arg)) {
             snprintf(last_filename, sizeof(last_filename), "%s", arg);
+            update_title(last_filename);
+        }
         return;
     }
 
     if (strncmp(cmd_buf, ":wq ", 4) == 0 && *arg) {
-        if (cmd_write(arg))
+        if (cmd_write(arg)) {
             snprintf(last_filename, sizeof(last_filename), "%s", arg);
+            update_title(last_filename);
+        }
         gtk_main_quit();
         return;
     }
@@ -180,6 +190,7 @@ static void cmd_execute(void) {
             }
         cairo_surface_destroy(surf);
         snprintf(last_filename, sizeof(last_filename), "%s", arg);
+        update_title(last_filename);
         gtk_widget_queue_draw(main_canvas);
         cmd_set("");
         return;
