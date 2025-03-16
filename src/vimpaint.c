@@ -193,6 +193,15 @@ static void cmd_execute(void) {
             show_grid = FALSE;
             gtk_widget_queue_draw(main_canvas);
             cmd_set("");
+        } else if (strncmp(opt, "color ", 6) == 0) {
+            int n = atoi(opt + 6);
+            if (n >= 0 && n < PALETTE_SIZE) {
+                fg_color = (guchar)n;
+                gtk_widget_queue_draw(palette_bar);
+                cmd_set("");
+            } else {
+                cmd_flash("Color index out of range.");
+            }
         } else {
             cmd_flash("Unknown option.");
         }
