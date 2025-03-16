@@ -7,7 +7,8 @@ static int CANVAS_H = 40;
 static int CELL_SIZE = 12;
 
 /* palette: index 0 = background (white), 1..N = foreground colors */
-static const double palette[][3] = {
+#define PALETTE_MAX 256
+static double palette[PALETTE_MAX][3] = {
     {1.0, 1.0, 1.0},  /* 0 white  (background) */
     {0.0, 0.0, 0.0},  /* 1 black  */
     {0.8, 0.1, 0.1},  /* 2 red    */
@@ -17,7 +18,8 @@ static const double palette[][3] = {
     {0.0, 0.7, 0.8},  /* 6 cyan   */
     {0.7, 0.0, 0.8},  /* 7 magenta*/
 };
-#define PALETTE_SIZE ((int)(sizeof(palette)/sizeof(palette[0])))
+static int palette_size = 8;
+#define PALETTE_SIZE palette_size
 
 static guchar *pixels = NULL;  /* flat [y * CANVAS_W + x], 0=background 1..7=palette */
 static guchar fg_color = 1;   /* current foreground color index */
@@ -194,13 +196,49 @@ static void cmd_execute(void) {
             gtk_widget_queue_draw(main_canvas);
             cmd_set("");
         } else if (strncmp(opt, "color ", 6) == 0) {
-            int n = atoi(opt + 6);
-            if (n >= 0 && n < PALETTE_SIZE) {
-                fg_color = (guchar)n;
-                gtk_widget_queue_draw(palette_bar);
-                cmd_set("");
+            const char *val = opt + 6;
+            if (val[0] == '#' && strlen(val) == 7) {
+                unsigned int rgb;
+                if (sscanf(val + 1, "%06x", &rgb) == 1) {
+                    double pr = ((rgb >> 16) & 0xff) / 255.0;
+                    double pg = ((rgb >>  8) & 0xff) / 255.0;
+                    double pb = ( rgb        & 0xff) / 255.0;
+                    int found = -1;
+                    for (int i = 0; i < PALETTE_SIZE; i++) {
+                        if (palette[i][0] == pr && palette[i][1] == pg && palette[i][2] == pb) {
+                            found = i; break;
+                        }
+                    }
+                    if (found < 0) {
+                        if (PALETTE_SIZE >= PALETTE_MAX) {
+                            cmd_flash("Palette full.");
+                        } else {
+                            found = palette_size;
+                            palette[found][0] = pr;
+                            palette[found][1] = pg;
+                            palette[found][2] = pb;
+                            palette_size++;
+                            fg_color = (guchar)found;
+                            gtk_widget_queue_draw(palette_bar);
+                            cmd_set("");
+                        }
+                    } else {
+                        fg_color = (guchar)found;
+                        gtk_widget_queue_draw(palette_bar);
+                        cmd_set("");
+                    }
+                } else {
+                    cmd_flash("Invalid hex color.");
+                }
             } else {
-                cmd_flash("Color index out of range.");
+                int n = atoi(val);
+                if (n >= 0 && n < PALETTE_SIZE) {
+                    fg_color = (guchar)n;
+                    gtk_widget_queue_draw(palette_bar);
+                    cmd_set("");
+                } else {
+                    cmd_flash("Color index out of range.");
+                }
             }
         } else {
             cmd_flash("Unknown option.");
