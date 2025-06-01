@@ -719,9 +719,10 @@ static gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event, gpoin
 }
 
 int main(int argc, char *argv[]) {
-    /* Parse optional: vimpaint [width [height]] */
+    /* Parse optional: vimpaint [width [height [cell_size]]] */
     if (argc >= 2) CANVAS_W = MAX(1, atoi(argv[1]));
     if (argc >= 3) CANVAS_H = MAX(1, atoi(argv[2]));
+    if (argc >= 4) CELL_SIZE = CLAMP(atoi(argv[3]), 4, 64);
 
     pixels = calloc(CANVAS_W * CANVAS_H, 1);
 
