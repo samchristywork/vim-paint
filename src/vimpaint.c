@@ -504,6 +504,15 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         return TRUE;
     }
 
+    if (event->keyval == GDK_KEY_g && (event->state & GDK_CONTROL_MASK)) {
+        char buf[128];
+        snprintf(buf, sizeof(buf), "\"%s\"  %dx%d  col: %d  row: %d",
+                 *last_filename ? last_filename : "[No Name]",
+                 CANVAS_W, CANVAS_H, cursor_x + 1, cursor_y + 1);
+        cmd_flash(buf);
+        return TRUE;
+    }
+
     if (event->keyval == GDK_KEY_r && (event->state & GDK_CONTROL_MASK)) {
         if (redo_count > 0) {
             redo_top--;
