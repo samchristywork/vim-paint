@@ -137,6 +137,16 @@ static void cmd_execute(void) {
         return;
     }
 
+    if (strcmp(cmd_buf, ":new") == 0) {
+        memset(pixels, 0, CANVAS_W * CANVAS_H);
+        last_filename[0] = '\0';
+        cursor_x = 0; cursor_y = 0;
+        gtk_window_set_title(GTK_WINDOW(main_window), "vim-paint");
+        gtk_widget_queue_draw(main_canvas);
+        cmd_set("");
+        return;
+    }
+
     if (strcmp(cmd_buf, ":wq") == 0) {
         if (*last_filename) cmd_write(last_filename);
         gtk_main_quit();
