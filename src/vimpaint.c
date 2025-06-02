@@ -147,8 +147,15 @@ static void cmd_execute(void) {
         return;
     }
 
+    if (strcmp(cmd_buf, ":w") == 0) {
+        if (*last_filename) cmd_write(last_filename);
+        else cmd_flash("No filename. Use :w filename");
+        return;
+    }
+
     if (strcmp(cmd_buf, ":wq") == 0) {
         if (*last_filename) cmd_write(last_filename);
+        else cmd_flash("No filename. Use :w filename");
         gtk_main_quit();
         return;
     }
