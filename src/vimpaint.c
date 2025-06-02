@@ -379,16 +379,18 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         return TRUE;
     }
 
+    static gboolean pending_g = FALSE;
+    static gboolean pending_d = FALSE;
+    static int d_count = 1;
+
     if (event->keyval == GDK_KEY_colon) {
+        pending_g = FALSE;
+        pending_d = FALSE;
         cmd_mode = TRUE;
         cmd_buf[0] = ':'; cmd_buf[1] = '\0'; cmd_len = 1;
         cmd_set(cmd_buf);
         return TRUE;
     }
-
-    static gboolean pending_g = FALSE;
-    static gboolean pending_d = FALSE;
-    static int d_count = 1;
     static int count = 0;
     static guint last_action = 0;
     static int last_find_dir = 0;  /* +1 = forward (f), -1 = backward (F), 0 = none */
@@ -464,6 +466,8 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     if (event->keyval == GDK_KEY_Escape) {
         visual_mode = FALSE;
         insert_mode = FALSE;
+        pending_g = FALSE;
+        pending_d = FALSE;
         status_update();
         gtk_widget_queue_draw(GTK_WIDGET(data));
         return TRUE;
