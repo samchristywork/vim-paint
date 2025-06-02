@@ -638,6 +638,11 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         fg_color = (fg_color - 2 + (PALETTE_SIZE - 1)) % (PALETTE_SIZE - 1) + 1;
         gtk_widget_queue_draw(palette_bar);
         break;
+    case GDK_KEY_space:
+        push_undo(cursor_x, cursor_y);
+        PX(cursor_y, cursor_x) = fg_color;
+        last_action = GDK_KEY_r;
+        break;
     case GDK_KEY_r:
         push_undo(cursor_x, cursor_y);
         PX(cursor_y, cursor_x) = fg_color;
