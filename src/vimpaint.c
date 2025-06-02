@@ -505,7 +505,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     }
 
     if (event->keyval == GDK_KEY_g && (event->state & GDK_CONTROL_MASK)) {
-        char buf[128];
+        char buf[512];
         snprintf(buf, sizeof(buf), "\"%s\"  %dx%d  col: %d  row: %d",
                  *last_filename ? last_filename : "[No Name]",
                  CANVAS_W, CANVAS_H, cursor_x + 1, cursor_y + 1);
