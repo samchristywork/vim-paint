@@ -704,6 +704,15 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     return TRUE;
 }
 
+static gboolean on_palette_click(GtkWidget *widget, GdkEventButton *event, gpointer data) {
+    int idx = (int)(event->x / SWATCH_W);
+    if (idx >= 0 && idx < PALETTE_SIZE) {
+        fg_color = (guchar)idx;
+        gtk_widget_queue_draw(widget);
+    }
+    return TRUE;
+}
+
 static gboolean on_button_press(GtkWidget *widget, GdkEventButton *event, gpointer data) {
     int cx = (int)(event->x / CELL_SIZE);
     int cy = (int)(event->y / CELL_SIZE);
@@ -767,10 +776,12 @@ int main(int argc, char *argv[]) {
     gtk_box_pack_start(GTK_BOX(vbox), cmd_label, FALSE, FALSE, 0);
 
     gtk_widget_add_events(main_canvas, GDK_BUTTON_PRESS_MASK | GDK_BUTTON1_MOTION_MASK);
+    gtk_widget_add_events(palette_bar, GDK_BUTTON_PRESS_MASK);
     g_signal_connect(main_canvas, "draw", G_CALLBACK(on_draw), NULL);
     g_signal_connect(main_canvas, "button-press-event", G_CALLBACK(on_button_press), NULL);
     g_signal_connect(main_canvas, "motion-notify-event", G_CALLBACK(on_motion_notify), NULL);
     g_signal_connect(palette_bar, "draw", G_CALLBACK(on_palette_draw), NULL);
+    g_signal_connect(palette_bar, "button-press-event", G_CALLBACK(on_palette_click), NULL);
     g_signal_connect(window, "key-press-event", G_CALLBACK(on_key_press), main_canvas);
 
     gtk_widget_show_all(window);
