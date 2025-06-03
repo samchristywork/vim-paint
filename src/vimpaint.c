@@ -92,15 +92,16 @@ static void cmd_set(const char *text) {
     gtk_label_set_text(GTK_LABEL(cmd_label), text);
 }
 
+static guint flash_timer_id = 0;
+
 static void status_update(void) {
     if (cmd_mode) return;
+    if (flash_timer_id) return;
     char buf[64];
     const char *mode = visual_mode ? "VISUAL" : insert_mode ? "INSERT" : "NORMAL";
     snprintf(buf, sizeof(buf), " %s  col: %d  row: %d", mode, cursor_x + 1, cursor_y + 1);
     gtk_label_set_text(GTK_LABEL(cmd_label), buf);
 }
-
-static guint flash_timer_id = 0;
 
 static gboolean on_flash_expire(gpointer data) {
     flash_timer_id = 0;
