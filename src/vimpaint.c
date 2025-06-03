@@ -675,6 +675,13 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         PX(cursor_y, cursor_x) = fg_color;
         last_action = GDK_KEY_r;
         break;
+    case GDK_KEY_D:
+        for (int ex = cursor_x; ex < CANVAS_W; ex++) {
+            push_undo(ex, cursor_y);
+            PX(cursor_y, ex) = 0;
+        }
+        last_action = GDK_KEY_x;
+        break;
     case GDK_KEY_x:
         push_undo(cursor_x, cursor_y);
         PX(cursor_y, cursor_x) = 0;
