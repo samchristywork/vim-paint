@@ -312,6 +312,32 @@ static void push_undo(int x, int y) {
     redo_count = 0;
 }
 
+static void flood_fill(int sx, int sy, guchar fill_color) {
+    guchar target = PX(sy, sx);
+    if (target == fill_color) return;
+    int total = CANVAS_W * CANVAS_H;
+    int *queue = malloc(total * sizeof(int));
+    if (!queue) return;
+    int head = 0, tail = 0;
+    queue[tail++] = sy * CANVAS_W + sx;
+    push_undo(sx, sy);
+    PX(sy, sx) = fill_color;
+    while (head < tail) {
+        int pos = queue[head++];
+        int x = pos % CANVAS_W, y = pos / CANVAS_W;
+        int neighbors[4][2] = {{x-1,y},{x+1,y},{x,y-1},{x,y+1}};
+        for (int i = 0; i < 4; i++) {
+            int nx = neighbors[i][0], ny = neighbors[i][1];
+            if (nx < 0 || nx >= CANVAS_W || ny < 0 || ny >= CANVAS_H) continue;
+            if (PX(ny, nx) != target) continue;
+            push_undo(nx, ny);
+            PX(ny, nx) = fill_color;
+            queue[tail++] = ny * CANVAS_W + nx;
+        }
+    }
+    free(queue);
+}
+
 static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
     for (int y = 0; y < CANVAS_H; y++) {
         for (int x = 0; x < CANVAS_W; x++) {
@@ -681,6 +707,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
             PX(cursor_y, ex) = 0;
         }
         last_action = GDK_KEY_x;
+        break;
+    case GDK_KEY_S:
+        flood_fill(cursor_x, cursor_y, fg_color);
         break;
     case GDK_KEY_x:
         push_undo(cursor_x, cursor_y);
