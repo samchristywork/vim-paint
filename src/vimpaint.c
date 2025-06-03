@@ -468,7 +468,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     int n = count > 0 ? count : 1;
     count = 0;
 
-    if (event->keyval == GDK_KEY_v && (event->state & GDK_CONTROL_MASK)) {
+    if (event->keyval == GDK_KEY_v) {
         visual_mode = !visual_mode;
         visual_anchor_x = cursor_x;
         visual_anchor_y = cursor_y;
