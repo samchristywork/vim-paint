@@ -692,19 +692,19 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         flash_color(fg_color);
         break;
     case GDK_KEY_space:
-        for (int ex = cursor_x; ex < MIN(cursor_x + n, CANVAS_W); ex++) {
-            push_undo(ex, cursor_y);
-            PX(cursor_y, ex) = fg_color;
-        }
+    case GDK_KEY_r: {
+        int x0 = CLAMP(cursor_x - n, 0, CANVAS_W - 1);
+        int x1 = CLAMP(cursor_x + n, 0, CANVAS_W - 1);
+        int y0 = CLAMP(cursor_y - n, 0, CANVAS_H - 1);
+        int y1 = CLAMP(cursor_y + n, 0, CANVAS_H - 1);
+        for (int ey = y0; ey <= y1; ey++)
+            for (int ex = x0; ex <= x1; ex++) {
+                push_undo(ex, ey);
+                PX(ey, ex) = fg_color;
+            }
         last_action = GDK_KEY_r;
         break;
-    case GDK_KEY_r:
-        for (int ex = cursor_x; ex < MIN(cursor_x + n, CANVAS_W); ex++) {
-            push_undo(ex, cursor_y);
-            PX(cursor_y, ex) = fg_color;
-        }
-        last_action = GDK_KEY_r;
-        break;
+    }
     case GDK_KEY_D:
         for (int ex = cursor_x; ex < CANVAS_W; ex++) {
             push_undo(ex, cursor_y);
@@ -715,13 +715,19 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     case GDK_KEY_S:
         flood_fill(cursor_x, cursor_y, fg_color);
         break;
-    case GDK_KEY_x:
-        for (int ex = cursor_x; ex < MIN(cursor_x + n, CANVAS_W); ex++) {
-            push_undo(ex, cursor_y);
-            PX(cursor_y, ex) = 0;
-        }
+    case GDK_KEY_x: {
+        int x0 = CLAMP(cursor_x - n, 0, CANVAS_W - 1);
+        int x1 = CLAMP(cursor_x + n, 0, CANVAS_W - 1);
+        int y0 = CLAMP(cursor_y - n, 0, CANVAS_H - 1);
+        int y1 = CLAMP(cursor_y + n, 0, CANVAS_H - 1);
+        for (int ey = y0; ey <= y1; ey++)
+            for (int ex = x0; ex <= x1; ex++) {
+                push_undo(ex, ey);
+                PX(ey, ex) = 0;
+            }
         last_action = GDK_KEY_x;
         break;
+    }
     case GDK_KEY_period:
         if (last_action == GDK_KEY_r || last_action == GDK_KEY_x) {
             push_undo(cursor_x, cursor_y);
