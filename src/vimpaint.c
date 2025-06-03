@@ -52,6 +52,17 @@ static void zoom_resize(void) {
     gtk_window_resize(GTK_WINDOW(main_window), 1, 1);
 }
 
+static void cmd_flash(const char *text);
+
+static void flash_color(int idx) {
+    char buf[64];
+    int r = (int)(palette[idx][0] * 255 + 0.5);
+    int g = (int)(palette[idx][1] * 255 + 0.5);
+    int b = (int)(palette[idx][2] * 255 + 0.5);
+    snprintf(buf, sizeof(buf), "color %d  #%02x%02x%02x", idx, r, g, b);
+    cmd_flash(buf);
+}
+
 static void update_title(const char *filename) {
     char buf[300];
     snprintf(buf, sizeof(buf), "vim-paint - %s", filename);
@@ -250,12 +261,12 @@ static void cmd_execute(void) {
                             palette_size++;
                             fg_color = (guchar)found;
                             gtk_widget_queue_draw(palette_bar);
-                            cmd_set("");
+                            flash_color(fg_color);
                         }
                     } else {
                         fg_color = (guchar)found;
                         gtk_widget_queue_draw(palette_bar);
-                        cmd_set("");
+                        flash_color(fg_color);
                     }
                 } else {
                     cmd_flash("Invalid hex color.");
@@ -265,7 +276,7 @@ static void cmd_execute(void) {
                 if (n >= 0 && n < PALETTE_SIZE) {
                     fg_color = (guchar)n;
                     gtk_widget_queue_draw(palette_bar);
-                    cmd_set("");
+                    flash_color(fg_color);
                 } else {
                     cmd_flash("Color index out of range.");
                 }
@@ -646,10 +657,12 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     case GDK_KEY_c:
         fg_color = (fg_color % (PALETTE_SIZE - 1)) + 1;
         gtk_widget_queue_draw(palette_bar);
+        flash_color(fg_color);
         break;
     case GDK_KEY_C:
         fg_color = (fg_color - 2 + (PALETTE_SIZE - 1)) % (PALETTE_SIZE - 1) + 1;
         gtk_widget_queue_draw(palette_bar);
+        flash_color(fg_color);
         break;
     case GDK_KEY_space:
         push_undo(cursor_x, cursor_y);
@@ -711,6 +724,7 @@ static gboolean on_palette_click(GtkWidget *widget, GdkEventButton *event, gpoin
     if (idx >= 0 && idx < PALETTE_SIZE) {
         fg_color = (guchar)idx;
         gtk_widget_queue_draw(widget);
+        flash_color(fg_color);
     }
     return TRUE;
 }
