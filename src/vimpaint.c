@@ -518,6 +518,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     }
 
     int n = count > 0 ? count : 1;
+    int radius = count;
     count = 0;
 
     if (event->keyval == GDK_KEY_v) {
@@ -723,10 +724,10 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         break;
     case GDK_KEY_space:
     case GDK_KEY_r: {
-        int x0 = CLAMP(cursor_x - n, 0, CANVAS_W - 1);
-        int x1 = CLAMP(cursor_x + n, 0, CANVAS_W - 1);
-        int y0 = CLAMP(cursor_y - n, 0, CANVAS_H - 1);
-        int y1 = CLAMP(cursor_y + n, 0, CANVAS_H - 1);
+        int x0 = CLAMP(cursor_x - radius, 0, CANVAS_W - 1);
+        int x1 = CLAMP(cursor_x + radius, 0, CANVAS_W - 1);
+        int y0 = CLAMP(cursor_y - radius, 0, CANVAS_H - 1);
+        int y1 = CLAMP(cursor_y + radius, 0, CANVAS_H - 1);
         for (int ey = y0; ey <= y1; ey++)
             for (int ex = x0; ex <= x1; ex++) {
                 push_undo(ex, ey);
@@ -746,10 +747,10 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         flood_fill(cursor_x, cursor_y, fg_color);
         break;
     case GDK_KEY_x: {
-        int x0 = CLAMP(cursor_x - n, 0, CANVAS_W - 1);
-        int x1 = CLAMP(cursor_x + n, 0, CANVAS_W - 1);
-        int y0 = CLAMP(cursor_y - n, 0, CANVAS_H - 1);
-        int y1 = CLAMP(cursor_y + n, 0, CANVAS_H - 1);
+        int x0 = CLAMP(cursor_x - radius, 0, CANVAS_W - 1);
+        int x1 = CLAMP(cursor_x + radius, 0, CANVAS_W - 1);
+        int y0 = CLAMP(cursor_y - radius, 0, CANVAS_H - 1);
+        int y1 = CLAMP(cursor_y + radius, 0, CANVAS_H - 1);
         for (int ey = y0; ey <= y1; ey++)
             for (int ex = x0; ex <= x1; ex++) {
                 push_undo(ex, ey);
