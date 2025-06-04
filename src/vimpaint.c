@@ -191,6 +191,17 @@ static void cmd_execute(void) {
         return;
     }
 
+    if (strcmp(cmd_buf, ":e") == 0) {
+        if (*last_filename) {
+            snprintf(cmd_buf, sizeof(cmd_buf), ":e %s", last_filename);
+            cmd_len = strlen(cmd_buf);
+            cmd_execute();
+        } else {
+            cmd_flash("No filename.");
+        }
+        return;
+    }
+
     if (strncmp(cmd_buf, ":e ", 3) == 0 && *arg) {
         cairo_surface_t *surf = cairo_image_surface_create_from_png(arg);
         if (cairo_surface_status(surf) != CAIRO_STATUS_SUCCESS) {
