@@ -421,11 +421,13 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
 
     static gboolean pending_g = FALSE;
     static gboolean pending_d = FALSE;
+    static gboolean pending_f = FALSE;
     static int d_count = 1;
 
     if (event->keyval == GDK_KEY_colon) {
         pending_g = FALSE;
         pending_d = FALSE;
+        pending_f = FALSE;
         cmd_mode = TRUE;
         cmd_buf[0] = ':'; cmd_buf[1] = '\0'; cmd_len = 1;
         cmd_set(cmd_buf);
@@ -481,6 +483,26 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         return TRUE;
     }
 
+    if (pending_f) {
+        pending_f = FALSE;
+        if (event->keyval == GDK_KEY_j) {
+            last_find_dir = 2;
+            for (int fy = cursor_y + 1; fy < CANVAS_H; fy++)
+                if (PX(fy, cursor_x)) { cursor_y = fy; break; }
+        } else if (event->keyval == GDK_KEY_k) {
+            last_find_dir = -2;
+            for (int fy = cursor_y - 1; fy >= 0; fy--)
+                if (PX(fy, cursor_x)) { cursor_y = fy; break; }
+        } else {
+            last_find_dir = 1;
+            for (int fx = cursor_x + 1; fx < CANVAS_W; fx++)
+                if (PX(cursor_y, fx)) { cursor_x = fx; break; }
+        }
+        status_update();
+        gtk_widget_queue_draw(GTK_WIDGET(data));
+        return TRUE;
+    }
+
     /* Accumulate numeric prefix; treat 0 as line-start only when count is 0 */
     if (event->keyval >= GDK_KEY_1 && event->keyval <= GDK_KEY_9) {
         count = count * 10 + (event->keyval - GDK_KEY_0);
@@ -508,6 +530,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         insert_mode = FALSE;
         pending_g = FALSE;
         pending_d = FALSE;
+        pending_f = FALSE;
         status_update();
         gtk_widget_queue_draw(GTK_WIDGET(data));
         return TRUE;
@@ -648,11 +671,8 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         cursor_x = MAX(cursor_x - 5 * n, 0);
         break;
     case GDK_KEY_f:
-        last_find_dir = 1;
-        for (int fx = cursor_x + 1; fx < CANVAS_W; fx++) {
-            if (PX(cursor_y, fx)) { cursor_x = fx; break; }
-        }
-        break;
+        pending_f = TRUE;
+        return TRUE;
     case GDK_KEY_F:
         last_find_dir = -1;
         for (int fx = cursor_x - 1; fx >= 0; fx--) {
@@ -660,21 +680,33 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         }
         break;
     case GDK_KEY_n:
-        if (last_find_dir > 0) {
+        if (last_find_dir == 1) {
             for (int fx = cursor_x + 1; fx < CANVAS_W; fx++)
                 if (PX(cursor_y, fx)) { cursor_x = fx; break; }
-        } else if (last_find_dir < 0) {
+        } else if (last_find_dir == -1) {
             for (int fx = cursor_x - 1; fx >= 0; fx--)
                 if (PX(cursor_y, fx)) { cursor_x = fx; break; }
+        } else if (last_find_dir == 2) {
+            for (int fy = cursor_y + 1; fy < CANVAS_H; fy++)
+                if (PX(fy, cursor_x)) { cursor_y = fy; break; }
+        } else if (last_find_dir == -2) {
+            for (int fy = cursor_y - 1; fy >= 0; fy--)
+                if (PX(fy, cursor_x)) { cursor_y = fy; break; }
         }
         break;
     case GDK_KEY_N:
-        if (last_find_dir > 0) {
+        if (last_find_dir == 1) {
             for (int fx = cursor_x - 1; fx >= 0; fx--)
                 if (PX(cursor_y, fx)) { cursor_x = fx; break; }
-        } else if (last_find_dir < 0) {
+        } else if (last_find_dir == -1) {
             for (int fx = cursor_x + 1; fx < CANVAS_W; fx++)
                 if (PX(cursor_y, fx)) { cursor_x = fx; break; }
+        } else if (last_find_dir == 2) {
+            for (int fy = cursor_y - 1; fy >= 0; fy--)
+                if (PX(fy, cursor_x)) { cursor_y = fy; break; }
+        } else if (last_find_dir == -2) {
+            for (int fy = cursor_y + 1; fy < CANVAS_H; fy++)
+                if (PX(fy, cursor_x)) { cursor_y = fy; break; }
         }
         break;
     case GDK_KEY_d:
