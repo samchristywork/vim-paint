@@ -312,6 +312,31 @@ static void push_undo(int x, int y) {
     redo_count = 0;
 }
 
+static void find_right(void) {
+    for (int fx = cursor_x + 1; fx < CANVAS_W; fx++)
+        if (PX(cursor_y, fx)) { cursor_x = fx; return; }
+    for (int fx = 0; fx < cursor_x; fx++)
+        if (PX(cursor_y, fx)) { cursor_x = fx; return; }
+}
+static void find_left(void) {
+    for (int fx = cursor_x - 1; fx >= 0; fx--)
+        if (PX(cursor_y, fx)) { cursor_x = fx; return; }
+    for (int fx = CANVAS_W - 1; fx > cursor_x; fx--)
+        if (PX(cursor_y, fx)) { cursor_x = fx; return; }
+}
+static void find_down(void) {
+    for (int fy = cursor_y + 1; fy < CANVAS_H; fy++)
+        if (PX(fy, cursor_x)) { cursor_y = fy; return; }
+    for (int fy = 0; fy < cursor_y; fy++)
+        if (PX(fy, cursor_x)) { cursor_y = fy; return; }
+}
+static void find_up(void) {
+    for (int fy = cursor_y - 1; fy >= 0; fy--)
+        if (PX(fy, cursor_x)) { cursor_y = fy; return; }
+    for (int fy = CANVAS_H - 1; fy > cursor_y; fy--)
+        if (PX(fy, cursor_x)) { cursor_y = fy; return; }
+}
+
 static void flood_fill(int sx, int sy, guchar fill_color) {
     guchar target = PX(sy, sx);
     if (target == fill_color) return;
@@ -486,21 +511,13 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     if (pending_f) {
         pending_f = FALSE;
         if (event->keyval == GDK_KEY_j) {
-            last_find_dir = 2;
-            for (int fy = cursor_y + 1; fy < CANVAS_H; fy++)
-                if (PX(fy, cursor_x)) { cursor_y = fy; break; }
+            last_find_dir = 2;  find_down();
         } else if (event->keyval == GDK_KEY_k) {
-            last_find_dir = -2;
-            for (int fy = cursor_y - 1; fy >= 0; fy--)
-                if (PX(fy, cursor_x)) { cursor_y = fy; break; }
+            last_find_dir = -2; find_up();
         } else if (event->keyval == GDK_KEY_h) {
-            last_find_dir = -1;
-            for (int fx = cursor_x - 1; fx >= 0; fx--)
-                if (PX(cursor_y, fx)) { cursor_x = fx; break; }
+            last_find_dir = -1; find_left();
         } else {
-            last_find_dir = 1;
-            for (int fx = cursor_x + 1; fx < CANVAS_W; fx++)
-                if (PX(cursor_y, fx)) { cursor_x = fx; break; }
+            last_find_dir = 1;  find_right();
         }
         status_update();
         gtk_widget_queue_draw(GTK_WIDGET(data));
@@ -679,34 +696,16 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         pending_f = TRUE;
         return TRUE;
     case GDK_KEY_n:
-        if (last_find_dir == 1) {
-            for (int fx = cursor_x + 1; fx < CANVAS_W; fx++)
-                if (PX(cursor_y, fx)) { cursor_x = fx; break; }
-        } else if (last_find_dir == -1) {
-            for (int fx = cursor_x - 1; fx >= 0; fx--)
-                if (PX(cursor_y, fx)) { cursor_x = fx; break; }
-        } else if (last_find_dir == 2) {
-            for (int fy = cursor_y + 1; fy < CANVAS_H; fy++)
-                if (PX(fy, cursor_x)) { cursor_y = fy; break; }
-        } else if (last_find_dir == -2) {
-            for (int fy = cursor_y - 1; fy >= 0; fy--)
-                if (PX(fy, cursor_x)) { cursor_y = fy; break; }
-        }
+        if      (last_find_dir ==  1) find_right();
+        else if (last_find_dir == -1) find_left();
+        else if (last_find_dir ==  2) find_down();
+        else if (last_find_dir == -2) find_up();
         break;
     case GDK_KEY_N:
-        if (last_find_dir == 1) {
-            for (int fx = cursor_x - 1; fx >= 0; fx--)
-                if (PX(cursor_y, fx)) { cursor_x = fx; break; }
-        } else if (last_find_dir == -1) {
-            for (int fx = cursor_x + 1; fx < CANVAS_W; fx++)
-                if (PX(cursor_y, fx)) { cursor_x = fx; break; }
-        } else if (last_find_dir == 2) {
-            for (int fy = cursor_y - 1; fy >= 0; fy--)
-                if (PX(fy, cursor_x)) { cursor_y = fy; break; }
-        } else if (last_find_dir == -2) {
-            for (int fy = cursor_y + 1; fy < CANVAS_H; fy++)
-                if (PX(fy, cursor_x)) { cursor_y = fy; break; }
-        }
+        if      (last_find_dir ==  1) find_left();
+        else if (last_find_dir == -1) find_right();
+        else if (last_find_dir ==  2) find_up();
+        else if (last_find_dir == -2) find_down();
         break;
     case GDK_KEY_d:
         pending_d = TRUE;
