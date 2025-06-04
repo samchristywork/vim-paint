@@ -493,6 +493,10 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
             last_find_dir = -2;
             for (int fy = cursor_y - 1; fy >= 0; fy--)
                 if (PX(fy, cursor_x)) { cursor_y = fy; break; }
+        } else if (event->keyval == GDK_KEY_h) {
+            last_find_dir = -1;
+            for (int fx = cursor_x - 1; fx >= 0; fx--)
+                if (PX(cursor_y, fx)) { cursor_x = fx; break; }
         } else {
             last_find_dir = 1;
             for (int fx = cursor_x + 1; fx < CANVAS_W; fx++)
@@ -673,12 +677,6 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     case GDK_KEY_f:
         pending_f = TRUE;
         return TRUE;
-    case GDK_KEY_F:
-        last_find_dir = -1;
-        for (int fx = cursor_x - 1; fx >= 0; fx--) {
-            if (PX(cursor_y, fx)) { cursor_x = fx; break; }
-        }
-        break;
     case GDK_KEY_n:
         if (last_find_dir == 1) {
             for (int fx = cursor_x + 1; fx < CANVAS_W; fx++)
