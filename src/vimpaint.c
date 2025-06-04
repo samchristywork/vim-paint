@@ -306,21 +306,52 @@ static guchar *yank_buf = NULL;
 static int yank_w = 0;
 static int yank_h = 0;
 
-#define UNDO_MAX 256
-typedef struct { int x, y; guchar old_val; } UndoEntry;
-static UndoEntry undo_stack[UNDO_MAX];
-static int undo_top = 0;
-static int undo_count = 0;
-static UndoEntry redo_stack[UNDO_MAX];
-static int redo_top = 0;
-static int redo_count = 0;
+#define UNDO_MAX 64
+typedef struct { int x, y; guchar before, after; } PixelChange;
+typedef struct { PixelChange *changes; int count; } UndoAction;
 
-static void push_undo(int x, int y) {
-    undo_stack[undo_top % UNDO_MAX] = (UndoEntry){x, y, PX(y, x)};
-    undo_top++;
-    if (undo_count < UNDO_MAX) undo_count++;
+static UndoAction undo_stack[UNDO_MAX];
+static int undo_top = 0, undo_count = 0;
+static UndoAction redo_stack[UNDO_MAX];
+static int redo_top = 0, redo_count = 0;
+
+static PixelChange *staged = NULL;
+static int staged_count = 0, staged_cap = 0;
+
+static void free_action(UndoAction *a) {
+    free(a->changes);
+    a->changes = NULL;
+    a->count = 0;
+}
+
+static void begin_undo_action(void) {
+    staged_count = 0;
+    for (int i = 0; i < redo_count; i++)
+        free_action(&redo_stack[(redo_top - redo_count + i + UNDO_MAX * 2) % UNDO_MAX]);
     redo_top = 0;
     redo_count = 0;
+}
+
+static void push_undo(int x, int y) {
+    if (staged_count >= staged_cap) {
+        staged_cap = staged_cap ? staged_cap * 2 : 16;
+        staged = realloc(staged, staged_cap * sizeof(PixelChange));
+    }
+    staged[staged_count++] = (PixelChange){x, y, PX(y, x), 0};
+}
+
+static void commit_undo_action(void) {
+    if (staged_count == 0) return;
+    for (int i = 0; i < staged_count; i++)
+        staged[i].after = PX(staged[i].y, staged[i].x);
+    int idx = undo_top % UNDO_MAX;
+    if (undo_count == UNDO_MAX) free_action(&undo_stack[idx]);
+    PixelChange *copy = malloc(staged_count * sizeof(PixelChange));
+    memcpy(copy, staged, staged_count * sizeof(PixelChange));
+    undo_stack[idx] = (UndoAction){copy, staged_count};
+    undo_top++;
+    if (undo_count < UNDO_MAX) undo_count++;
+    staged_count = 0;
 }
 
 static void find_right(void) {
@@ -354,6 +385,7 @@ static void flood_fill(int sx, int sy, guchar fill_color) {
     int total = CANVAS_W * CANVAS_H;
     int *queue = malloc(total * sizeof(int));
     if (!queue) return;
+    begin_undo_action();
     int head = 0, tail = 0;
     queue[tail++] = sy * CANVAS_W + sx;
     push_undo(sx, sy);
@@ -372,6 +404,7 @@ static void flood_fill(int sx, int sy, guchar fill_color) {
         }
     }
     free(queue);
+    commit_undo_action();
 }
 
 static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
@@ -501,6 +534,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         case GDK_KEY_k: whole_row = TRUE; y0 = MAX(cursor_y - d_count, 0); break;
         default: return TRUE;
         }
+        begin_undo_action();
         if (whole_row) {
             for (int ey = y0; ey <= y1; ey++)
                 for (int ex = 0; ex < CANVAS_W; ex++) {
@@ -513,6 +547,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
                 PX(cursor_y, ex) = 0;
             }
         }
+        commit_undo_action();
         last_action = GDK_KEY_x;
         status_update();
         gtk_widget_queue_draw(GTK_WIDGET(data));
@@ -593,11 +628,13 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         int y0 = MIN(cursor_y, visual_anchor_y);
         int y1 = MAX(cursor_y, visual_anchor_y);
         guchar val = (event->keyval == GDK_KEY_r) ? fg_color : 0;
+        begin_undo_action();
         for (int ey = y0; ey <= y1; ey++)
             for (int ex = x0; ex <= x1; ex++) {
                 push_undo(ex, ey);
                 PX(ey, ex) = val;
             }
+        commit_undo_action();
         last_action = event->keyval;
         visual_mode = FALSE;
         status_update();
@@ -624,13 +661,19 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         if (redo_count > 0) {
             redo_top--;
             redo_count--;
-            UndoEntry e = redo_stack[redo_top % UNDO_MAX];
-            undo_stack[undo_top % UNDO_MAX] = (UndoEntry){e.x, e.y, PX(e.y, e.x)};
+            int ridx = redo_top % UNDO_MAX;
+            UndoAction a = redo_stack[ridx];
+            redo_stack[ridx] = (UndoAction){NULL, 0};
+            int uidx = undo_top % UNDO_MAX;
+            if (undo_count == UNDO_MAX) free_action(&undo_stack[uidx]);
+            undo_stack[uidx] = a;
             undo_top++;
             if (undo_count < UNDO_MAX) undo_count++;
-            PX(e.y, e.x) = e.old_val;
-            cursor_x = e.x;
-            cursor_y = e.y;
+            for (int i = 0; i < a.count; i++) {
+                PX(a.changes[i].y, a.changes[i].x) = a.changes[i].after;
+                cursor_x = a.changes[i].x;
+                cursor_y = a.changes[i].y;
+            }
             status_update();
             gtk_widget_queue_draw(GTK_WIDGET(data));
         }
@@ -658,35 +701,35 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         break;
     case GDK_KEY_H:
         cursor_x = MAX(cursor_x - 5 * n, 0);
-        if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
+        if (insert_mode) { begin_undo_action(); push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; commit_undo_action(); }
         break;
     case GDK_KEY_h:
         cursor_x = MAX(cursor_x - n, 0);
-        if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
+        if (insert_mode) { begin_undo_action(); push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; commit_undo_action(); }
         break;
     case GDK_KEY_L:
         cursor_x = MIN(cursor_x + 5 * n, CANVAS_W - 1);
-        if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
+        if (insert_mode) { begin_undo_action(); push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; commit_undo_action(); }
         break;
     case GDK_KEY_l:
         cursor_x = MIN(cursor_x + n, CANVAS_W - 1);
-        if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
+        if (insert_mode) { begin_undo_action(); push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; commit_undo_action(); }
         break;
     case GDK_KEY_K:
         cursor_y = MAX(cursor_y - 5 * n, 0);
-        if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
+        if (insert_mode) { begin_undo_action(); push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; commit_undo_action(); }
         break;
     case GDK_KEY_k:
         cursor_y = MAX(cursor_y - n, 0);
-        if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
+        if (insert_mode) { begin_undo_action(); push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; commit_undo_action(); }
         break;
     case GDK_KEY_J:
         cursor_y = MIN(cursor_y + 5 * n, CANVAS_H - 1);
-        if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
+        if (insert_mode) { begin_undo_action(); push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; commit_undo_action(); }
         break;
     case GDK_KEY_j:
         cursor_y = MIN(cursor_y + n, CANVAS_H - 1);
-        if (insert_mode) { push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; }
+        if (insert_mode) { begin_undo_action(); push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; commit_undo_action(); }
         break;
     case GDK_KEY_G:
         cursor_y = CANVAS_H - 1;
@@ -738,19 +781,23 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         int x1 = CLAMP(cursor_x + radius, 0, CANVAS_W - 1);
         int y0 = CLAMP(cursor_y - radius, 0, CANVAS_H - 1);
         int y1 = CLAMP(cursor_y + radius, 0, CANVAS_H - 1);
+        begin_undo_action();
         for (int ey = y0; ey <= y1; ey++)
             for (int ex = x0; ex <= x1; ex++) {
                 push_undo(ex, ey);
                 PX(ey, ex) = fg_color;
             }
+        commit_undo_action();
         last_action = GDK_KEY_r;
         break;
     }
     case GDK_KEY_D:
+        begin_undo_action();
         for (int ex = cursor_x; ex < CANVAS_W; ex++) {
             push_undo(ex, cursor_y);
             PX(cursor_y, ex) = 0;
         }
+        commit_undo_action();
         last_action = GDK_KEY_x;
         break;
     case GDK_KEY_S:
@@ -761,22 +808,27 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         int x1 = CLAMP(cursor_x + radius, 0, CANVAS_W - 1);
         int y0 = CLAMP(cursor_y - radius, 0, CANVAS_H - 1);
         int y1 = CLAMP(cursor_y + radius, 0, CANVAS_H - 1);
+        begin_undo_action();
         for (int ey = y0; ey <= y1; ey++)
             for (int ex = x0; ex <= x1; ex++) {
                 push_undo(ex, ey);
                 PX(ey, ex) = 0;
             }
+        commit_undo_action();
         last_action = GDK_KEY_x;
         break;
     }
     case GDK_KEY_period:
         if (last_action == GDK_KEY_r || last_action == GDK_KEY_x) {
+            begin_undo_action();
             push_undo(cursor_x, cursor_y);
             PX(cursor_y, cursor_x) = (last_action == GDK_KEY_r) ? fg_color : 0;
+            commit_undo_action();
         }
         break;
     case GDK_KEY_p:
         if (yank_buf) {
+            begin_undo_action();
             for (int ey = 0; ey < yank_h; ey++)
                 for (int ex = 0; ex < yank_w; ex++) {
                     int px = cursor_x + ex, py = cursor_y + ey;
@@ -785,19 +837,26 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
                         PX(py, px) = yank_buf[ey * yank_w + ex];
                     }
                 }
+            commit_undo_action();
         }
         break;
     case GDK_KEY_u:
         if (undo_count > 0) {
             undo_top--;
             undo_count--;
-            UndoEntry e = undo_stack[undo_top % UNDO_MAX];
-            redo_stack[redo_top % UNDO_MAX] = (UndoEntry){e.x, e.y, PX(e.y, e.x)};
+            int uidx = undo_top % UNDO_MAX;
+            UndoAction a = undo_stack[uidx];
+            undo_stack[uidx] = (UndoAction){NULL, 0};
+            int ridx = redo_top % UNDO_MAX;
+            if (redo_count == UNDO_MAX) free_action(&redo_stack[ridx]);
+            redo_stack[ridx] = a;
             redo_top++;
             if (redo_count < UNDO_MAX) redo_count++;
-            PX(e.y, e.x) = e.old_val;
-            cursor_x = e.x;
-            cursor_y = e.y;
+            for (int i = a.count - 1; i >= 0; i--) {
+                PX(a.changes[i].y, a.changes[i].x) = a.changes[i].before;
+                cursor_x = a.changes[i].x;
+                cursor_y = a.changes[i].y;
+            }
         }
         break;
     default:
@@ -825,8 +884,10 @@ static gboolean on_button_press(GtkWidget *widget, GdkEventButton *event, gpoint
     cursor_x = CLAMP(cx, 0, CANVAS_W - 1);
     cursor_y = CLAMP(cy, 0, CANVAS_H - 1);
     if (insert_mode) {
+        begin_undo_action();
         push_undo(cursor_x, cursor_y);
         PX(cursor_y, cursor_x) = fg_color;
+        commit_undo_action();
     }
     status_update();
     gtk_widget_queue_draw(widget);
@@ -841,8 +902,10 @@ static gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event, gpoin
     cursor_x = cx;
     cursor_y = cy;
     if (insert_mode) {
+        begin_undo_action();
         push_undo(cursor_x, cursor_y);
         PX(cursor_y, cursor_x) = fg_color;
+        commit_undo_action();
     }
     status_update();
     gtk_widget_queue_draw(widget);
