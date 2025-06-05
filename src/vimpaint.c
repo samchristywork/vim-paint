@@ -521,11 +521,12 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     static guint last_action = 0;
     static int last_radius = 0;
     static int last_find_dir = 0;  /* +1 = forward (f), -1 = backward (F), 0 = none */
+    static int gg_count = 0;
 
     if (pending_g) {
         pending_g = FALSE;
         if (event->keyval == GDK_KEY_g) {
-            cursor_y = 0;
+            cursor_y = gg_count > 0 ? CLAMP(gg_count - 1, 0, CANVAS_H - 1) : 0;
             count = 0;
             status_update();
             gtk_widget_queue_draw(GTK_WIDGET(data));
@@ -699,6 +700,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
 
     if (event->keyval == GDK_KEY_g) {
         pending_g = TRUE;
+        gg_count = orig_count;
         return TRUE;
     }
 
