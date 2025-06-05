@@ -53,6 +53,7 @@ static void zoom_resize(void) {
 }
 
 static void cmd_flash(const char *text);
+static void clear_history(void);
 
 static void flash_color(int idx) {
     char buf[64];
@@ -151,6 +152,7 @@ static void cmd_execute(void) {
 
     if (strcmp(cmd_buf, ":new") == 0) {
         memset(pixels, 0, CANVAS_W * CANVAS_H);
+        clear_history();
         last_filename[0] = '\0';
         cursor_x = 0; cursor_y = 0;
         gtk_window_set_title(GTK_WINDOW(main_window), "vim-paint");
@@ -231,6 +233,7 @@ static void cmd_execute(void) {
                 PX(y, x) = best;
             }
         cairo_surface_destroy(surf);
+        clear_history();
         snprintf(last_filename, sizeof(last_filename), "%s", arg);
         update_title(last_filename);
         gtk_widget_queue_draw(main_canvas);
@@ -322,6 +325,16 @@ static void free_action(UndoAction *a) {
     free(a->changes);
     a->changes = NULL;
     a->count = 0;
+}
+
+static void clear_history(void) {
+    for (int i = 0; i < undo_count; i++)
+        free_action(&undo_stack[(undo_top - undo_count + i + UNDO_MAX * 2) % UNDO_MAX]);
+    undo_top = 0; undo_count = 0;
+    for (int i = 0; i < redo_count; i++)
+        free_action(&redo_stack[(redo_top - redo_count + i + UNDO_MAX * 2) % UNDO_MAX]);
+    redo_top = 0; redo_count = 0;
+    staged_count = 0;
 }
 
 static void begin_undo_action(void) {
