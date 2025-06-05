@@ -186,8 +186,8 @@ static void cmd_execute(void) {
         if (cmd_write(arg)) {
             snprintf(last_filename, sizeof(last_filename), "%s", arg);
             update_title(last_filename);
+            gtk_main_quit();
         }
-        gtk_main_quit();
         return;
     }
 
