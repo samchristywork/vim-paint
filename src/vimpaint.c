@@ -504,6 +504,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     }
     static int count = 0;
     static guint last_action = 0;
+    static int last_radius = 0;
     static int last_find_dir = 0;  /* +1 = forward (f), -1 = backward (F), 0 = none */
 
     if (pending_g) {
@@ -789,6 +790,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
             }
         commit_undo_action();
         last_action = GDK_KEY_r;
+        last_radius = radius;
         break;
     }
     case GDK_KEY_D:
@@ -816,13 +818,22 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
             }
         commit_undo_action();
         last_action = GDK_KEY_x;
+        last_radius = radius;
         break;
     }
     case GDK_KEY_period:
         if (last_action == GDK_KEY_r || last_action == GDK_KEY_x) {
+            guchar val = (last_action == GDK_KEY_r) ? fg_color : 0;
+            int x0 = CLAMP(cursor_x - last_radius, 0, CANVAS_W - 1);
+            int x1 = CLAMP(cursor_x + last_radius, 0, CANVAS_W - 1);
+            int y0 = CLAMP(cursor_y - last_radius, 0, CANVAS_H - 1);
+            int y1 = CLAMP(cursor_y + last_radius, 0, CANVAS_H - 1);
             begin_undo_action();
-            push_undo(cursor_x, cursor_y);
-            PX(cursor_y, cursor_x) = (last_action == GDK_KEY_r) ? fg_color : 0;
+            for (int ey = y0; ey <= y1; ey++)
+                for (int ex = x0; ex <= x1; ex++) {
+                    push_undo(ex, ey);
+                    PX(ey, ex) = val;
+                }
             commit_undo_action();
         }
         break;
