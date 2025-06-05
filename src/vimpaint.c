@@ -501,6 +501,8 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         return TRUE;
     }
 
+    if (event->is_modifier) return FALSE;
+
     static gboolean pending_g = FALSE;
     static gboolean pending_d = FALSE;
     static gboolean pending_f = FALSE;
@@ -594,6 +596,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         return TRUE;
     }
 
+    int orig_count = count;
     int n = count > 0 ? count : 1;
     int radius = count;
     count = 0;
@@ -746,7 +749,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         if (insert_mode) { begin_undo_action(); push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; commit_undo_action(); }
         break;
     case GDK_KEY_G:
-        cursor_y = CANVAS_H - 1;
+        cursor_y = orig_count > 0 ? CLAMP(orig_count - 1, 0, CANVAS_H - 1) : CANVAS_H - 1;
         break;
     case GDK_KEY_0:
         cursor_x = 0;
