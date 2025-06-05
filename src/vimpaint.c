@@ -899,7 +899,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
 
 static gboolean on_palette_click(GtkWidget *widget, GdkEventButton *event, gpointer data) {
     int idx = (int)(event->x / SWATCH_W);
-    if (idx >= 0 && idx < PALETTE_SIZE) {
+    if (idx > 0 && idx < PALETTE_SIZE) {
         fg_color = (guchar)idx;
         gtk_widget_queue_draw(widget);
         flash_color(fg_color);
