@@ -878,6 +878,8 @@ static gboolean on_palette_click(GtkWidget *widget, GdkEventButton *event, gpoin
     return TRUE;
 }
 
+static gboolean drag_painting = FALSE;
+
 static gboolean on_button_press(GtkWidget *widget, GdkEventButton *event, gpointer data) {
     int cx = (int)(event->x / CELL_SIZE);
     int cy = (int)(event->y / CELL_SIZE);
@@ -885,12 +887,20 @@ static gboolean on_button_press(GtkWidget *widget, GdkEventButton *event, gpoint
     cursor_y = CLAMP(cy, 0, CANVAS_H - 1);
     if (insert_mode) {
         begin_undo_action();
+        drag_painting = TRUE;
         push_undo(cursor_x, cursor_y);
         PX(cursor_y, cursor_x) = fg_color;
-        commit_undo_action();
     }
     status_update();
     gtk_widget_queue_draw(widget);
+    return TRUE;
+}
+
+static gboolean on_button_release(GtkWidget *widget, GdkEventButton *event, gpointer data) {
+    if (drag_painting) {
+        commit_undo_action();
+        drag_painting = FALSE;
+    }
     return TRUE;
 }
 
@@ -901,11 +911,9 @@ static gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event, gpoin
     if (cx == cursor_x && cy == cursor_y) return TRUE;
     cursor_x = cx;
     cursor_y = cy;
-    if (insert_mode) {
-        begin_undo_action();
+    if (insert_mode && drag_painting) {
         push_undo(cursor_x, cursor_y);
         PX(cursor_y, cursor_x) = fg_color;
-        commit_undo_action();
     }
     status_update();
     gtk_widget_queue_draw(widget);
@@ -944,10 +952,11 @@ int main(int argc, char *argv[]) {
     gtk_widget_set_size_request(cmd_label, CANVAS_W * CELL_SIZE, 20);
     gtk_box_pack_start(GTK_BOX(vbox), cmd_label, FALSE, FALSE, 0);
 
-    gtk_widget_add_events(main_canvas, GDK_BUTTON_PRESS_MASK | GDK_BUTTON1_MOTION_MASK);
+    gtk_widget_add_events(main_canvas, GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK | GDK_BUTTON1_MOTION_MASK);
     gtk_widget_add_events(palette_bar, GDK_BUTTON_PRESS_MASK);
     g_signal_connect(main_canvas, "draw", G_CALLBACK(on_draw), NULL);
     g_signal_connect(main_canvas, "button-press-event", G_CALLBACK(on_button_press), NULL);
+    g_signal_connect(main_canvas, "button-release-event", G_CALLBACK(on_button_release), NULL);
     g_signal_connect(main_canvas, "motion-notify-event", G_CALLBACK(on_motion_notify), NULL);
     g_signal_connect(palette_bar, "draw", G_CALLBACK(on_palette_draw), NULL);
     g_signal_connect(palette_bar, "button-press-event", G_CALLBACK(on_palette_click), NULL);
