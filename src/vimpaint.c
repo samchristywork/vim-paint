@@ -798,6 +798,15 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         gtk_widget_queue_draw(palette_bar);
         flash_color(fg_color);
         break;
+    case GDK_KEY_e: {
+        guchar idx = PX(cursor_y, cursor_x);
+        if (idx > 0) {
+            fg_color = idx;
+            gtk_widget_queue_draw(palette_bar);
+            flash_color(fg_color);
+        }
+        break;
+    }
     case GDK_KEY_space:
     case GDK_KEY_r: {
         int x0 = CLAMP(cursor_x - radius, 0, CANVAS_W - 1);
