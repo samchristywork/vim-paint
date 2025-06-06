@@ -954,10 +954,23 @@ static gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event, gpoin
 }
 
 int main(int argc, char *argv[]) {
-    /* Parse optional: vimpaint [width [height [cell_size]]] */
-    if (argc >= 2) CANVAS_W = MAX(1, atoi(argv[1]));
-    if (argc >= 3) CANVAS_H = MAX(1, atoi(argv[2]));
-    if (argc >= 4) CELL_SIZE = CLAMP(atoi(argv[3]), 4, 64);
+    /* Parse optional: vimpaint [width [height [cell_size]]] [file.png]
+       Any argument that doesn't parse as a positive integer is the filename. */
+    char *startup_file = NULL;
+    if (argc >= 2) {
+        int v = atoi(argv[1]);
+        if (v > 0) CANVAS_W = v; else startup_file = argv[1];
+    }
+    if (argc >= 3 && !startup_file) {
+        int v = atoi(argv[2]);
+        if (v > 0) CANVAS_H = v; else startup_file = argv[2];
+    }
+    if (argc >= 4 && !startup_file) {
+        int v = atoi(argv[3]);
+        if (v > 0) CELL_SIZE = CLAMP(v, 4, 64); else startup_file = argv[3];
+    }
+    if (argc >= 5 && !startup_file)
+        startup_file = argv[4];
 
     pixels = calloc(CANVAS_W * CANVAS_H, 1);
 
@@ -997,6 +1010,13 @@ int main(int argc, char *argv[]) {
 
     gtk_widget_show_all(window);
     status_update();
+
+    if (startup_file) {
+        snprintf(cmd_buf, sizeof(cmd_buf), ":e %s", startup_file);
+        cmd_len = strlen(cmd_buf);
+        cmd_execute();
+    }
+
     gtk_main();
 
     return 0;
