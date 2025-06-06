@@ -972,6 +972,15 @@ int main(int argc, char *argv[]) {
     if (argc >= 5 && !startup_file)
         startup_file = argv[4];
 
+    if (startup_file) {
+        cairo_surface_t *probe = cairo_image_surface_create_from_png(startup_file);
+        if (cairo_surface_status(probe) == CAIRO_STATUS_SUCCESS) {
+            CANVAS_W = cairo_image_surface_get_width(probe);
+            CANVAS_H = cairo_image_surface_get_height(probe);
+        }
+        cairo_surface_destroy(probe);
+    }
+
     pixels = calloc(CANVAS_W * CANVAS_H, 1);
 
     gtk_init(&argc, &argv);
