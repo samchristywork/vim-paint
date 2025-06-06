@@ -962,6 +962,21 @@ static gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event, gpoin
     return TRUE;
 }
 
+static gboolean on_scroll(GtkWidget *widget, GdkEventScroll *event, gpointer data) {
+    double dy = 0;
+    if (event->direction == GDK_SCROLL_SMOOTH) {
+        double dx;
+        gdk_event_get_scroll_deltas((GdkEvent *)event, &dx, &dy);
+    } else if (event->direction == GDK_SCROLL_UP) {
+        dy = -1;
+    } else if (event->direction == GDK_SCROLL_DOWN) {
+        dy = 1;
+    }
+    if (dy < 0 && CELL_SIZE < 32) { CELL_SIZE += 2; zoom_resize(); }
+    else if (dy > 0 && CELL_SIZE > 4) { CELL_SIZE -= 2; zoom_resize(); }
+    return TRUE;
+}
+
 int main(int argc, char *argv[]) {
     /* Parse optional: vimpaint [width [height [cell_size]]] [file.png]
        Any argument that doesn't parse as a positive integer is the filename. */
@@ -1016,12 +1031,13 @@ int main(int argc, char *argv[]) {
     gtk_widget_set_size_request(cmd_label, CANVAS_W * CELL_SIZE, 20);
     gtk_box_pack_start(GTK_BOX(vbox), cmd_label, FALSE, FALSE, 0);
 
-    gtk_widget_add_events(main_canvas, GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK | GDK_BUTTON1_MOTION_MASK);
+    gtk_widget_add_events(main_canvas, GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK | GDK_BUTTON1_MOTION_MASK | GDK_SCROLL_MASK | GDK_SMOOTH_SCROLL_MASK);
     gtk_widget_add_events(palette_bar, GDK_BUTTON_PRESS_MASK);
     g_signal_connect(main_canvas, "draw", G_CALLBACK(on_draw), NULL);
     g_signal_connect(main_canvas, "button-press-event", G_CALLBACK(on_button_press), NULL);
     g_signal_connect(main_canvas, "button-release-event", G_CALLBACK(on_button_release), NULL);
     g_signal_connect(main_canvas, "motion-notify-event", G_CALLBACK(on_motion_notify), NULL);
+    g_signal_connect(main_canvas, "scroll-event", G_CALLBACK(on_scroll), NULL);
     g_signal_connect(palette_bar, "draw", G_CALLBACK(on_palette_draw), NULL);
     g_signal_connect(palette_bar, "button-press-event", G_CALLBACK(on_palette_click), NULL);
     g_signal_connect(window, "key-press-event", G_CALLBACK(on_key_press), main_canvas);
