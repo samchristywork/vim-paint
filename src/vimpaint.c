@@ -963,14 +963,15 @@ static gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event, gpoin
 }
 
 static gboolean on_scroll(GtkWidget *widget, GdkEventScroll *event, gpointer data) {
+    static double accum = 0;
     double dy = 0;
     if (event->direction == GDK_SCROLL_SMOOTH) {
         double dx;
         gdk_event_get_scroll_deltas((GdkEvent *)event, &dx, &dy);
-    } else if (event->direction == GDK_SCROLL_UP) {
-        dy = -1;
-    } else if (event->direction == GDK_SCROLL_DOWN) {
-        dy = 1;
+        accum += dy;
+        if (accum > -3.0 && accum < 3.0) return TRUE;
+        dy = accum;
+        accum = 0;
     }
     if (dy < 0 && CELL_SIZE < 32) { CELL_SIZE += 2; zoom_resize(); }
     else if (dy > 0 && CELL_SIZE > 4) { CELL_SIZE -= 2; zoom_resize(); }
