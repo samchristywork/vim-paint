@@ -302,6 +302,30 @@ static void cmd_execute(void) {
         return;
     }
 
+    if (strncmp(cmd_buf, ":resize ", 8) == 0 && *arg) {
+        int nw = 0, nh = 0;
+        if (sscanf(arg, "%dx%d", &nw, &nh) != 2)
+            sscanf(arg, "%d %d", &nw, &nh);
+        if (nw < 1 || nh < 1) { cmd_flash("Usage: :resize WxH"); return; }
+        guchar *np = calloc(nw * nh, 1);
+        if (!np) { cmd_flash("Out of memory."); return; }
+        int cw = MIN(CANVAS_W, nw), ch = MIN(CANVAS_H, nh);
+        for (int y = 0; y < ch; y++)
+            for (int x = 0; x < cw; x++)
+                np[y * nw + x] = PX(y, x);
+        free(pixels);
+        pixels = np;
+        CANVAS_W = nw;
+        CANVAS_H = nh;
+        cursor_x = CLAMP(cursor_x, 0, CANVAS_W - 1);
+        cursor_y = CLAMP(cursor_y, 0, CANVAS_H - 1);
+        clear_history();
+        zoom_resize();
+        gtk_widget_queue_draw(main_canvas);
+        cmd_set("");
+        return;
+    }
+
     cmd_flash("Unknown command.");
 }
 
