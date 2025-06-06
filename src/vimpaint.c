@@ -507,6 +507,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     static gboolean pending_d = FALSE;
     static gboolean pending_f = FALSE;
     static int d_count = 1;
+    static int f_count = 1;
 
     if (event->keyval == GDK_KEY_colon) {
         pending_g = FALSE;
@@ -573,15 +574,17 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
 
     if (pending_f) {
         pending_f = FALSE;
+        void (*fn)(void) = find_right;
         if (event->keyval == GDK_KEY_j) {
-            last_find_dir = 2;  find_down();
+            last_find_dir = 2;  fn = find_down;
         } else if (event->keyval == GDK_KEY_k) {
-            last_find_dir = -2; find_up();
+            last_find_dir = -2; fn = find_up;
         } else if (event->keyval == GDK_KEY_h) {
-            last_find_dir = -1; find_left();
+            last_find_dir = -1; fn = find_left;
         } else {
-            last_find_dir = 1;  find_right();
+            last_find_dir = 1;
         }
+        for (int i = 0; i < f_count; i++) fn();
         status_update();
         gtk_widget_queue_draw(GTK_WIDGET(data));
         return TRUE;
@@ -767,6 +770,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         break;
     case GDK_KEY_f:
         pending_f = TRUE;
+        f_count = n;
         return TRUE;
     case GDK_KEY_n:
         if      (last_find_dir ==  1) find_right();
