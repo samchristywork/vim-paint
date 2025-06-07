@@ -963,6 +963,40 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         }
         break;
     }
+    case GDK_KEY_o: {
+        int cx = cursor_x, cy = cursor_y, r = radius;
+        begin_undo_action();
+        if (r == 0) {
+            push_undo(cx, cy); PX(cy, cx) = fg_color;
+        } else {
+            int bx = r, by = 0, err = 0;
+#define CPSET(px, py) do { int _x=(px),_y=(py); \
+    if (_x>=0&&_x<CANVAS_W&&_y>=0&&_y<CANVAS_H){push_undo(_x,_y);PX(_y,_x)=fg_color;} } while(0)
+            while (bx >= by) {
+                CPSET(cx+bx,cy+by); CPSET(cx+by,cy+bx);
+                CPSET(cx-by,cy+bx); CPSET(cx-bx,cy+by);
+                CPSET(cx-bx,cy-by); CPSET(cx-by,cy-bx);
+                CPSET(cx+by,cy-bx); CPSET(cx+bx,cy-by);
+                if (err <= 0) { by++; err += 2*by+1; }
+                if (err >  0) { bx--; err -= 2*bx+1; }
+            }
+#undef CPSET
+        }
+        commit_undo_action();
+        break;
+    }
+    case GDK_KEY_O: {
+        int cx = cursor_x, cy = cursor_y, r = radius;
+        begin_undo_action();
+        for (int ey = cy - r; ey <= cy + r; ey++)
+            for (int ex = cx - r; ex <= cx + r; ex++)
+                if ((ex-cx)*(ex-cx)+(ey-cy)*(ey-cy) <= r*r &&
+                    ex >= 0 && ex < CANVAS_W && ey >= 0 && ey < CANVAS_H) {
+                    push_undo(ex, ey); PX(ey, ex) = fg_color;
+                }
+        commit_undo_action();
+        break;
+    }
     case GDK_KEY_space:
     case GDK_KEY_r: {
         int x0 = CLAMP(cursor_x - radius, 0, CANVAS_W - 1);
