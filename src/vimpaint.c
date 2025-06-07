@@ -326,6 +326,19 @@ static void cmd_execute(void) {
         return;
     }
 
+    if (strcmp(cmd_buf, ":fliph") == 0) {
+        for (int y = 0; y < CANVAS_H; y++)
+            for (int x = 0; x < CANVAS_W / 2; x++) {
+                guchar tmp = PX(y, x);
+                PX(y, x) = PX(y, CANVAS_W - 1 - x);
+                PX(y, CANVAS_W - 1 - x) = tmp;
+            }
+        clear_history();
+        gtk_widget_queue_draw(main_canvas);
+        cmd_set("");
+        return;
+    }
+
     cmd_flash("Unknown command.");
 }
 
