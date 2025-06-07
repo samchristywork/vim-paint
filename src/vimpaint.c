@@ -352,6 +352,26 @@ static void cmd_execute(void) {
         return;
     }
 
+    if (strcmp(cmd_buf, ":rotate") == 0) {
+        int nW = CANVAS_H, nH = CANVAS_W;
+        guchar *np = malloc(nW * nH);
+        if (!np) { cmd_flash("Out of memory."); return; }
+        for (int y = 0; y < CANVAS_H; y++)
+            for (int x = 0; x < CANVAS_W; x++)
+                np[x * nW + (CANVAS_H - 1 - y)] = PX(y, x);
+        free(pixels);
+        pixels = np;
+        CANVAS_W = nW;
+        CANVAS_H = nH;
+        cursor_x = CLAMP(cursor_x, 0, CANVAS_W - 1);
+        cursor_y = CLAMP(cursor_y, 0, CANVAS_H - 1);
+        clear_history();
+        zoom_resize();
+        gtk_widget_queue_draw(main_canvas);
+        cmd_set("");
+        return;
+    }
+
     cmd_flash("Unknown command.");
 }
 
