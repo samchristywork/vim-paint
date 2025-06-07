@@ -687,6 +687,30 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         return TRUE;
     }
 
+    if (visual_mode && event->keyval == GDK_KEY_backslash) {
+        int x0 = visual_anchor_x, y0 = visual_anchor_y;
+        int x1 = cursor_x,        y1 = cursor_y;
+        int dx = abs(x1 - x0), dy = abs(y1 - y0);
+        int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+        int err = dx - dy;
+        begin_undo_action();
+        int cx = x0, cy = y0;
+        while (1) {
+            push_undo(cx, cy);
+            PX(cy, cx) = fg_color;
+            if (cx == x1 && cy == y1) break;
+            int e2 = 2 * err;
+            if (e2 > -dy) { err -= dy; cx += sx; }
+            if (e2 <  dx) { err += dx; cy += sy; }
+        }
+        commit_undo_action();
+        last_action = GDK_KEY_r;
+        visual_mode = FALSE;
+        status_update();
+        gtk_widget_queue_draw(GTK_WIDGET(data));
+        return TRUE;
+    }
+
     if (event->keyval == GDK_KEY_s && (event->state & GDK_CONTROL_MASK)) {
         if (*last_filename) cmd_write(last_filename);
         else cmd_flash("No filename. Use :w filename");
