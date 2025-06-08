@@ -522,8 +522,11 @@ static void push_undo(int x, int y) {
     for (int i = 0; i < staged_count; i++)
         if (staged[i].x == x && staged[i].y == y) return;
     if (staged_count >= staged_cap) {
-        staged_cap = staged_cap ? staged_cap * 2 : 16;
-        staged = realloc(staged, staged_cap * sizeof(PixelChange));
+        int new_cap = staged_cap ? staged_cap * 2 : 16;
+        PixelChange *tmp = realloc(staged, new_cap * sizeof(PixelChange));
+        if (!tmp) return;
+        staged = tmp;
+        staged_cap = new_cap;
     }
     staged[staged_count++] = (PixelChange){x, y, PX(y, x), 0};
 }
