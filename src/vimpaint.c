@@ -1,6 +1,7 @@
 #include <gtk/gtk.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 static int CANVAS_W = 80;
 static int CANVAS_H = 40;
@@ -1209,36 +1210,45 @@ static gboolean on_scroll(GtkWidget *widget, GdkEventScroll *event, gpointer dat
 }
 
 int main(int argc, char *argv[]) {
-    /* Parse optional: vimpaint [width [height [cell_size]]] [file.png]
-       Any argument that doesn't parse as a positive integer is the filename. */
-    char *startup_file = NULL;
-    if (argc >= 2) {
-        int v = atoi(argv[1]);
-        if (v > 0) CANVAS_W = v; else startup_file = argv[1];
+    int explicit_w = 0, explicit_h = 0;
+    int opt;
+    while ((opt = getopt(argc, argv, "W:H:z:h")) != -1) {
+        switch (opt) {
+        case 'W': {
+            int v = atoi(optarg);
+            if (v > 0) { CANVAS_W = v; explicit_w = 1; }
+            break;
+        }
+        case 'H': {
+            int v = atoi(optarg);
+            if (v > 0) { CANVAS_H = v; explicit_h = 1; }
+            break;
+        }
+        case 'z': {
+            int v = atoi(optarg);
+            if (v > 0) CELL_SIZE = CLAMP(v, 4, 64);
+            break;
+        }
     }
-    if (argc >= 3 && !startup_file) {
-        int v = atoi(argv[2]);
-        if (v > 0) CANVAS_H = v; else startup_file = argv[2];
-    }
-    if (argc >= 4 && !startup_file) {
-        int v = atoi(argv[3]);
-        if (v > 0) CELL_SIZE = CLAMP(v, 4, 64); else startup_file = argv[3];
-    }
-    if (argc >= 5 && !startup_file)
-        startup_file = argv[4];
+
+    char *startup_file = (optind < argc) ? argv[optind] : NULL;
 
     if (startup_file) {
         cairo_surface_t *probe = cairo_image_surface_create_from_png(startup_file);
         if (cairo_surface_status(probe) == CAIRO_STATUS_SUCCESS) {
-            CANVAS_W = cairo_image_surface_get_width(probe);
-            CANVAS_H = cairo_image_surface_get_height(probe);
+            if (!explicit_w) CANVAS_W = cairo_image_surface_get_width(probe);
+            if (!explicit_h) CANVAS_H = cairo_image_surface_get_height(probe);
         }
         cairo_surface_destroy(probe);
     }
 
     pixels = calloc(CANVAS_W * CANVAS_H, 1);
 
-    gtk_init(&argc, &argv);
+    /* Pass only program name + positional args to gtk_init */
+    char **gtk_argv = argv + optind - 1;
+    gtk_argv[0] = argv[0];
+    int gtk_argc = argc - optind + 1;
+    gtk_init(&gtk_argc, &gtk_argv);
 
     main_window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     GtkWidget *window = main_window;
