@@ -1209,6 +1209,25 @@ static gboolean on_scroll(GtkWidget *widget, GdkEventScroll *event, gpointer dat
     return TRUE;
 }
 
+static void usage(const char *prog, int exitcode) {
+    FILE *out = exitcode ? stderr : stdout;
+    fprintf(out,
+        "Usage: %s [OPTIONS] [FILE]\n"
+        "\n"
+        "A vim-inspired pixel art editor.\n"
+        "\n"
+        "Arguments:\n"
+        "  FILE        PNG file to open at startup\n"
+        "\n"
+        "Options:\n"
+        "  -W N        Canvas width in cells (default: %d)\n"
+        "  -H N        Canvas height in cells (default: %d)\n"
+        "  -z N        Cell size in pixels, 4-64 (default: %d)\n"
+        "  -h          Show this help message\n",
+        prog, CANVAS_W, CANVAS_H, CELL_SIZE);
+    exit(exitcode);
+}
+
 int main(int argc, char *argv[]) {
     int explicit_w = 0, explicit_h = 0;
     int opt;
@@ -1228,6 +1247,12 @@ int main(int argc, char *argv[]) {
             int v = atoi(optarg);
             if (v > 0) CELL_SIZE = CLAMP(v, 4, 64);
             break;
+        }
+        case 'h':
+            usage(argv[0], 0);
+            break;
+        default:
+            usage(argv[0], 1);
         }
     }
 
