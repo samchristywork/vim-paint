@@ -402,6 +402,32 @@ static void cmd_execute(void) {
         return;
     }
 
+    if (strncmp(cmd_buf, ":loadp ", 7) == 0 && *arg) {
+        FILE *f = fopen(arg, "r");
+        if (!f) { cmd_flash("Cannot open file."); return; }
+        double np[PALETTE_MAX][3];
+        int count = 0;
+        char line[16];
+        while (fgets(line, sizeof(line), f) && count < PALETTE_MAX) {
+            unsigned int rgb;
+            if (line[0] == '#' && sscanf(line + 1, "%06x", &rgb) == 1) {
+                np[count][0] = ((rgb >> 16) & 0xff) / 255.0;
+                np[count][1] = ((rgb >>  8) & 0xff) / 255.0;
+                np[count][2] = ( rgb        & 0xff) / 255.0;
+                count++;
+            }
+        }
+        fclose(f);
+        if (count == 0) { cmd_flash("No colors found."); return; }
+        memcpy(palette, np, count * sizeof(np[0]));
+        palette_size = count;
+        if (fg_color >= (guchar)palette_size) fg_color = 1;
+        gtk_widget_queue_draw(palette_bar);
+        gtk_widget_queue_draw(main_canvas);
+        cmd_flash("Palette loaded.");
+        return;
+    }
+
     if (strcmp(cmd_buf, ":fliph") == 0) {
         for (int y = 0; y < CANVAS_H; y++)
             for (int x = 0; x < CANVAS_W / 2; x++) {
