@@ -519,6 +519,8 @@ static void begin_undo_action(void) {
 }
 
 static void push_undo(int x, int y) {
+    for (int i = 0; i < staged_count; i++)
+        if (staged[i].x == x && staged[i].y == y) return;
     if (staged_count >= staged_cap) {
         staged_cap = staged_cap ? staged_cap * 2 : 16;
         staged = realloc(staged, staged_cap * sizeof(PixelChange));
