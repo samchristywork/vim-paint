@@ -310,8 +310,11 @@ static void cmd_execute(void) {
             const char *val = opt + 6;
             unsigned int rgb = 0;
             gboolean have_rgb = FALSE;
-            if (val[0] == '#' && strlen(val) == 7) {
-                have_rgb = sscanf(val + 1, "%06x", &rgb) == 1;
+            if (val[0] == '#' && strlen(val) >= 7) {
+                char tmp[8];
+                strncpy(tmp, val, 7);
+                tmp[7] = '\0';
+                have_rgb = sscanf(tmp + 1, "%06x", &rgb) == 1;
                 if (!have_rgb) cmd_flash("Invalid hex color.");
             } else {
                 for (int i = 0; i < NAMED_COLORS_COUNT; i++) {
