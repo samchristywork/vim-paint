@@ -388,6 +388,20 @@ static void cmd_execute(void) {
         return;
     }
 
+    if (strncmp(cmd_buf, ":savep ", 7) == 0 && *arg) {
+        FILE *f = fopen(arg, "w");
+        if (!f) { cmd_flash("Cannot open file."); return; }
+        for (int i = 0; i < PALETTE_SIZE; i++) {
+            int r = (int)(palette[i][0] * 255 + 0.5);
+            int g = (int)(palette[i][1] * 255 + 0.5);
+            int b = (int)(palette[i][2] * 255 + 0.5);
+            fprintf(f, "#%02x%02x%02x\n", r, g, b);
+        }
+        fclose(f);
+        cmd_flash("Palette saved.");
+        return;
+    }
+
     if (strcmp(cmd_buf, ":fliph") == 0) {
         for (int y = 0; y < CANVAS_H; y++)
             for (int x = 0; x < CANVAS_W / 2; x++) {
