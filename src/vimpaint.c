@@ -954,6 +954,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         if (insert_mode) { begin_undo_action(); push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; commit_undo_action(); }
         break;
     case GDK_KEY_h:
+    case GDK_KEY_Left:
         cursor_x = MAX(cursor_x - n, 0);
         if (insert_mode) { begin_undo_action(); push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; commit_undo_action(); }
         break;
@@ -962,6 +963,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         if (insert_mode) { begin_undo_action(); push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; commit_undo_action(); }
         break;
     case GDK_KEY_l:
+    case GDK_KEY_Right:
         cursor_x = MIN(cursor_x + n, CANVAS_W - 1);
         if (insert_mode) { begin_undo_action(); push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; commit_undo_action(); }
         break;
@@ -970,6 +972,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         if (insert_mode) { begin_undo_action(); push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; commit_undo_action(); }
         break;
     case GDK_KEY_k:
+    case GDK_KEY_Up:
         cursor_y = MAX(cursor_y - n, 0);
         if (insert_mode) { begin_undo_action(); push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; commit_undo_action(); }
         break;
@@ -978,6 +981,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         if (insert_mode) { begin_undo_action(); push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; commit_undo_action(); }
         break;
     case GDK_KEY_j:
+    case GDK_KEY_Down:
         cursor_y = MIN(cursor_y + n, CANVAS_H - 1);
         if (insert_mode) { begin_undo_action(); push_undo(cursor_x, cursor_y); PX(cursor_y, cursor_x) = fg_color; commit_undo_action(); }
         break;
