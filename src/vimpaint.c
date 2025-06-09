@@ -918,7 +918,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         return TRUE;
     case GDK_KEY_plus:
     case GDK_KEY_equal:
-        if (CELL_SIZE < 32) { CELL_SIZE += 2; zoom_resize(); }
+        if (CELL_SIZE < 64) { CELL_SIZE += 2; zoom_resize(); }
         break;
     case GDK_KEY_minus:
         if (CELL_SIZE > 4) { CELL_SIZE -= 2; zoom_resize(); }
@@ -1212,7 +1212,7 @@ static gboolean on_scroll(GtkWidget *widget, GdkEventScroll *event, gpointer dat
         dy = accum;
         accum = 0;
     }
-    if (dy < 0 && CELL_SIZE < 32) { CELL_SIZE += 2; zoom_resize(); }
+    if (dy < 0 && CELL_SIZE < 64) { CELL_SIZE += 2; zoom_resize(); }
     else if (dy > 0 && CELL_SIZE > 4) { CELL_SIZE -= 2; zoom_resize(); }
     return TRUE;
 }
