@@ -3,8 +3,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-static int CANVAS_W = 80;
-static int CANVAS_H = 40;
+#define DEFAULT_CANVAS_W 80
+#define DEFAULT_CANVAS_H 40
+static int CANVAS_W = DEFAULT_CANVAS_W;
+static int CANVAS_H = DEFAULT_CANVAS_H;
 static int CELL_SIZE = 12;
 
 /* palette: index 0 = background (white), 1..N = foreground colors */
@@ -206,11 +208,17 @@ static void cmd_execute(void) {
     }
 
     if (strcmp(cmd_buf, ":new") == 0) {
-        memset(pixels, 0, CANVAS_W * CANVAS_H);
+        guchar *np = calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, 1);
+        if (!np) { cmd_flash("Out of memory."); return; }
+        free(pixels);
+        pixels = np;
+        CANVAS_W = DEFAULT_CANVAS_W;
+        CANVAS_H = DEFAULT_CANVAS_H;
         clear_history();
         last_filename[0] = '\0';
         cursor_x = 0; cursor_y = 0;
         gtk_window_set_title(GTK_WINDOW(main_window), "vim-paint");
+        zoom_resize();
         gtk_widget_queue_draw(main_canvas);
         cmd_set("");
         return;
