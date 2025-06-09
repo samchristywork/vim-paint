@@ -317,6 +317,32 @@ static void cmd_execute(void) {
             show_grid = FALSE;
             gtk_widget_queue_draw(main_canvas);
             cmd_set("");
+        } else if (strncmp(opt, "bg ", 3) == 0) {
+            const char *val = opt + 3;
+            unsigned int rgb = 0;
+            gboolean have_rgb = FALSE;
+            if (val[0] == '#' && strlen(val) >= 7) {
+                char tmp[8];
+                strncpy(tmp, val, 7);
+                tmp[7] = '\0';
+                have_rgb = sscanf(tmp + 1, "%06x", &rgb) == 1;
+                if (!have_rgb) cmd_flash("Invalid hex color.");
+            } else {
+                for (int i = 0; i < NAMED_COLORS_COUNT; i++) {
+                    if (strcmp(val, named_colors[i].name) == 0) {
+                        rgb = named_colors[i].rgb; have_rgb = TRUE; break;
+                    }
+                }
+                if (!have_rgb) cmd_flash("Unknown color.");
+            }
+            if (have_rgb) {
+                palette[0][0] = ((rgb >> 16) & 0xff) / 255.0;
+                palette[0][1] = ((rgb >>  8) & 0xff) / 255.0;
+                palette[0][2] = ( rgb        & 0xff) / 255.0;
+                gtk_widget_queue_draw(palette_bar);
+                gtk_widget_queue_draw(main_canvas);
+                cmd_set("");
+            }
         } else if (strncmp(opt, "color ", 6) == 0) {
             const char *val = opt + 6;
             unsigned int rgb = 0;
