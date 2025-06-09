@@ -57,6 +57,9 @@ static void zoom_resize(void) {
 
 static void cmd_flash(const char *text);
 static void clear_history(void);
+static void begin_undo_action(void);
+static void push_undo(int x, int y);
+static void commit_undo_action(void);
 
 static void flash_color(int idx) {
     char buf[64];
@@ -441,26 +444,38 @@ static void cmd_execute(void) {
     }
 
     if (strcmp(cmd_buf, ":fliph") == 0) {
+        begin_undo_action();
+        for (int y = 0; y < CANVAS_H; y++)
+            for (int x = 0; x < CANVAS_W / 2; x++) {
+                push_undo(x, y);
+                push_undo(CANVAS_W - 1 - x, y);
+            }
         for (int y = 0; y < CANVAS_H; y++)
             for (int x = 0; x < CANVAS_W / 2; x++) {
                 guchar tmp = PX(y, x);
                 PX(y, x) = PX(y, CANVAS_W - 1 - x);
                 PX(y, CANVAS_W - 1 - x) = tmp;
             }
-        clear_history();
+        commit_undo_action();
         gtk_widget_queue_draw(main_canvas);
         cmd_set("");
         return;
     }
 
     if (strcmp(cmd_buf, ":flipv") == 0) {
+        begin_undo_action();
+        for (int y = 0; y < CANVAS_H / 2; y++)
+            for (int x = 0; x < CANVAS_W; x++) {
+                push_undo(x, y);
+                push_undo(x, CANVAS_H - 1 - y);
+            }
         for (int y = 0; y < CANVAS_H / 2; y++)
             for (int x = 0; x < CANVAS_W; x++) {
                 guchar tmp = PX(y, x);
                 PX(y, x) = PX(CANVAS_H - 1 - y, x);
                 PX(CANVAS_H - 1 - y, x) = tmp;
             }
-        clear_history();
+        commit_undo_action();
         gtk_widget_queue_draw(main_canvas);
         cmd_set("");
         return;
