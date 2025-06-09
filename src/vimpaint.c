@@ -60,6 +60,7 @@ static void clear_history(void);
 static void begin_undo_action(void);
 static void push_undo(int x, int y);
 static void commit_undo_action(void);
+static void cmd_open(const char *filename);
 
 static void flash_color(int idx) {
     char buf[64];
@@ -198,6 +199,42 @@ static const struct { const char *name; unsigned int rgb; } named_colors[] = {
 };
 #define NAMED_COLORS_COUNT ((int)(sizeof named_colors / sizeof named_colors[0]))
 
+static void cmd_open(const char *filename) {
+    cairo_surface_t *surf = cairo_image_surface_create_from_png(filename);
+    if (cairo_surface_status(surf) != CAIRO_STATUS_SUCCESS) {
+        cmd_flash("Open failed.");
+        cairo_surface_destroy(surf);
+        return;
+    }
+    guchar *d = cairo_image_surface_get_data(surf);
+    int stride = cairo_image_surface_get_stride(surf);
+    int w = MIN(cairo_image_surface_get_width(surf), CANVAS_W);
+    int h = MIN(cairo_image_surface_get_height(surf), CANVAS_H);
+    memset(pixels, 0, CANVAS_W * CANVAS_H);
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++) {
+            double pr = d[y * stride + x * 4 + 2] / 255.0;
+            double pg = d[y * stride + x * 4 + 1] / 255.0;
+            double pb = d[y * stride + x * 4 + 0] / 255.0;
+            int best = 0;
+            double best_dist = 1e9;
+            for (int i = 0; i < PALETTE_SIZE; i++) {
+                double dr = pr - palette[i][0];
+                double dg = pg - palette[i][1];
+                double db = pb - palette[i][2];
+                double dist = dr*dr + dg*dg + db*db;
+                if (dist < best_dist) { best_dist = dist; best = i; }
+            }
+            PX(y, x) = best;
+        }
+    cairo_surface_destroy(surf);
+    clear_history();
+    snprintf(last_filename, sizeof(last_filename), "%s", filename);
+    update_title(last_filename);
+    gtk_widget_queue_draw(main_canvas);
+    cmd_set("");
+}
+
 static void cmd_execute(void) {
     /* Extract argument: text after the command verb, leading spaces stripped */
     const char *p = cmd_buf + 1;
@@ -260,50 +297,13 @@ static void cmd_execute(void) {
     }
 
     if (strcmp(cmd_buf, ":e") == 0) {
-        if (*last_filename) {
-            snprintf(cmd_buf, sizeof(cmd_buf), ":e %s", last_filename);
-            cmd_len = strlen(cmd_buf);
-            cmd_execute();
-        } else {
-            cmd_flash("No filename.");
-        }
+        if (*last_filename) cmd_open(last_filename);
+        else cmd_flash("No filename.");
         return;
     }
 
     if (strncmp(cmd_buf, ":e ", 3) == 0 && *arg) {
-        cairo_surface_t *surf = cairo_image_surface_create_from_png(arg);
-        if (cairo_surface_status(surf) != CAIRO_STATUS_SUCCESS) {
-            cmd_flash("Open failed.");
-            cairo_surface_destroy(surf);
-            return;
-        }
-        guchar *d = cairo_image_surface_get_data(surf);
-        int stride = cairo_image_surface_get_stride(surf);
-        int w = MIN(cairo_image_surface_get_width(surf), CANVAS_W);
-        int h = MIN(cairo_image_surface_get_height(surf), CANVAS_H);
-        memset(pixels, 0, CANVAS_W * CANVAS_H);
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++) {
-                double pr = d[y * stride + x * 4 + 2] / 255.0;
-                double pg = d[y * stride + x * 4 + 1] / 255.0;
-                double pb = d[y * stride + x * 4 + 0] / 255.0;
-                int best = 0;
-                double best_dist = 1e9;
-                for (int i = 0; i < PALETTE_SIZE; i++) {
-                    double dr = pr - palette[i][0];
-                    double dg = pg - palette[i][1];
-                    double db = pb - palette[i][2];
-                    double dist = dr*dr + dg*dg + db*db;
-                    if (dist < best_dist) { best_dist = dist; best = i; }
-                }
-                PX(y, x) = best;
-            }
-        cairo_surface_destroy(surf);
-        clear_history();
-        snprintf(last_filename, sizeof(last_filename), "%s", arg);
-        update_title(last_filename);
-        gtk_widget_queue_draw(main_canvas);
-        cmd_set("");
+        cmd_open(arg);
         return;
     }
 
@@ -1342,11 +1342,8 @@ int main(int argc, char *argv[]) {
     gtk_widget_show_all(window);
     status_update();
 
-    if (startup_file) {
-        snprintf(cmd_buf, sizeof(cmd_buf), ":e %s", startup_file);
-        cmd_len = strlen(cmd_buf);
-        cmd_execute();
-    }
+    if (startup_file)
+        cmd_open(startup_file);
 
     gtk_main();
 
