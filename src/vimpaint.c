@@ -37,9 +37,9 @@ static gboolean insert_mode = FALSE;
 static gboolean show_grid = TRUE;
 
 static gboolean cmd_mode = FALSE;
-static char cmd_buf[256];
+static char cmd_buf[4096];
 static int cmd_len = 0;
-static char last_filename[256] = "";
+static char last_filename[4096] = "";
 static GtkWidget *cmd_label = NULL;
 static GtkWidget *main_canvas = NULL;
 static GtkWidget *palette_bar = NULL;
@@ -696,7 +696,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
             if (cmd_len > 1) { cmd_buf[--cmd_len] = '\0'; cmd_set(cmd_buf); }
         } else {
             guint32 uc = gdk_keyval_to_unicode(event->keyval);
-            if (uc >= 0x20 && uc < 0x7f && cmd_len < 254) {
+            if (uc >= 0x20 && uc < 0x7f && cmd_len < (int)sizeof(cmd_buf) - 2) {
                 cmd_buf[cmd_len++] = (char)uc;
                 cmd_buf[cmd_len] = '\0';
                 cmd_set(cmd_buf);
