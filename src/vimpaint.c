@@ -1032,6 +1032,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     case GDK_KEY_minus:
         if (CELL_SIZE > 4) { CELL_SIZE -= 2; zoom_resize(); }
         break;
+    case GDK_KEY_bar:
+        show_grid = !show_grid;
+        break;
     case GDK_KEY_i:
         insert_mode = TRUE;
         break;
