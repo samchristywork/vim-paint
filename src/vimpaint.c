@@ -505,6 +505,30 @@ static void cmd_execute(void) {
         return;
     }
 
+    if (strncmp(cmd_buf, ":delp ", 6) == 0 && *arg) {
+        int idx = atoi(arg);
+        if (idx <= 0 || idx >= PALETTE_SIZE) {
+            cmd_flash("Invalid palette index (must be 1 or above).");
+            return;
+        }
+        for (int i = 0; i < CANVAS_W * CANVAS_H; i++) {
+            if (pixels[i] == (guchar)idx) pixels[i] = 0;
+            else if (pixels[i] > (guchar)idx) pixels[i]--;
+        }
+        for (int i = idx; i < PALETTE_SIZE - 1; i++) {
+            palette[i][0] = palette[i+1][0];
+            palette[i][1] = palette[i+1][1];
+            palette[i][2] = palette[i+1][2];
+        }
+        palette_size--;
+        if (fg_color >= (guchar)PALETTE_SIZE) fg_color = PALETTE_SIZE - 1;
+        clear_history();
+        gtk_widget_queue_draw(palette_bar);
+        gtk_widget_queue_draw(main_canvas);
+        cmd_flash("Entry deleted.");
+        return;
+    }
+
     if (strcmp(cmd_buf, ":fliph") == 0) {
         begin_undo_action();
         for (int y = 0; y < CANVAS_H; y++)
