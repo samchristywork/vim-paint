@@ -345,6 +345,42 @@ static void cmd_execute(void) {
             }
         } else if (strncmp(opt, "color ", 6) == 0) {
             const char *val = opt + 6;
+            /* two-arg form: :set color <idx> <color> - edit slot in place */
+            const char *sp = strchr(val, ' ');
+            if (sp && val[0] >= '0' && val[0] <= '9') {
+                int slot = atoi(val);
+                const char *cval = sp + 1;
+                while (*cval == ' ') cval++;
+                if (slot < 0 || slot >= PALETTE_SIZE) {
+                    cmd_flash("Invalid palette index.");
+                } else {
+                    unsigned int rgb2 = 0;
+                    gboolean ok = FALSE;
+                    if (cval[0] == '#' && strlen(cval) >= 7) {
+                        char tmp[8];
+                        strncpy(tmp, cval, 7);
+                        tmp[7] = '\0';
+                        ok = sscanf(tmp + 1, "%06x", &rgb2) == 1;
+                        if (!ok) cmd_flash("Invalid hex color.");
+                    } else {
+                        for (int i = 0; i < NAMED_COLORS_COUNT; i++) {
+                            if (strcmp(cval, named_colors[i].name) == 0) {
+                                rgb2 = named_colors[i].rgb; ok = TRUE; break;
+                            }
+                        }
+                        if (!ok) cmd_flash("Unknown color.");
+                    }
+                    if (ok) {
+                        palette[slot][0] = ((rgb2 >> 16) & 0xff) / 255.0;
+                        palette[slot][1] = ((rgb2 >>  8) & 0xff) / 255.0;
+                        palette[slot][2] = ( rgb2        & 0xff) / 255.0;
+                        gtk_widget_queue_draw(palette_bar);
+                        gtk_widget_queue_draw(main_canvas);
+                        cmd_set("");
+                    }
+                }
+                return;
+            }
             unsigned int rgb = 0;
             gboolean have_rgb = FALSE;
             if (val[0] == '#' && strlen(val) >= 7) {
