@@ -35,6 +35,7 @@ static int visual_anchor_x = 0;
 static int visual_anchor_y = 0;
 static gboolean insert_mode = FALSE;
 static gboolean show_grid = TRUE;
+static gboolean canvas_dirty = FALSE;
 
 static gboolean cmd_mode = FALSE;
 static char cmd_buf[4096];
@@ -61,6 +62,7 @@ static void begin_undo_action(void);
 static void push_undo(int x, int y);
 static void commit_undo_action(void);
 static void cmd_open(const char *filename);
+static void title_refresh(void);
 
 static void flash_color(int idx) {
     char buf[64];
@@ -72,9 +74,16 @@ static void flash_color(int idx) {
 }
 
 static void update_title(const char *filename) {
-    char buf[300];
-    snprintf(buf, sizeof(buf), "vim-paint - %s", filename);
+    char buf[4300];
+    snprintf(buf, sizeof(buf), "vim-paint - %s%s",
+             filename, canvas_dirty ? " [+]" : "");
     gtk_window_set_title(GTK_WINDOW(main_window), buf);
+}
+
+static void title_refresh(void) {
+    if (*last_filename) update_title(last_filename);
+    else gtk_window_set_title(GTK_WINDOW(main_window),
+                              canvas_dirty ? "vim-paint [+]" : "vim-paint");
 }
 
 static gboolean on_palette_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
@@ -138,10 +147,13 @@ static gboolean cmd_write(const char *filename) {
     cairo_surface_mark_dirty(surf);
     gboolean ok = cairo_surface_write_to_png(surf, filename) == CAIRO_STATUS_SUCCESS;
     cairo_surface_destroy(surf);
-    if (ok)
+    if (ok) {
+        canvas_dirty = FALSE;
+        title_refresh();
         cmd_flash("Written.");
-    else
+    } else {
         cmd_flash("Write failed.");
+    }
     return ok;
 }
 
@@ -255,6 +267,7 @@ static void cmd_execute(void) {
         CANVAS_W = DEFAULT_CANVAS_W;
         CANVAS_H = DEFAULT_CANVAS_H;
         clear_history();
+        canvas_dirty = FALSE;
         last_filename[0] = '\0';
         cursor_x = 0; cursor_y = 0;
         gtk_window_set_title(GTK_WINDOW(main_window), "vim-paint");
@@ -655,6 +668,8 @@ static void commit_undo_action(void) {
     undo_top++;
     if (undo_count < UNDO_MAX) undo_count++;
     staged_count = 0;
+    canvas_dirty = TRUE;
+    title_refresh();
 }
 
 static void find_right(void) {
