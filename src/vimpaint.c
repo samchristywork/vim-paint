@@ -330,6 +330,15 @@ static void cmd_execute(void) {
             show_grid = FALSE;
             gtk_widget_queue_draw(main_canvas);
             cmd_set("");
+        } else if (strncmp(opt, "zoom ", 5) == 0) {
+            int v = atoi(opt + 5);
+            if (v >= 4 && v <= 64) {
+                CELL_SIZE = v;
+                zoom_resize();
+                cmd_set("");
+            } else {
+                cmd_flash("Zoom must be 4-64.");
+            }
         } else if (strncmp(opt, "bg ", 3) == 0) {
             const char *val = opt + 3;
             unsigned int rgb = 0;
