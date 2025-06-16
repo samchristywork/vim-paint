@@ -609,6 +609,59 @@ static void cmd_execute(void) {
         return;
     }
 
+    if (strcmp(cmd_buf, ":help") == 0) {
+        GtkWidget *dlg = gtk_message_dialog_new(
+            GTK_WINDOW(main_window),
+            GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+            GTK_MESSAGE_INFO, GTK_BUTTONS_CLOSE,
+            "vim-paint key bindings");
+        gtk_message_dialog_format_secondary_text(GTK_MESSAGE_DIALOG(dlg),
+            "Movement\n"
+            "  h/j/k/l or arrows   move cursor (n=count prefix)\n"
+            "  H/J/K/L             jump 5 cells\n"
+            "  0 / $               first / last column\n"
+            "  gg / G              first / last row\n"
+            "\n"
+            "Drawing\n"
+            "  Space / r           paint rect  (n=radius)\n"
+            "  x                   erase rect  (n=radius)\n"
+            "  o                   circle outline  (n=radius)\n"
+            "  O                   filled circle   (n=radius)\n"
+            "  S                   flood fill\n"
+            "  i                   insert mode (move to paint)\n"
+            "  .                   repeat last paint / erase\n"
+            "\n"
+            "Visual mode  (v)\n"
+            "  r / x               fill / erase selection\n"
+            "  y / p               yank / paste\n"
+            "  \\                   draw line from anchor to cursor\n"
+            "\n"
+            "Palette\n"
+            "  c / C               cycle color forward / backward\n"
+            "  e                   pick color under cursor\n"
+            "  :set color <hex|name>          add/select color\n"
+            "  :set color <idx> <hex|name>    edit palette slot\n"
+            "  :set bg <hex|name>             set background color\n"
+            "  :savep / :loadp <file>         save / load palette\n"
+            "  :delp <idx>                    delete palette entry\n"
+            "\n"
+            "Files\n"
+            "  :w [file]   :wq [file]   :e [file]   :new\n"
+            "\n"
+            "Transform\n"
+            "  :resize WxH   :fliph   :flipv   :rotate\n"
+            "\n"
+            "View\n"
+            "  + / -               zoom in / out\n"
+            "  | (pipe)            toggle grid\n"
+            "  :set zoom N         set cell size\n"
+            "  Ctrl-G              show file info\n");
+        gtk_dialog_run(GTK_DIALOG(dlg));
+        gtk_widget_destroy(dlg);
+        cmd_set("");
+        return;
+    }
+
     cmd_flash("Unknown command.");
 }
 
