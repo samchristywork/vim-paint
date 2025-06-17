@@ -1353,17 +1353,20 @@ static gboolean on_palette_click(GtkWidget *widget, GdkEventButton *event, gpoin
 }
 
 static gboolean drag_painting = FALSE;
+static guchar drag_color = 0;
 
 static gboolean on_button_press(GtkWidget *widget, GdkEventButton *event, gpointer data) {
+    if (event->button != 1 && event->button != 3) return FALSE;
     int cx = (int)(event->x / CELL_SIZE);
     int cy = (int)(event->y / CELL_SIZE);
     cursor_x = CLAMP(cx, 0, CANVAS_W - 1);
     cursor_y = CLAMP(cy, 0, CANVAS_H - 1);
     if (insert_mode) {
+        drag_color = (event->button == 3) ? 0 : fg_color;
         begin_undo_action();
         drag_painting = TRUE;
         push_undo(cursor_x, cursor_y);
-        PX(cursor_y, cursor_x) = fg_color;
+        PX(cursor_y, cursor_x) = drag_color;
     }
     status_update();
     gtk_widget_queue_draw(widget);
@@ -1379,7 +1382,9 @@ static gboolean on_button_release(GtkWidget *widget, GdkEventButton *event, gpoi
 }
 
 static gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event, gpointer data) {
-    if (!(event->state & GDK_BUTTON1_MASK)) return TRUE;
+    gboolean btn1 = event->state & GDK_BUTTON1_MASK;
+    gboolean btn3 = event->state & GDK_BUTTON3_MASK;
+    if (!btn1 && !btn3) return TRUE;
     int cx = CLAMP((int)(event->x / CELL_SIZE), 0, CANVAS_W - 1);
     int cy = CLAMP((int)(event->y / CELL_SIZE), 0, CANVAS_H - 1);
     if (cx == cursor_x && cy == cursor_y) return TRUE;
@@ -1387,7 +1392,7 @@ static gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event, gpoin
     cursor_y = cy;
     if (insert_mode && drag_painting) {
         push_undo(cursor_x, cursor_y);
-        PX(cursor_y, cursor_x) = fg_color;
+        PX(cursor_y, cursor_x) = drag_color;
     }
     status_update();
     gtk_widget_queue_draw(widget);
@@ -1498,7 +1503,7 @@ int main(int argc, char *argv[]) {
     gtk_widget_set_size_request(cmd_label, CANVAS_W * CELL_SIZE, 20);
     gtk_box_pack_start(GTK_BOX(vbox), cmd_label, FALSE, FALSE, 0);
 
-    gtk_widget_add_events(main_canvas, GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK | GDK_BUTTON1_MOTION_MASK | GDK_SCROLL_MASK | GDK_SMOOTH_SCROLL_MASK);
+    gtk_widget_add_events(main_canvas, GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK | GDK_BUTTON1_MOTION_MASK | GDK_BUTTON3_MOTION_MASK | GDK_SCROLL_MASK | GDK_SMOOTH_SCROLL_MASK);
     gtk_widget_add_events(palette_bar, GDK_BUTTON_PRESS_MASK);
     g_signal_connect(main_canvas, "draw", G_CALLBACK(on_draw), NULL);
     g_signal_connect(main_canvas, "button-press-event", G_CALLBACK(on_button_press), NULL);
