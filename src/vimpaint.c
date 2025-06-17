@@ -972,6 +972,8 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     static int count = 0;
     static guint last_action = 0;
     static int last_radius = 0;
+    static gboolean last_was_visual = FALSE;
+    static int last_visual_dx = 0, last_visual_dy = 0;
     static int last_find_dir = 0;  /* +1 = forward (f), -1 = backward (F), 0 = none */
     static int gg_count = 0;
 
@@ -1014,6 +1016,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         }
         commit_undo_action();
         last_action = GDK_KEY_x;
+        last_was_visual = FALSE;
         status_update();
         gtk_widget_queue_draw(GTK_WIDGET(data));
         return TRUE;
@@ -1102,6 +1105,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
                 paint_pixel(ex, ey, val);
         commit_undo_action();
         last_action = event->keyval;
+        last_was_visual = TRUE;
+        last_visual_dx = visual_anchor_x - cursor_x;
+        last_visual_dy = visual_anchor_y - cursor_y;
         visual_mode = FALSE;
         status_update();
         gtk_widget_queue_draw(GTK_WIDGET(data));
@@ -1124,7 +1130,10 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
             if (e2 <  dx) { err += dx; cy += sy; }
         }
         commit_undo_action();
-        last_action = GDK_KEY_r;
+        last_action = GDK_KEY_backslash;
+        last_was_visual = TRUE;
+        last_visual_dx = visual_anchor_x - cursor_x;
+        last_visual_dy = visual_anchor_y - cursor_y;
         visual_mode = FALSE;
         status_update();
         gtk_widget_queue_draw(GTK_WIDGET(data));
@@ -1327,6 +1336,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         commit_undo_action();
         last_action = GDK_KEY_r;
         last_radius = radius;
+        last_was_visual = FALSE;
         break;
     }
     case GDK_KEY_D:
@@ -1335,6 +1345,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
             paint_pixel(ex, cursor_y, 0);
         commit_undo_action();
         last_action = GDK_KEY_x;
+        last_was_visual = FALSE;
         break;
     case GDK_KEY_S:
         flood_fill(cursor_x, cursor_y, fg_color);
@@ -1351,10 +1362,39 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         commit_undo_action();
         last_action = GDK_KEY_x;
         last_radius = radius;
+        last_was_visual = FALSE;
         break;
     }
     case GDK_KEY_period:
-        if (last_action == GDK_KEY_r || last_action == GDK_KEY_x) {
+        if (last_was_visual) {
+            int ax = cursor_x + last_visual_dx;
+            int ay = cursor_y + last_visual_dy;
+            begin_undo_action();
+            if (last_action == GDK_KEY_backslash) {
+                int lx0 = ax, ly0 = ay, lx1 = cursor_x, ly1 = cursor_y;
+                int ldx = abs(lx1 - lx0), ldy = abs(ly1 - ly0);
+                int lsx = lx0 < lx1 ? 1 : -1, lsy = ly0 < ly1 ? 1 : -1;
+                int lerr = ldx - ldy;
+                int lcx = lx0, lcy = ly0;
+                while (1) {
+                    paint_pixel(lcx, lcy, fg_color);
+                    if (lcx == lx1 && lcy == ly1) break;
+                    int e2 = 2 * lerr;
+                    if (e2 > -ldy) { lerr -= ldy; lcx += lsx; }
+                    if (e2 <  ldx) { lerr += ldx; lcy += lsy; }
+                }
+            } else {
+                guchar val = (last_action == GDK_KEY_r) ? fg_color : 0;
+                int x0 = CLAMP(MIN(cursor_x, ax), 0, CANVAS_W - 1);
+                int x1 = CLAMP(MAX(cursor_x, ax), 0, CANVAS_W - 1);
+                int y0 = CLAMP(MIN(cursor_y, ay), 0, CANVAS_H - 1);
+                int y1 = CLAMP(MAX(cursor_y, ay), 0, CANVAS_H - 1);
+                for (int ey = y0; ey <= y1; ey++)
+                    for (int ex = x0; ex <= x1; ex++)
+                        paint_pixel(ex, ey, val);
+            }
+            commit_undo_action();
+        } else if (last_action == GDK_KEY_r || last_action == GDK_KEY_x) {
             guchar val = (last_action == GDK_KEY_r) ? fg_color : 0;
             int x0 = CLAMP(cursor_x - last_radius, 0, CANVAS_W - 1);
             int x1 = CLAMP(cursor_x + last_radius, 0, CANVAS_W - 1);
