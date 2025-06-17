@@ -69,6 +69,7 @@ static void tab_reset(void) {
     tab_glob_idx = 0;
 }
 
+static void palette_to_rgb(int idx, int *r, int *g, int *b);
 static void cmd_flash(const char *text);
 static void clear_history(void);
 static void begin_undo_action(void);
@@ -80,9 +81,8 @@ static void paint_pixel(int x, int y, guchar color);
 
 static void flash_color(int idx) {
     char buf[64];
-    int r = (int)(palette[idx][0] * 255 + 0.5);
-    int g = (int)(palette[idx][1] * 255 + 0.5);
-    int b = (int)(palette[idx][2] * 255 + 0.5);
+    int r, g, b;
+    palette_to_rgb(idx, &r, &g, &b);
     snprintf(buf, sizeof(buf), "color %d  #%02x%02x%02x", idx, r, g, b);
     cmd_flash(buf);
 }
@@ -130,9 +130,8 @@ static void status_update(void) {
     if (flash_timer_id) return;
     char buf[128];
     const char *mode = visual_mode ? "VISUAL" : insert_mode ? "INSERT" : "NORMAL";
-    int r = (int)(palette[fg_color][0] * 255 + 0.5);
-    int g = (int)(palette[fg_color][1] * 255 + 0.5);
-    int b = (int)(palette[fg_color][2] * 255 + 0.5);
+    int r, g, b;
+    palette_to_rgb(fg_color, &r, &g, &b);
     snprintf(buf, sizeof(buf), " %s  col: %d  row: %d  [%d] #%02x%02x%02x",
              mode, cursor_x + 1, cursor_y + 1, (int)fg_color, r, g, b);
     gtk_label_set_text(GTK_LABEL(cmd_label), buf);
@@ -232,6 +231,12 @@ static const struct { const char *name; unsigned int rgb; } named_colors[] = {
 /* Returns TRUE and sets *out_rgb on success.
    Flashes "Invalid hex color." and returns FALSE if val starts with '#' but is malformed.
    Returns FALSE without flashing if val is neither a valid hex nor a known name. */
+static void palette_to_rgb(int idx, int *r, int *g, int *b) {
+    *r = (int)(palette[idx][0] * 255 + 0.5);
+    *g = (int)(palette[idx][1] * 255 + 0.5);
+    *b = (int)(palette[idx][2] * 255 + 0.5);
+}
+
 static void set_palette_rgb(int slot, unsigned int rgb) {
     palette[slot][0] = ((rgb >> 16) & 0xff) / 255.0;
     palette[slot][1] = ((rgb >>  8) & 0xff) / 255.0;
@@ -504,9 +509,8 @@ static void cmd_execute(void) {
         FILE *f = fopen(arg, "w");
         if (!f) { cmd_flash("Cannot open file."); return; }
         for (int i = 0; i < PALETTE_SIZE; i++) {
-            int r = (int)(palette[i][0] * 255 + 0.5);
-            int g = (int)(palette[i][1] * 255 + 0.5);
-            int b = (int)(palette[i][2] * 255 + 0.5);
+            int r, g, b;
+            palette_to_rgb(i, &r, &g, &b);
             fprintf(f, "#%02x%02x%02x\n", r, g, b);
         }
         fclose(f);
