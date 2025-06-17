@@ -229,6 +229,28 @@ static const struct { const char *name; unsigned int rgb; } named_colors[] = {
 };
 #define NAMED_COLORS_COUNT ((int)(sizeof named_colors / sizeof named_colors[0]))
 
+/* Returns TRUE and sets *out_rgb on success.
+   Flashes "Invalid hex color." and returns FALSE if val starts with '#' but is malformed.
+   Returns FALSE without flashing if val is neither a valid hex nor a known name. */
+static gboolean parse_color(const char *val, unsigned int *out_rgb) {
+    if (val[0] == '#') {
+        char tmp[8];
+        strncpy(tmp, val, 7);
+        tmp[7] = '\0';
+        if (strlen(val) >= 7 && sscanf(tmp + 1, "%06x", out_rgb) == 1)
+            return TRUE;
+        cmd_flash("Invalid hex color.");
+        return FALSE;
+    }
+    for (int i = 0; i < NAMED_COLORS_COUNT; i++) {
+        if (strcmp(val, named_colors[i].name) == 0) {
+            *out_rgb = named_colors[i].rgb;
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
 static void cmd_open(const char *filename) {
     cairo_surface_t *surf = cairo_image_surface_create_from_png(filename);
     if (cairo_surface_status(surf) != CAIRO_STATUS_SUCCESS) {
@@ -360,28 +382,15 @@ static void cmd_execute(void) {
         } else if (strncmp(opt, "bg ", 3) == 0) {
             const char *val = opt + 3;
             unsigned int rgb = 0;
-            gboolean have_rgb = FALSE;
-            if (val[0] == '#' && strlen(val) >= 7) {
-                char tmp[8];
-                strncpy(tmp, val, 7);
-                tmp[7] = '\0';
-                have_rgb = sscanf(tmp + 1, "%06x", &rgb) == 1;
-                if (!have_rgb) cmd_flash("Invalid hex color.");
-            } else {
-                for (int i = 0; i < NAMED_COLORS_COUNT; i++) {
-                    if (strcmp(val, named_colors[i].name) == 0) {
-                        rgb = named_colors[i].rgb; have_rgb = TRUE; break;
-                    }
-                }
-                if (!have_rgb) cmd_flash("Unknown color.");
-            }
-            if (have_rgb) {
+            if (parse_color(val, &rgb)) {
                 palette[0][0] = ((rgb >> 16) & 0xff) / 255.0;
                 palette[0][1] = ((rgb >>  8) & 0xff) / 255.0;
                 palette[0][2] = ( rgb        & 0xff) / 255.0;
                 gtk_widget_queue_draw(palette_bar);
                 gtk_widget_queue_draw(main_canvas);
                 cmd_set("");
+            } else if (val[0] != '#') {
+                cmd_flash("Unknown color.");
             }
         } else if (strncmp(opt, "color ", 6) == 0) {
             const char *val = opt + 6;
@@ -395,47 +404,22 @@ static void cmd_execute(void) {
                     cmd_flash("Invalid palette index.");
                 } else {
                     unsigned int rgb2 = 0;
-                    gboolean ok = FALSE;
-                    if (cval[0] == '#' && strlen(cval) >= 7) {
-                        char tmp[8];
-                        strncpy(tmp, cval, 7);
-                        tmp[7] = '\0';
-                        ok = sscanf(tmp + 1, "%06x", &rgb2) == 1;
-                        if (!ok) cmd_flash("Invalid hex color.");
-                    } else {
-                        for (int i = 0; i < NAMED_COLORS_COUNT; i++) {
-                            if (strcmp(cval, named_colors[i].name) == 0) {
-                                rgb2 = named_colors[i].rgb; ok = TRUE; break;
-                            }
-                        }
-                        if (!ok) cmd_flash("Unknown color.");
-                    }
-                    if (ok) {
+                    if (parse_color(cval, &rgb2)) {
                         palette[slot][0] = ((rgb2 >> 16) & 0xff) / 255.0;
                         palette[slot][1] = ((rgb2 >>  8) & 0xff) / 255.0;
                         palette[slot][2] = ( rgb2        & 0xff) / 255.0;
                         gtk_widget_queue_draw(palette_bar);
                         gtk_widget_queue_draw(main_canvas);
                         cmd_set("");
+                    } else if (cval[0] != '#') {
+                        cmd_flash("Unknown color.");
                     }
                 }
                 return;
             }
             unsigned int rgb = 0;
-            gboolean have_rgb = FALSE;
-            if (val[0] == '#' && strlen(val) >= 7) {
-                char tmp[8];
-                strncpy(tmp, val, 7);
-                tmp[7] = '\0';
-                have_rgb = sscanf(tmp + 1, "%06x", &rgb) == 1;
-                if (!have_rgb) cmd_flash("Invalid hex color.");
-            } else {
-                for (int i = 0; i < NAMED_COLORS_COUNT; i++) {
-                    if (strcmp(val, named_colors[i].name) == 0) {
-                        rgb = named_colors[i].rgb; have_rgb = TRUE; break;
-                    }
-                }
-                if (!have_rgb) {
+            if (!parse_color(val, &rgb)) {
+                if (val[0] != '#') {
                     int n = atoi(val);
                     if (n > 0 && n < PALETTE_SIZE) {
                         fg_color = (guchar)n;
@@ -445,8 +429,7 @@ static void cmd_execute(void) {
                         cmd_flash("Unknown color.");
                     }
                 }
-            }
-            if (have_rgb) {
+            } else {
                 double pr = ((rgb >> 16) & 0xff) / 255.0;
                 double pg = ((rgb >>  8) & 0xff) / 255.0;
                 double pb = ( rgb        & 0xff) / 255.0;
