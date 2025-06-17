@@ -232,6 +232,12 @@ static const struct { const char *name; unsigned int rgb; } named_colors[] = {
 /* Returns TRUE and sets *out_rgb on success.
    Flashes "Invalid hex color." and returns FALSE if val starts with '#' but is malformed.
    Returns FALSE without flashing if val is neither a valid hex nor a known name. */
+static void set_palette_rgb(int slot, unsigned int rgb) {
+    palette[slot][0] = ((rgb >> 16) & 0xff) / 255.0;
+    palette[slot][1] = ((rgb >>  8) & 0xff) / 255.0;
+    palette[slot][2] = ( rgb        & 0xff) / 255.0;
+}
+
 static gboolean parse_color(const char *val, unsigned int *out_rgb) {
     if (val[0] == '#') {
         char tmp[8];
@@ -383,9 +389,7 @@ static void cmd_execute(void) {
             const char *val = opt + 3;
             unsigned int rgb = 0;
             if (parse_color(val, &rgb)) {
-                palette[0][0] = ((rgb >> 16) & 0xff) / 255.0;
-                palette[0][1] = ((rgb >>  8) & 0xff) / 255.0;
-                palette[0][2] = ( rgb        & 0xff) / 255.0;
+                set_palette_rgb(0, rgb);
                 gtk_widget_queue_draw(palette_bar);
                 gtk_widget_queue_draw(main_canvas);
                 cmd_set("");
@@ -405,9 +409,7 @@ static void cmd_execute(void) {
                 } else {
                     unsigned int rgb2 = 0;
                     if (parse_color(cval, &rgb2)) {
-                        palette[slot][0] = ((rgb2 >> 16) & 0xff) / 255.0;
-                        palette[slot][1] = ((rgb2 >>  8) & 0xff) / 255.0;
-                        palette[slot][2] = ( rgb2        & 0xff) / 255.0;
+                        set_palette_rgb(slot, rgb2);
                         gtk_widget_queue_draw(palette_bar);
                         gtk_widget_queue_draw(main_canvas);
                         cmd_set("");
@@ -444,9 +446,7 @@ static void cmd_execute(void) {
                         cmd_flash("Palette full.");
                     } else {
                         found = palette_size;
-                        palette[found][0] = pr;
-                        palette[found][1] = pg;
-                        palette[found][2] = pb;
+                        set_palette_rgb(found, rgb);
                         palette_size++;
                         fg_color = (guchar)found;
                         gtk_widget_queue_draw(palette_bar);
@@ -517,21 +517,15 @@ static void cmd_execute(void) {
     if (strncmp(cmd_buf, ":loadp ", 7) == 0 && *arg) {
         FILE *f = fopen(arg, "r");
         if (!f) { cmd_flash("Cannot open file."); return; }
-        double np[PALETTE_MAX][3];
         int count = 0;
         char line[16];
         while (fgets(line, sizeof(line), f) && count < PALETTE_MAX) {
             unsigned int rgb;
-            if (line[0] == '#' && sscanf(line + 1, "%06x", &rgb) == 1) {
-                np[count][0] = ((rgb >> 16) & 0xff) / 255.0;
-                np[count][1] = ((rgb >>  8) & 0xff) / 255.0;
-                np[count][2] = ( rgb        & 0xff) / 255.0;
-                count++;
-            }
+            if (line[0] == '#' && sscanf(line + 1, "%06x", &rgb) == 1)
+                set_palette_rgb(count++, rgb);
         }
         fclose(f);
         if (count == 0) { cmd_flash("No colors found."); return; }
-        memcpy(palette, np, count * sizeof(np[0]));
         palette_size = count;
         if (fg_color >= (guchar)palette_size) fg_color = 1;
         gtk_widget_queue_draw(palette_bar);
