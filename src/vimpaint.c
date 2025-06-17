@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <glob.h>
 
 #define DEFAULT_CANVAS_W 80
 #define DEFAULT_CANVAS_H 40
@@ -42,6 +43,11 @@ static gboolean sym_v = FALSE;
 static gboolean cmd_mode = FALSE;
 static char cmd_buf[4096];
 static int cmd_len = 0;
+
+static glob_t tab_glob;
+static gboolean tab_glob_valid = FALSE;
+static int tab_glob_idx = 0;
+static char tab_cmd_prefix[32];
 static char last_filename[4096] = "";
 static GtkWidget *cmd_label = NULL;
 static GtkWidget *main_canvas = NULL;
@@ -56,6 +62,11 @@ static void zoom_resize(void) {
     gtk_widget_set_size_request(palette_bar, CANVAS_W * CELL_SIZE, SWATCH_H);
     gtk_widget_set_size_request(cmd_label,   CANVAS_W * CELL_SIZE, 20);
     gtk_window_resize(GTK_WINDOW(main_window), 1, 1);
+}
+
+static void tab_reset(void) {
+    if (tab_glob_valid) { globfree(&tab_glob); tab_glob_valid = FALSE; }
+    tab_glob_idx = 0;
 }
 
 static void cmd_flash(const char *text);
@@ -882,14 +893,51 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
 static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     if (cmd_mode) {
         if (event->keyval == GDK_KEY_Escape) {
+            tab_reset();
             cmd_mode = FALSE;
             status_update();
         } else if (event->keyval == GDK_KEY_Return) {
+            tab_reset();
             cmd_mode = FALSE;
             cmd_execute();
         } else if (event->keyval == GDK_KEY_BackSpace) {
+            tab_reset();
             if (cmd_len > 1) { cmd_buf[--cmd_len] = '\0'; cmd_set(cmd_buf); }
+        } else if (event->keyval == GDK_KEY_Tab) {
+            static const char *const file_pfxs[] = {
+                ":loadp ", ":savep ", ":wq ", ":w ", ":e ", NULL
+            };
+            const char *pfx = NULL;
+            for (int i = 0; file_pfxs[i]; i++) {
+                size_t plen = strlen(file_pfxs[i]);
+                if (strncmp(cmd_buf, file_pfxs[i], plen) == 0) { pfx = file_pfxs[i]; break; }
+            }
+            if (pfx) {
+                if (!tab_glob_valid) {
+                    const char *partial = cmd_buf + strlen(pfx);
+                    char pattern[sizeof(cmd_buf) + 2];
+                    snprintf(pattern, sizeof(pattern), "%s*", partial);
+                    memset(&tab_glob, 0, sizeof(tab_glob));
+                    if (glob(pattern, GLOB_MARK | GLOB_TILDE, NULL, &tab_glob) == 0
+                            && tab_glob.gl_pathc > 0) {
+                        tab_glob_valid = TRUE;
+                        tab_glob_idx = 0;
+                        snprintf(tab_cmd_prefix, sizeof(tab_cmd_prefix), "%s", pfx);
+                    } else {
+                        globfree(&tab_glob);
+                    }
+                } else {
+                    tab_glob_idx = (tab_glob_idx + 1) % (int)tab_glob.gl_pathc;
+                }
+                if (tab_glob_valid) {
+                    snprintf(cmd_buf, sizeof(cmd_buf), "%s%s",
+                             tab_cmd_prefix, tab_glob.gl_pathv[tab_glob_idx]);
+                    cmd_len = strlen(cmd_buf);
+                    cmd_set(cmd_buf);
+                }
+            }
         } else {
+            tab_reset();
             guint32 uc = gdk_keyval_to_unicode(event->keyval);
             if (uc >= 0x20 && uc < 0x7f && cmd_len < (int)sizeof(cmd_buf) - 2) {
                 cmd_buf[cmd_len++] = (char)uc;
