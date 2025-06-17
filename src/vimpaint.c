@@ -128,9 +128,13 @@ static guint flash_timer_id = 0;
 static void status_update(void) {
     if (cmd_mode) return;
     if (flash_timer_id) return;
-    char buf[64];
+    char buf[128];
     const char *mode = visual_mode ? "VISUAL" : insert_mode ? "INSERT" : "NORMAL";
-    snprintf(buf, sizeof(buf), " %s  col: %d  row: %d", mode, cursor_x + 1, cursor_y + 1);
+    int r = (int)(palette[fg_color][0] * 255 + 0.5);
+    int g = (int)(palette[fg_color][1] * 255 + 0.5);
+    int b = (int)(palette[fg_color][2] * 255 + 0.5);
+    snprintf(buf, sizeof(buf), " %s  col: %d  row: %d  [%d] #%02x%02x%02x",
+             mode, cursor_x + 1, cursor_y + 1, (int)fg_color, r, g, b);
     gtk_label_set_text(GTK_LABEL(cmd_label), buf);
 }
 
