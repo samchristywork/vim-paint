@@ -29,6 +29,11 @@ static guchar *pixels = NULL;  /* flat [y * CANVAS_W + x], 0=background 1..7=pal
 static guchar fg_color = 1;   /* current foreground color index */
 
 #define PX(y, x) pixels[(y) * CANVAS_W + (x)]
+#define RECT_BOUNDS(rad) \
+    int x0 = CLAMP(cursor_x - (rad), 0, CANVAS_W - 1); \
+    int x1 = CLAMP(cursor_x + (rad), 0, CANVAS_W - 1); \
+    int y0 = CLAMP(cursor_y - (rad), 0, CANVAS_H - 1); \
+    int y1 = CLAMP(cursor_y + (rad), 0, CANVAS_H - 1)
 static int cursor_x = 0;
 static int cursor_y = 0;
 static gboolean visual_mode = FALSE;
@@ -1318,10 +1323,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     }
     case GDK_KEY_space:
     case GDK_KEY_r: {
-        int x0 = CLAMP(cursor_x - radius, 0, CANVAS_W - 1);
-        int x1 = CLAMP(cursor_x + radius, 0, CANVAS_W - 1);
-        int y0 = CLAMP(cursor_y - radius, 0, CANVAS_H - 1);
-        int y1 = CLAMP(cursor_y + radius, 0, CANVAS_H - 1);
+        RECT_BOUNDS(radius);
         begin_undo_action();
         for (int ey = y0; ey <= y1; ey++)
             for (int ex = x0; ex <= x1; ex++)
@@ -1344,10 +1346,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         flood_fill(cursor_x, cursor_y, fg_color);
         break;
     case GDK_KEY_x: {
-        int x0 = CLAMP(cursor_x - radius, 0, CANVAS_W - 1);
-        int x1 = CLAMP(cursor_x + radius, 0, CANVAS_W - 1);
-        int y0 = CLAMP(cursor_y - radius, 0, CANVAS_H - 1);
-        int y1 = CLAMP(cursor_y + radius, 0, CANVAS_H - 1);
+        RECT_BOUNDS(radius);
         begin_undo_action();
         for (int ey = y0; ey <= y1; ey++)
             for (int ex = x0; ex <= x1; ex++)
@@ -1378,10 +1377,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
             commit_undo_action();
         } else if (last_action == GDK_KEY_r || last_action == GDK_KEY_x) {
             guchar val = (last_action == GDK_KEY_r) ? fg_color : 0;
-            int x0 = CLAMP(cursor_x - last_radius, 0, CANVAS_W - 1);
-            int x1 = CLAMP(cursor_x + last_radius, 0, CANVAS_W - 1);
-            int y0 = CLAMP(cursor_y - last_radius, 0, CANVAS_H - 1);
-            int y1 = CLAMP(cursor_y + last_radius, 0, CANVAS_H - 1);
+            RECT_BOUNDS(last_radius);
             begin_undo_action();
             for (int ey = y0; ey <= y1; ey++)
                 for (int ex = x0; ex <= x1; ex++)
