@@ -71,6 +71,7 @@ static void tab_reset(void) {
 
 static void palette_to_rgb(int idx, int *r, int *g, int *b);
 static void draw_line(int x0, int y0, int x1, int y1, guchar color);
+static void insert_paint(void);
 static void cmd_flash(const char *text);
 static void clear_history(void);
 static void begin_undo_action(void);
@@ -242,6 +243,14 @@ static void set_palette_rgb(int slot, unsigned int rgb) {
     palette[slot][0] = ((rgb >> 16) & 0xff) / 255.0;
     palette[slot][1] = ((rgb >>  8) & 0xff) / 255.0;
     palette[slot][2] = ( rgb        & 0xff) / 255.0;
+}
+
+static void insert_paint(void) {
+    if (insert_mode) {
+        begin_undo_action();
+        paint_pixel(cursor_x, cursor_y, fg_color);
+        commit_undo_action();
+    }
 }
 
 static void draw_line(int x0, int y0, int x1, int y1, guchar color) {
@@ -1187,39 +1196,39 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
         break;
     case GDK_KEY_H:
         cursor_x = MAX(cursor_x - 5 * n, 0);
-        if (insert_mode) { begin_undo_action(); paint_pixel(cursor_x, cursor_y, fg_color); commit_undo_action(); }
+        insert_paint();
         break;
     case GDK_KEY_h:
     case GDK_KEY_Left:
         cursor_x = MAX(cursor_x - n, 0);
-        if (insert_mode) { begin_undo_action(); paint_pixel(cursor_x, cursor_y, fg_color); commit_undo_action(); }
+        insert_paint();
         break;
     case GDK_KEY_L:
         cursor_x = MIN(cursor_x + 5 * n, CANVAS_W - 1);
-        if (insert_mode) { begin_undo_action(); paint_pixel(cursor_x, cursor_y, fg_color); commit_undo_action(); }
+        insert_paint();
         break;
     case GDK_KEY_l:
     case GDK_KEY_Right:
         cursor_x = MIN(cursor_x + n, CANVAS_W - 1);
-        if (insert_mode) { begin_undo_action(); paint_pixel(cursor_x, cursor_y, fg_color); commit_undo_action(); }
+        insert_paint();
         break;
     case GDK_KEY_K:
         cursor_y = MAX(cursor_y - 5 * n, 0);
-        if (insert_mode) { begin_undo_action(); paint_pixel(cursor_x, cursor_y, fg_color); commit_undo_action(); }
+        insert_paint();
         break;
     case GDK_KEY_k:
     case GDK_KEY_Up:
         cursor_y = MAX(cursor_y - n, 0);
-        if (insert_mode) { begin_undo_action(); paint_pixel(cursor_x, cursor_y, fg_color); commit_undo_action(); }
+        insert_paint();
         break;
     case GDK_KEY_J:
         cursor_y = MIN(cursor_y + 5 * n, CANVAS_H - 1);
-        if (insert_mode) { begin_undo_action(); paint_pixel(cursor_x, cursor_y, fg_color); commit_undo_action(); }
+        insert_paint();
         break;
     case GDK_KEY_j:
     case GDK_KEY_Down:
         cursor_y = MIN(cursor_y + n, CANVAS_H - 1);
-        if (insert_mode) { begin_undo_action(); paint_pixel(cursor_x, cursor_y, fg_color); commit_undo_action(); }
+        insert_paint();
         break;
     case GDK_KEY_G:
         cursor_y = orig_count > 0 ? CLAMP(orig_count - 1, 0, CANVAS_H - 1) : CANVAS_H - 1;
