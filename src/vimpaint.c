@@ -70,6 +70,7 @@ static void tab_reset(void) {
 }
 
 static void palette_to_rgb(int idx, int *r, int *g, int *b);
+static void draw_line(int x0, int y0, int x1, int y1, guchar color);
 static void cmd_flash(const char *text);
 static void clear_history(void);
 static void begin_undo_action(void);
@@ -241,6 +242,20 @@ static void set_palette_rgb(int slot, unsigned int rgb) {
     palette[slot][0] = ((rgb >> 16) & 0xff) / 255.0;
     palette[slot][1] = ((rgb >>  8) & 0xff) / 255.0;
     palette[slot][2] = ( rgb        & 0xff) / 255.0;
+}
+
+static void draw_line(int x0, int y0, int x1, int y1, guchar color) {
+    int dx = abs(x1 - x0), dy = abs(y1 - y0);
+    int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+    int err = dx - dy;
+    int cx = x0, cy = y0;
+    while (1) {
+        paint_pixel(cx, cy, color);
+        if (cx == x1 && cy == y1) break;
+        int e2 = 2 * err;
+        if (e2 > -dy) { err -= dy; cx += sx; }
+        if (e2 <  dx) { err += dx; cy += sy; }
+    }
 }
 
 static gboolean parse_color(const char *val, unsigned int *out_rgb) {
@@ -1096,20 +1111,8 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
     }
 
     if (visual_mode && event->keyval == GDK_KEY_backslash) {
-        int x0 = visual_anchor_x, y0 = visual_anchor_y;
-        int x1 = cursor_x,        y1 = cursor_y;
-        int dx = abs(x1 - x0), dy = abs(y1 - y0);
-        int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
-        int err = dx - dy;
         begin_undo_action();
-        int cx = x0, cy = y0;
-        while (1) {
-            paint_pixel(cx, cy, fg_color);
-            if (cx == x1 && cy == y1) break;
-            int e2 = 2 * err;
-            if (e2 > -dy) { err -= dy; cx += sx; }
-            if (e2 <  dx) { err += dx; cy += sy; }
-        }
+        draw_line(visual_anchor_x, visual_anchor_y, cursor_x, cursor_y, fg_color);
         commit_undo_action();
         last_action = GDK_KEY_backslash;
         last_was_visual = TRUE;
@@ -1352,18 +1355,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer dat
             int ay = cursor_y + last_visual_dy;
             begin_undo_action();
             if (last_action == GDK_KEY_backslash) {
-                int lx0 = ax, ly0 = ay, lx1 = cursor_x, ly1 = cursor_y;
-                int ldx = abs(lx1 - lx0), ldy = abs(ly1 - ly0);
-                int lsx = lx0 < lx1 ? 1 : -1, lsy = ly0 < ly1 ? 1 : -1;
-                int lerr = ldx - ldy;
-                int lcx = lx0, lcy = ly0;
-                while (1) {
-                    paint_pixel(lcx, lcy, fg_color);
-                    if (lcx == lx1 && lcy == ly1) break;
-                    int e2 = 2 * lerr;
-                    if (e2 > -ldy) { lerr -= ldy; lcx += lsx; }
-                    if (e2 <  ldx) { lerr += ldx; lcy += lsy; }
-                }
+                draw_line(ax, ay, cursor_x, cursor_y, fg_color);
             } else {
                 guchar val = (last_action == GDK_KEY_r) ? fg_color : 0;
                 int x0 = CLAMP(MIN(cursor_x, ax), 0, CANVAS_W - 1);
