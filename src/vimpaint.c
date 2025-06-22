@@ -846,6 +846,8 @@ static void commit_undo_action(void) {
   if (undo_count == UNDO_MAX)
     free_action(&undo_stack[idx]);
   PixelChange *copy = malloc(staged_count * sizeof(PixelChange));
+  if (!copy)
+    return;
   memcpy(copy, staged, staged_count * sizeof(PixelChange));
   undo_stack[idx] = (UndoAction){copy, staged_count};
   undo_top++;
