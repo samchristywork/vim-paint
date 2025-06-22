@@ -1685,7 +1685,11 @@ static gboolean on_scroll(GtkWidget *widget, GdkEventScroll *event,
                           gpointer data) {
   static double accum = 0;
   double dy = 0;
-  if (event->direction == GDK_SCROLL_SMOOTH) {
+  if (event->direction == GDK_SCROLL_UP) {
+    dy = -1;
+  } else if (event->direction == GDK_SCROLL_DOWN) {
+    dy = 1;
+  } else if (event->direction == GDK_SCROLL_SMOOTH) {
     double dx;
     gdk_event_get_scroll_deltas((GdkEvent *)event, &dx, &dy);
     accum += dy;
