@@ -346,6 +346,7 @@ static void cmd_open(const char *filename) {
     }
   cairo_surface_destroy(surf);
   clear_history();
+  canvas_dirty = FALSE;
   snprintf(last_filename, sizeof(last_filename), "%s", filename);
   update_title(last_filename);
   gtk_widget_queue_draw(main_canvas);
