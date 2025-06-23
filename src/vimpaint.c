@@ -619,6 +619,9 @@ static void cmd_execute(void) {
       return;
     }
     palette_size = count;
+    for (int i = 0; i < CANVAS_W * CANVAS_H; i++)
+      if (pixels[i] >= (guchar)palette_size)
+        pixels[i] = 0;
     if (fg_color >= (guchar)palette_size)
       fg_color = 1;
     gtk_widget_queue_draw(palette_bar);
