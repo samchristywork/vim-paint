@@ -1173,6 +1173,8 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
       y0 = MAX(cursor_y - d_count, 0);
       break;
     default:
+      status_update();
+      gtk_widget_queue_draw(GTK_WIDGET(data));
       return TRUE;
     }
     begin_undo_action();
