@@ -1357,7 +1357,10 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
 
   switch (event->keyval) {
   case GDK_KEY_q:
-    gtk_main_quit();
+    if (canvas_dirty)
+      cmd_flash("Unsaved changes. Use :q to quit or :wq to save and quit.");
+    else
+      gtk_main_quit();
     return TRUE;
   case GDK_KEY_plus:
   case GDK_KEY_equal:
