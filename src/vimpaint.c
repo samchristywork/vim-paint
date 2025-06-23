@@ -363,6 +363,14 @@ static void cmd_execute(void) {
   const char *arg = p;
 
   if (strcmp(cmd_buf, ":q") == 0) {
+    if (canvas_dirty)
+      cmd_flash("Unsaved changes. Use :q! to force quit or :wq to save and quit.");
+    else
+      gtk_main_quit();
+    return;
+  }
+
+  if (strcmp(cmd_buf, ":q!") == 0) {
     gtk_main_quit();
     return;
   }
