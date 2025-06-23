@@ -1473,11 +1473,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     break;
   case GDK_KEY_e: {
     guchar idx = PX(cursor_y, cursor_x);
-    if (idx > 0) {
-      fg_color = idx;
-      gtk_widget_queue_draw(palette_bar);
-      flash_color(fg_color);
-    }
+    fg_color = idx;
+    gtk_widget_queue_draw(palette_bar);
+    flash_color(fg_color);
     break;
   }
   case GDK_KEY_o: {
