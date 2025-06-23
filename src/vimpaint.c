@@ -577,6 +577,8 @@ static void cmd_execute(void) {
     CANVAS_H = nh;
     cursor_x = CLAMP(cursor_x, 0, CANVAS_W - 1);
     cursor_y = CLAMP(cursor_y, 0, CANVAS_H - 1);
+    visual_anchor_x = CLAMP(visual_anchor_x, 0, CANVAS_W - 1);
+    visual_anchor_y = CLAMP(visual_anchor_y, 0, CANVAS_H - 1);
     clear_history();
     zoom_resize();
     gtk_widget_queue_draw(main_canvas);
