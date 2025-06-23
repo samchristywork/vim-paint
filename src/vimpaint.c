@@ -484,7 +484,10 @@ static void cmd_execute(void) {
             set_palette_rgb(slot, rgb2);
             gtk_widget_queue_draw(palette_bar);
             gtk_widget_queue_draw(main_canvas);
-            cmd_set("");
+            if (slot == 0)
+              cmd_flash("Background color updated.");
+            else
+              cmd_set("");
           } else if (cval[0] != '#') {
             cmd_flash("Unknown color.");
           }
