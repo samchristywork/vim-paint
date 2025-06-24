@@ -808,6 +808,7 @@ static void cmd_execute(void) {
         "\n"
         "Drawing\n"
         "  Space / r           paint rect  (n=radius)\n"
+        "  R                   rect outline  (n=radius)\n"
         "  x                   erase rect  (n=radius)\n"
         "  o                   circle outline  (n=radius)\n"
         "  O                   filled circle   (n=radius)\n"
@@ -1649,6 +1650,23 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
         paint_pixel(ex, ey, fg_color);
     commit_undo_action();
     last_action = GDK_KEY_r;
+    last_radius = radius;
+    last_was_visual = FALSE;
+    break;
+  }
+  case GDK_KEY_R: {
+    RECT_BOUNDS(radius);
+    begin_undo_action();
+    for (int ex = x0; ex <= x1; ex++) {
+      paint_pixel(ex, y0, fg_color);
+      paint_pixel(ex, y1, fg_color);
+    }
+    for (int ey = y0 + 1; ey < y1; ey++) {
+      paint_pixel(x0, ey, fg_color);
+      paint_pixel(x1, ey, fg_color);
+    }
+    commit_undo_action();
+    last_action = GDK_KEY_R;
     last_radius = radius;
     last_was_visual = FALSE;
     break;
