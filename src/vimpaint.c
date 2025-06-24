@@ -376,6 +376,32 @@ static void cmd_execute(void) {
   }
 
   if (strcmp(cmd_buf, ":new") == 0) {
+    if (canvas_dirty) {
+      cmd_flash("Unsaved changes. Use :new! to discard or :w to save first.");
+      return;
+    }
+    guchar *np = calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, 1);
+    if (!np) {
+      cmd_flash("Out of memory.");
+      return;
+    }
+    free(pixels);
+    pixels = np;
+    CANVAS_W = DEFAULT_CANVAS_W;
+    CANVAS_H = DEFAULT_CANVAS_H;
+    clear_history();
+    canvas_dirty = FALSE;
+    last_filename[0] = '\0';
+    cursor_x = 0;
+    cursor_y = 0;
+    gtk_window_set_title(GTK_WINDOW(main_window), "vim-paint");
+    zoom_resize();
+    gtk_widget_queue_draw(main_canvas);
+    cmd_set("");
+    return;
+  }
+
+  if (strcmp(cmd_buf, ":new!") == 0) {
     guchar *np = calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, 1);
     if (!np) {
       cmd_flash("Out of memory.");
@@ -433,6 +459,18 @@ static void cmd_execute(void) {
   }
 
   if (strcmp(cmd_buf, ":e") == 0) {
+    if (canvas_dirty) {
+      cmd_flash("Unsaved changes. Use :e! to discard or :w to save first.");
+      return;
+    }
+    if (*last_filename)
+      cmd_open(last_filename);
+    else
+      cmd_flash("No filename.");
+    return;
+  }
+
+  if (strcmp(cmd_buf, ":e!") == 0) {
     if (*last_filename)
       cmd_open(last_filename);
     else
@@ -441,6 +479,15 @@ static void cmd_execute(void) {
   }
 
   if (strncmp(cmd_buf, ":e ", 3) == 0 && *arg) {
+    if (canvas_dirty) {
+      cmd_flash("Unsaved changes. Use :e! to discard or :w to save first.");
+      return;
+    }
+    cmd_open(arg);
+    return;
+  }
+
+  if (strncmp(cmd_buf, ":e! ", 4) == 0 && *arg) {
     cmd_open(arg);
     return;
   }
@@ -1065,7 +1112,8 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
       }
     } else if (event->keyval == GDK_KEY_Tab) {
       static const char *const file_pfxs[] = {":loadp ", ":savep ", ":wq ",
-                                              ":w ",     ":e ",     NULL};
+                                              ":w ",     ":e! ",    ":e ",
+                                              NULL};
       const char *pfx = NULL;
       for (int i = 0; file_pfxs[i]; i++) {
         size_t plen = strlen(file_pfxs[i]);
