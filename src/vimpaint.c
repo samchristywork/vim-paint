@@ -1712,13 +1712,25 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
             paint_pixel(ex, ey, val);
       }
       commit_undo_action();
-    } else if (last_action == GDK_KEY_r || last_action == GDK_KEY_x) {
-      guchar val = (last_action == GDK_KEY_r) ? fg_color : 0;
+    } else if (last_action == GDK_KEY_r || last_action == GDK_KEY_x ||
+               last_action == GDK_KEY_R) {
       RECT_BOUNDS(last_radius);
       begin_undo_action();
-      for (int ey = y0; ey <= y1; ey++)
-        for (int ex = x0; ex <= x1; ex++)
-          paint_pixel(ex, ey, val);
+      if (last_action == GDK_KEY_R) {
+        for (int ex = x0; ex <= x1; ex++) {
+          paint_pixel(ex, y0, fg_color);
+          paint_pixel(ex, y1, fg_color);
+        }
+        for (int ey = y0 + 1; ey < y1; ey++) {
+          paint_pixel(x0, ey, fg_color);
+          paint_pixel(x1, ey, fg_color);
+        }
+      } else {
+        guchar val = (last_action == GDK_KEY_r) ? fg_color : 0;
+        for (int ey = y0; ey <= y1; ey++)
+          for (int ex = x0; ex <= x1; ex++)
+            paint_pixel(ex, ey, val);
+      }
       commit_undo_action();
     }
     break;
