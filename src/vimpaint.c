@@ -50,6 +50,12 @@ static gboolean cmd_mode = FALSE;
 static char cmd_buf[4096];
 static int cmd_len = 0;
 
+#define CMD_HISTORY_MAX 64
+static char cmd_history[CMD_HISTORY_MAX][4096];
+static int cmd_history_count = 0;
+static int cmd_history_idx = -1;
+static char cmd_history_draft[4096] = "";
+
 static glob_t tab_glob;
 static gboolean tab_glob_valid = FALSE;
 static int tab_glob_idx = 0;
@@ -1103,7 +1109,50 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     } else if (event->keyval == GDK_KEY_Return) {
       tab_reset();
       cmd_mode = FALSE;
+      if (cmd_len > 1) {
+        if (cmd_history_count == 0 ||
+            strcmp(cmd_history[(cmd_history_count - 1) % CMD_HISTORY_MAX],
+                   cmd_buf) != 0) {
+          snprintf(cmd_history[cmd_history_count % CMD_HISTORY_MAX],
+                   sizeof(cmd_buf), "%s", cmd_buf);
+          cmd_history_count++;
+        }
+      }
+      cmd_history_idx = -1;
+      cmd_history_draft[0] = '\0';
       cmd_execute();
+    } else if (event->keyval == GDK_KEY_Up) {
+      tab_reset();
+      if (cmd_history_count > 0) {
+        if (cmd_history_idx == -1)
+          snprintf(cmd_history_draft, sizeof(cmd_history_draft), "%s", cmd_buf);
+        int next = cmd_history_idx + 1;
+        int avail = cmd_history_count < CMD_HISTORY_MAX ? cmd_history_count
+                                                        : CMD_HISTORY_MAX;
+        if (next < avail) {
+          cmd_history_idx = next;
+          int hidx =
+              (cmd_history_count - 1 - cmd_history_idx) % CMD_HISTORY_MAX;
+          snprintf(cmd_buf, sizeof(cmd_buf), "%s", cmd_history[hidx]);
+          cmd_len = strlen(cmd_buf);
+          cmd_set(cmd_buf);
+        }
+      }
+    } else if (event->keyval == GDK_KEY_Down) {
+      tab_reset();
+      if (cmd_history_idx > 0) {
+        cmd_history_idx--;
+        int hidx =
+            (cmd_history_count - 1 - cmd_history_idx) % CMD_HISTORY_MAX;
+        snprintf(cmd_buf, sizeof(cmd_buf), "%s", cmd_history[hidx]);
+        cmd_len = strlen(cmd_buf);
+        cmd_set(cmd_buf);
+      } else if (cmd_history_idx == 0) {
+        cmd_history_idx = -1;
+        snprintf(cmd_buf, sizeof(cmd_buf), "%s", cmd_history_draft);
+        cmd_len = strlen(cmd_buf);
+        cmd_set(cmd_buf);
+      }
     } else if (event->keyval == GDK_KEY_BackSpace) {
       tab_reset();
       if (cmd_len > 1) {
