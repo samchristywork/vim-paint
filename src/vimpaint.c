@@ -302,11 +302,20 @@ static void draw_line(int x0, int y0, int x1, int y1, guchar color) {
 
 static gboolean parse_color(const char *val, unsigned int *out_rgb) {
   if (val[0] == '#') {
-    char tmp[8];
-    strncpy(tmp, val, 7);
-    tmp[7] = '\0';
-    if (strlen(val) >= 7 && sscanf(tmp + 1, "%06x", out_rgb) == 1)
-      return TRUE;
+    size_t len = strlen(val);
+    if (len == 4) {
+      unsigned int r, g, b;
+      if (sscanf(val + 1, "%1x%1x%1x", &r, &g, &b) == 3) {
+        *out_rgb = ((r * 17) << 16) | ((g * 17) << 8) | (b * 17);
+        return TRUE;
+      }
+    } else if (len >= 7) {
+      char tmp[8];
+      strncpy(tmp, val + 1, 6);
+      tmp[6] = '\0';
+      if (sscanf(tmp, "%06x", out_rgb) == 1)
+        return TRUE;
+    }
     cmd_flash("Invalid hex color.");
     return FALSE;
   }
