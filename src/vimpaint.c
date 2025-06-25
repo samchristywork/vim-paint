@@ -818,7 +818,7 @@ static void cmd_execute(void) {
         "\n"
         "Visual mode  (v)\n"
         "  r / x               fill / erase selection\n"
-        "  y / p               yank / paste\n"
+        "  y / p / P           yank / paste / paste centered\n"
         "  \\                   draw line from anchor to cursor\n"
         "\n"
         "Palette\n"
@@ -1740,7 +1740,23 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
       for (int ey = 0; ey < yank_h; ey++)
         for (int ex = 0; ex < yank_w; ex++) {
           int px = cursor_x + ex, py = cursor_y + ey;
-          if (px < CANVAS_W && py < CANVAS_H) {
+          if (px >= 0 && px < CANVAS_W && py >= 0 && py < CANVAS_H) {
+            push_undo(px, py);
+            PX(py, px) = yank_buf[ey * yank_w + ex];
+          }
+        }
+      commit_undo_action();
+    }
+    break;
+  case GDK_KEY_P:
+    if (yank_buf) {
+      int ox = cursor_x - yank_w / 2;
+      int oy = cursor_y - yank_h / 2;
+      begin_undo_action();
+      for (int ey = 0; ey < yank_h; ey++)
+        for (int ex = 0; ex < yank_w; ex++) {
+          int px = ox + ex, py = oy + ey;
+          if (px >= 0 && px < CANVAS_W && py >= 0 && py < CANVAS_H) {
             push_undo(px, py);
             PX(py, px) = yank_buf[ey * yank_w + ex];
           }
