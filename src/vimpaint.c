@@ -1790,6 +1790,7 @@ static gboolean on_palette_click(GtkWidget *widget, GdkEventButton *event,
 }
 
 static gboolean drag_painting = FALSE;
+static gboolean drag_selecting = FALSE;
 static guchar drag_color = 0;
 
 static gboolean on_button_press(GtkWidget *widget, GdkEventButton *event,
@@ -1805,6 +1806,11 @@ static gboolean on_button_press(GtkWidget *widget, GdkEventButton *event,
     begin_undo_action();
     drag_painting = TRUE;
     paint_pixel(cursor_x, cursor_y, drag_color);
+  } else if (event->button == 1) {
+    visual_mode = TRUE;
+    visual_anchor_x = cursor_x;
+    visual_anchor_y = cursor_y;
+    drag_selecting = TRUE;
   }
   status_update();
   gtk_widget_queue_draw(widget);
@@ -1816,6 +1822,15 @@ static gboolean on_button_release(GtkWidget *widget, GdkEventButton *event,
   if (drag_painting) {
     commit_undo_action();
     drag_painting = FALSE;
+  }
+  if (drag_selecting) {
+    drag_selecting = FALSE;
+    /* Collapse to a point click — cancel visual mode */
+    if (cursor_x == visual_anchor_x && cursor_y == visual_anchor_y) {
+      visual_mode = FALSE;
+      status_update();
+      gtk_widget_queue_draw(widget);
+    }
   }
   return TRUE;
 }
