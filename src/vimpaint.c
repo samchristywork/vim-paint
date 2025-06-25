@@ -60,6 +60,12 @@ static glob_t tab_glob;
 static gboolean tab_glob_valid = FALSE;
 static int tab_glob_idx = 0;
 static char tab_cmd_prefix[32];
+
+static int color_tab_matches[256];
+static int color_tab_count = 0;
+static int color_tab_idx = 0;
+static gboolean color_tab_valid = FALSE;
+static char color_tab_prefix[64];
 static char last_filename[4096] = "";
 static GtkWidget *cmd_label = NULL;
 static GtkWidget *main_canvas = NULL;
@@ -83,6 +89,9 @@ static void tab_reset(void) {
     tab_glob_valid = FALSE;
   }
   tab_glob_idx = 0;
+  color_tab_valid = FALSE;
+  color_tab_count = 0;
+  color_tab_idx = 0;
 }
 
 static void palette_to_rgb(int idx, int *r, int *g, int *b);
@@ -1203,6 +1212,57 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
                    tab_glob.gl_pathv[tab_glob_idx]);
           cmd_len = strlen(cmd_buf);
           cmd_set(cmd_buf);
+        }
+      } else {
+        /* Color name completion for :set bg and :set color */
+        static const char *const color_pfxs[] = {
+            ":set bg ", ":set color ", NULL};
+        const char *cpfx = NULL;
+        for (int i = 0; color_pfxs[i]; i++) {
+          size_t plen = strlen(color_pfxs[i]);
+          if (strncmp(cmd_buf, color_pfxs[i], plen) == 0) {
+            cpfx = color_pfxs[i];
+            break;
+          }
+        }
+        /* Also match :set color <N> <partial> */
+        char dyn_pfx[64] = "";
+        if (!cpfx && strncmp(cmd_buf, ":set color ", 11) == 0) {
+          const char *after = cmd_buf + 11;
+          if (*after >= '0' && *after <= '9') {
+            const char *sp = strchr(after, ' ');
+            if (sp) {
+              size_t plen = (size_t)(sp + 1 - cmd_buf);
+              if (plen < sizeof(dyn_pfx)) {
+                strncpy(dyn_pfx, cmd_buf, plen);
+                dyn_pfx[plen] = '\0';
+                cpfx = dyn_pfx;
+              }
+            }
+          }
+        }
+        if (cpfx) {
+          const char *partial = cmd_buf + strlen(cpfx);
+          if (!color_tab_valid) {
+            color_tab_count = 0;
+            color_tab_idx = 0;
+            size_t plen = strlen(partial);
+            for (int i = 0; i < NAMED_COLORS_COUNT; i++)
+              if (strncmp(named_colors[i].name, partial, plen) == 0)
+                color_tab_matches[color_tab_count++] = i;
+            if (color_tab_count > 0) {
+              color_tab_valid = TRUE;
+              snprintf(color_tab_prefix, sizeof(color_tab_prefix), "%s", cpfx);
+            }
+          } else {
+            color_tab_idx = (color_tab_idx + 1) % color_tab_count;
+          }
+          if (color_tab_valid) {
+            snprintf(cmd_buf, sizeof(cmd_buf), "%s%s", color_tab_prefix,
+                     named_colors[color_tab_matches[color_tab_idx]].name);
+            cmd_len = strlen(cmd_buf);
+            cmd_set(cmd_buf);
+          }
         }
       }
     } else {
