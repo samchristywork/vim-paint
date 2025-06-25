@@ -832,6 +832,7 @@ static void cmd_execute(void) {
         "\n"
         "Palette\n"
         "  c / C               cycle color forward / backward\n"
+        "  Ctrl-1..9           select palette slot directly\n"
         "  e                   pick color under cursor\n"
         "  :set color <hex|name>          add/select color\n"
         "  :set color <idx> <hex|name>    edit palette slot\n"
@@ -1393,6 +1394,20 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
       fn();
     status_update();
     gtk_widget_queue_draw(GTK_WIDGET(data));
+    return TRUE;
+  }
+
+  /* Ctrl+1–9: select palette slot directly */
+  if ((event->state & GDK_CONTROL_MASK) &&
+      event->keyval >= GDK_KEY_1 && event->keyval <= GDK_KEY_9) {
+    int slot = event->keyval - GDK_KEY_0;
+    if (slot < PALETTE_SIZE) {
+      fg_color = (guchar)slot;
+      gtk_widget_queue_draw(palette_bar);
+      flash_color(fg_color);
+    } else {
+      cmd_flash("No such palette slot.");
+    }
     return TRUE;
   }
 
