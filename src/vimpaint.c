@@ -804,6 +804,50 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strcmp(cmd_buf, ":center") == 0) {
+    /* Find bounding box of non-background pixels */
+    int min_x = CANVAS_W, max_x = -1, min_y = CANVAS_H, max_y = -1;
+    for (int y = 0; y < CANVAS_H; y++)
+      for (int x = 0; x < CANVAS_W; x++)
+        if (PX(y, x)) {
+          if (x < min_x) min_x = x;
+          if (x > max_x) max_x = x;
+          if (y < min_y) min_y = y;
+          if (y > max_y) max_y = y;
+        }
+    if (max_x < 0) {
+      cmd_flash("Nothing to center.");
+      return;
+    }
+    int dx = (CANVAS_W - (max_x - min_x + 1)) / 2 - min_x;
+    int dy = (CANVAS_H - (max_y - min_y + 1)) / 2 - min_y;
+    if (dx == 0 && dy == 0) {
+      cmd_flash("Already centered.");
+      return;
+    }
+    guchar *np = calloc(CANVAS_W * CANVAS_H, 1);
+    if (!np) {
+      cmd_flash("Out of memory.");
+      return;
+    }
+    for (int y = 0; y < CANVAS_H; y++)
+      for (int x = 0; x < CANVAS_W; x++) {
+        if (!PX(y, x))
+          continue;
+        int nx = x + dx, ny = y + dy;
+        if (nx >= 0 && nx < CANVAS_W && ny >= 0 && ny < CANVAS_H)
+          np[ny * CANVAS_W + nx] = PX(y, x);
+      }
+    memcpy(pixels, np, CANVAS_W * CANVAS_H);
+    free(np);
+    clear_history();
+    canvas_dirty = TRUE;
+    title_refresh();
+    gtk_widget_queue_draw(main_canvas);
+    cmd_set("");
+    return;
+  }
+
   if (strcmp(cmd_buf, ":help") == 0) {
     GtkWidget *dlg = gtk_message_dialog_new(
         GTK_WINDOW(main_window),
@@ -846,7 +890,7 @@ static void cmd_execute(void) {
         "  :w [file]   :wq [file]   :e [file]   :new\n"
         "\n"
         "Transform\n"
-        "  :resize WxH   :fliph   :flipv   :rotate\n"
+        "  :resize WxH   :fliph   :flipv   :rotate   :center\n"
         "\n"
         "View\n"
         "  + / -               zoom in / out\n"
