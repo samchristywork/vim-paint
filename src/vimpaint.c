@@ -164,8 +164,10 @@ static void status_update(void) {
   const char *mode = visual_mode ? "VISUAL" : insert_mode ? "INSERT" : "NORMAL";
   int r, g, b;
   palette_to_rgb(fg_color, &r, &g, &b);
-  snprintf(buf, sizeof(buf), " %s  col: %d  row: %d  [%d] #%02x%02x%02x", mode,
-           cursor_x + 1, cursor_y + 1, (int)fg_color, r, g, b);
+  snprintf(buf, sizeof(buf),
+           " %s  col: %d  row: %d  [%d] #%02x%02x%02x  %dx%d", mode,
+           cursor_x + 1, cursor_y + 1, (int)fg_color, r, g, b,
+           CANVAS_W, CANVAS_H);
   gtk_label_set_text(GTK_LABEL(cmd_label), buf);
 }
 
