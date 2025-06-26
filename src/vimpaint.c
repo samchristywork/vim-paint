@@ -253,7 +253,12 @@ static void cmd_export_bmp(const char *filename) {
   fwrite(fh, 1, sizeof(fh), f);
   fwrite(ih, 1, sizeof(ih), f);
 
-  unsigned char row_buf[CANVAS_W * 3 + 3];
+  unsigned char *row_buf = malloc(row_bytes);
+  if (!row_buf) {
+    fclose(f);
+    cmd_flash("Export failed.");
+    return;
+  }
   unsigned char padding[3] = {0, 0, 0};
   for (int y = 0; y < CANVAS_H; y++) {
     for (int x = 0; x < CANVAS_W; x++) {
@@ -266,6 +271,7 @@ static void cmd_export_bmp(const char *filename) {
     if (pad)
       fwrite(padding, 1, pad, f);
   }
+  free(row_buf);
   fclose(f);
   cmd_flash("Exported.");
 }
