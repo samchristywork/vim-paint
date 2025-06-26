@@ -1348,10 +1348,16 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
           tab_glob_idx = (tab_glob_idx + 1) % (int)tab_glob.gl_pathc;
         }
         if (tab_glob_valid) {
-          snprintf(cmd_buf, sizeof(cmd_buf), "%s%s", tab_cmd_prefix,
-                   tab_glob.gl_pathv[tab_glob_idx]);
-          cmd_len = strlen(cmd_buf);
-          cmd_set(cmd_buf);
+          int written = snprintf(cmd_buf, sizeof(cmd_buf), "%s%s",
+                                 tab_cmd_prefix,
+                                 tab_glob.gl_pathv[tab_glob_idx]);
+          if (written >= (int)sizeof(cmd_buf)) {
+            tab_reset();
+            cmd_flash("Path too long.");
+          } else {
+            cmd_len = strlen(cmd_buf);
+            cmd_set(cmd_buf);
+          }
         }
       } else {
         /* Color name completion for :set bg and :set color */
