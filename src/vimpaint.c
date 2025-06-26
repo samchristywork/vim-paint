@@ -210,6 +210,66 @@ static gboolean cmd_write(const char *filename) {
   return ok;
 }
 
+static void cmd_export_bmp(const char *filename) {
+  int row_bytes = CANVAS_W * 3;
+  int pad = (4 - (row_bytes % 4)) % 4;
+  int stride = row_bytes + pad;
+  int pixel_data_size = stride * CANVAS_H;
+  int file_size = 14 + 40 + pixel_data_size;
+
+  FILE *f = fopen(filename, "wb");
+  if (!f) {
+    cmd_flash("Export failed.");
+    return;
+  }
+
+  /* File header */
+  unsigned char fh[14] = {
+      'B', 'M',
+      (unsigned char)(file_size),       (unsigned char)(file_size >> 8),
+      (unsigned char)(file_size >> 16), (unsigned char)(file_size >> 24),
+      0, 0, 0, 0,   /* reserved */
+      54, 0, 0, 0,  /* offset to pixel data */
+  };
+  /* Info header (BITMAPINFOHEADER) */
+  int neg_h = -CANVAS_H; /* negative = top-down */
+  unsigned char ih[40] = {
+      40, 0, 0, 0,  /* header size */
+      (unsigned char)(CANVAS_W),        (unsigned char)(CANVAS_W >> 8),
+      (unsigned char)(CANVAS_W >> 16),  (unsigned char)(CANVAS_W >> 24),
+      (unsigned char)(neg_h),           (unsigned char)(neg_h >> 8),
+      (unsigned char)(neg_h >> 16),     (unsigned char)(neg_h >> 24),
+      1, 0,         /* color planes */
+      24, 0,        /* bits per pixel */
+      0, 0, 0, 0,   /* compression (none) */
+      (unsigned char)(pixel_data_size),       (unsigned char)(pixel_data_size >> 8),
+      (unsigned char)(pixel_data_size >> 16), (unsigned char)(pixel_data_size >> 24),
+      0, 0, 0, 0,   /* x pixels/meter */
+      0, 0, 0, 0,   /* y pixels/meter */
+      0, 0, 0, 0,   /* colors in table */
+      0, 0, 0, 0,   /* important colors */
+  };
+
+  fwrite(fh, 1, sizeof(fh), f);
+  fwrite(ih, 1, sizeof(ih), f);
+
+  unsigned char row_buf[CANVAS_W * 3 + 3];
+  unsigned char padding[3] = {0, 0, 0};
+  for (int y = 0; y < CANVAS_H; y++) {
+    for (int x = 0; x < CANVAS_W; x++) {
+      int idx = PX(y, x);
+      row_buf[x * 3 + 0] = (unsigned char)(palette[idx][2] * 255 + 0.5);
+      row_buf[x * 3 + 1] = (unsigned char)(palette[idx][1] * 255 + 0.5);
+      row_buf[x * 3 + 2] = (unsigned char)(palette[idx][0] * 255 + 0.5);
+    }
+    fwrite(row_buf, 1, row_bytes, f);
+    if (pad)
+      fwrite(padding, 1, pad, f);
+  }
+  fclose(f);
+  cmd_flash("Exported.");
+}
+
 // clang-format off
 static const struct { const char *name; unsigned int rgb; } named_colors[] = {
     {"black", 0x000000}, {"navy", 0x000080}, {"darkblue", 0x00008b},
@@ -804,6 +864,32 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strncmp(cmd_buf, ":export ", 8) == 0 && *arg) {
+    size_t alen = strlen(arg);
+    if (alen >= 4 && strcmp(arg + alen - 4, ".bmp") == 0) {
+      cmd_export_bmp(arg);
+    } else {
+      /* Fall back to PNG for any other extension */
+      cairo_surface_t *surf =
+          cairo_image_surface_create(CAIRO_FORMAT_RGB24, CANVAS_W, CANVAS_H);
+      guchar *d = cairo_image_surface_get_data(surf);
+      int st = cairo_image_surface_get_stride(surf);
+      for (int y = 0; y < CANVAS_H; y++)
+        for (int x = 0; x < CANVAS_W; x++) {
+          int idx = PX(y, x);
+          d[y * st + x * 4 + 0] = (guchar)(palette[idx][2] * 255);
+          d[y * st + x * 4 + 1] = (guchar)(palette[idx][1] * 255);
+          d[y * st + x * 4 + 2] = (guchar)(palette[idx][0] * 255);
+        }
+      cairo_surface_mark_dirty(surf);
+      gboolean ok =
+          cairo_surface_write_to_png(surf, arg) == CAIRO_STATUS_SUCCESS;
+      cairo_surface_destroy(surf);
+      cmd_flash(ok ? "Exported." : "Export failed.");
+    }
+    return;
+  }
+
   if (strcmp(cmd_buf, ":center") == 0) {
     /* Find bounding box of non-background pixels */
     int min_x = CANVAS_W, max_x = -1, min_y = CANVAS_H, max_y = -1;
@@ -888,6 +974,7 @@ static void cmd_execute(void) {
         "\n"
         "Files\n"
         "  :w [file]   :wq [file]   :e [file]   :new\n"
+        "  :export <file>    export as BMP or PNG (by extension)\n"
         "\n"
         "Transform\n"
         "  :resize WxH   :fliph   :flipv   :rotate   :center\n"
@@ -1226,9 +1313,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
         cmd_set(cmd_buf);
       }
     } else if (event->keyval == GDK_KEY_Tab) {
-      static const char *const file_pfxs[] = {":loadp ", ":savep ", ":wq ",
-                                              ":w ",     ":e! ",    ":e ",
-                                              NULL};
+      static const char *const file_pfxs[] = {":loadp ",  ":savep ", ":export ",
+                                              ":wq ",    ":w ",     ":e! ",
+                                              ":e ",     NULL};
       const char *pfx = NULL;
       for (int i = 0; file_pfxs[i]; i++) {
         size_t plen = strlen(file_pfxs[i]);
