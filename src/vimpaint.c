@@ -102,6 +102,7 @@ static void clear_history(void);
 static void begin_undo_action(void);
 static void push_undo(int x, int y);
 static void commit_undo_action(void);
+static void commit_canvas_snapshot(guchar *before_snap, int bw, int bh);
 static void cmd_open(const char *filename);
 static void title_refresh(void);
 static void paint_pixel(int x, int y, guchar color);
@@ -848,9 +849,17 @@ static void cmd_execute(void) {
   }
 
   if (strcmp(cmd_buf, ":rotate") == 0) {
+    int bw = CANVAS_W, bh = CANVAS_H;
+    guchar *before_snap = malloc(bw * bh);
+    if (!before_snap) {
+      cmd_flash("Out of memory.");
+      return;
+    }
+    memcpy(before_snap, pixels, bw * bh);
     int nW = CANVAS_H, nH = CANVAS_W;
     guchar *np = malloc(nW * nH);
     if (!np) {
+      free(before_snap);
       cmd_flash("Out of memory.");
       return;
     }
@@ -863,7 +872,7 @@ static void cmd_execute(void) {
     CANVAS_H = nH;
     cursor_x = CLAMP(cursor_x, 0, CANVAS_W - 1);
     cursor_y = CLAMP(cursor_y, 0, CANVAS_H - 1);
-    clear_history();
+    commit_canvas_snapshot(before_snap, bw, bh);
     zoom_resize();
     gtk_widget_queue_draw(main_canvas);
     cmd_set("");
@@ -1011,6 +1020,11 @@ typedef struct {
 typedef struct {
   PixelChange *changes;
   int count;
+  /* Non-NULL for canvas-resizing ops (e.g. :rotate) */
+  guchar *before_snap;
+  int before_w, before_h;
+  guchar *after_snap;
+  int after_w, after_h;
 } UndoAction;
 
 static UndoAction undo_stack[UNDO_MAX];
@@ -1025,6 +1039,10 @@ static void free_action(UndoAction *a) {
   free(a->changes);
   a->changes = NULL;
   a->count = 0;
+  free(a->before_snap);
+  a->before_snap = NULL;
+  free(a->after_snap);
+  a->after_snap = NULL;
 }
 
 static void clear_history(void) {
@@ -1082,6 +1100,29 @@ static void commit_undo_action(void) {
   if (undo_count < UNDO_MAX)
     undo_count++;
   staged_count = 0;
+  canvas_dirty = TRUE;
+  title_refresh();
+}
+
+/* Record a full-canvas snapshot undo entry (for ops that change dimensions). */
+static void commit_canvas_snapshot(guchar *before_snap, int bw, int bh) {
+  guchar *after_snap = malloc(CANVAS_W * CANVAS_H);
+  if (after_snap)
+    memcpy(after_snap, pixels, CANVAS_W * CANVAS_H);
+  for (int i = 0; i < redo_count; i++)
+    free_action(
+        &redo_stack[(redo_top - redo_count + i + UNDO_MAX * 2) % UNDO_MAX]);
+  redo_top = 0;
+  redo_count = 0;
+  int idx = undo_top % UNDO_MAX;
+  if (undo_count == UNDO_MAX)
+    free_action(&undo_stack[idx]);
+  undo_stack[idx] = (UndoAction){
+      .before_snap = before_snap, .before_w = bw, .before_h = bh,
+      .after_snap  = after_snap,  .after_w  = CANVAS_W, .after_h = CANVAS_H};
+  undo_top++;
+  if (undo_count < UNDO_MAX)
+    undo_count++;
   canvas_dirty = TRUE;
   title_refresh();
 }
@@ -1676,10 +1717,24 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
       undo_top++;
       if (undo_count < UNDO_MAX)
         undo_count++;
-      for (int i = 0; i < a.count; i++) {
-        PX(a.changes[i].y, a.changes[i].x) = a.changes[i].after;
-        cursor_x = a.changes[i].x;
-        cursor_y = a.changes[i].y;
+      if (a.after_snap) {
+        guchar *np = malloc(a.after_w * a.after_h);
+        if (np) {
+          memcpy(np, a.after_snap, a.after_w * a.after_h);
+          free(pixels);
+          pixels = np;
+          CANVAS_W = a.after_w;
+          CANVAS_H = a.after_h;
+          cursor_x = CLAMP(cursor_x, 0, CANVAS_W - 1);
+          cursor_y = CLAMP(cursor_y, 0, CANVAS_H - 1);
+          zoom_resize();
+        }
+      } else {
+        for (int i = 0; i < a.count; i++) {
+          PX(a.changes[i].y, a.changes[i].x) = a.changes[i].after;
+          cursor_x = a.changes[i].x;
+          cursor_y = a.changes[i].y;
+        }
       }
       status_update();
       gtk_widget_queue_draw(GTK_WIDGET(data));
@@ -1998,10 +2053,24 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
       redo_top++;
       if (redo_count < UNDO_MAX)
         redo_count++;
-      for (int i = a.count - 1; i >= 0; i--) {
-        PX(a.changes[i].y, a.changes[i].x) = a.changes[i].before;
-        cursor_x = a.changes[i].x;
-        cursor_y = a.changes[i].y;
+      if (a.before_snap) {
+        guchar *np = malloc(a.before_w * a.before_h);
+        if (np) {
+          memcpy(np, a.before_snap, a.before_w * a.before_h);
+          free(pixels);
+          pixels = np;
+          CANVAS_W = a.before_w;
+          CANVAS_H = a.before_h;
+          cursor_x = CLAMP(cursor_x, 0, CANVAS_W - 1);
+          cursor_y = CLAMP(cursor_y, 0, CANVAS_H - 1);
+          zoom_resize();
+        }
+      } else {
+        for (int i = a.count - 1; i >= 0; i--) {
+          PX(a.changes[i].y, a.changes[i].x) = a.changes[i].before;
+          cursor_x = a.changes[i].x;
+          cursor_y = a.changes[i].y;
+        }
       }
     }
     break;
