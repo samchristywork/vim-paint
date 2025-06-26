@@ -10,20 +10,23 @@ static int CANVAS_W = DEFAULT_CANVAS_W;
 static int CANVAS_H = DEFAULT_CANVAS_H;
 static int CELL_SIZE = 12;
 
-/* palette: index 0 = background (white), 1..N = foreground colors */
-#define PALETTE_MAX 256
-static double palette[PALETTE_MAX][3] = {
-    {1.0, 1.0, 1.0}, /* 0 white  (background) */
-    {0.0, 0.0, 0.0}, /* 1 black  */
-    {0.8, 0.1, 0.1}, /* 2 red    */
-    {0.1, 0.7, 0.1}, /* 3 green  */
-    {0.1, 0.3, 0.9}, /* 4 blue   */
-    {0.9, 0.8, 0.0}, /* 5 yellow */
-    {0.0, 0.7, 0.8}, /* 6 cyan   */
-    {0.7, 0.0, 0.8}, /* 7 magenta*/
-};
-static int palette_size = 8;
+/* palette: index 0 = background (white), 1..N = foreground colors.
+   Pixel indices are stored as guchar, so the effective ceiling is 256. */
+static double (*palette)[3] = NULL;
+static int palette_size = 0;
+static int palette_cap  = 0;
 #define PALETTE_SIZE palette_size
+
+static int palette_reserve(int needed) {
+  if (needed <= palette_cap) return 1;
+  int nc = palette_cap ? palette_cap * 2 : 8;
+  while (nc < needed) nc *= 2;
+  double (*np)[3] = realloc(palette, (size_t)nc * sizeof(*np));
+  if (!np) return 0;
+  palette = np;
+  palette_cap = nc;
+  return 1;
+}
 
 static guchar *pixels =
     NULL; /* flat [y * CANVAS_W + x], 0=background 1..7=palette */
@@ -667,8 +670,10 @@ static void cmd_execute(void) {
           }
         }
         if (found < 0) {
-          if (PALETTE_SIZE >= PALETTE_MAX) {
+          if (PALETTE_SIZE >= 256) {
             cmd_flash("Palette full.");
+          } else if (!palette_reserve(palette_size + 1)) {
+            cmd_flash("Out of memory.");
           } else {
             found = palette_size;
             set_palette_rgb(found, rgb);
@@ -761,10 +766,12 @@ static void cmd_execute(void) {
     }
     int count = 0;
     char line[16];
-    while (fgets(line, sizeof(line), f) && count < PALETTE_MAX) {
+    while (fgets(line, sizeof(line), f) && count < 256) {
       unsigned int rgb;
-      if (line[0] == '#' && sscanf(line + 1, "%06x", &rgb) == 1)
-        set_palette_rgb(count++, rgb);
+      if (line[0] == '#' && sscanf(line + 1, "%06x", &rgb) == 1) {
+        if (palette_reserve(count + 1))
+          set_palette_rgb(count++, rgb);
+      }
     }
     fclose(f);
     if (count == 0) {
@@ -2252,6 +2259,14 @@ int main(int argc, char *argv[]) {
     }
     cairo_surface_destroy(probe);
   }
+
+  static const double default_pal[8][3] = {
+      {1.0,1.0,1.0},{0.0,0.0,0.0},{0.8,0.1,0.1},{0.1,0.7,0.1},
+      {0.1,0.3,0.9},{0.9,0.8,0.0},{0.0,0.7,0.8},{0.7,0.0,0.8},
+  };
+  palette_reserve(8);
+  memcpy(palette, default_pal, sizeof(default_pal));
+  palette_size = 8;
 
   pixels = calloc(CANVAS_W * CANVAS_H, 1);
 
