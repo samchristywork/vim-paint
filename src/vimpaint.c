@@ -710,6 +710,22 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strncmp(cmd_buf, ":goto ", 6) == 0 && *arg) {
+    int gx = 0, gy = 0;
+    if (sscanf(arg, "%d,%d", &gx, &gy) != 2)
+      sscanf(arg, "%d %d", &gx, &gy);
+    if (gx < 1 || gy < 1) {
+      cmd_flash("Usage: :goto col,row  (1-based)");
+      return;
+    }
+    cursor_x = CLAMP(gx - 1, 0, CANVAS_W - 1);
+    cursor_y = CLAMP(gy - 1, 0, CANVAS_H - 1);
+    status_update();
+    gtk_widget_queue_draw(main_canvas);
+    cmd_set("");
+    return;
+  }
+
   if (strncmp(cmd_buf, ":resize ", 8) == 0 && *arg) {
     int nw = 0, nh = 0;
     if (sscanf(arg, "%dx%d", &nw, &nh) != 2)
@@ -1005,7 +1021,8 @@ static void cmd_execute(void) {
         "  + / -               zoom in / out\n"
         "  | (pipe)            toggle grid\n"
         "  :set zoom N         set cell size\n"
-        "  Ctrl-G              show file info\n");
+        "  Ctrl-G              show file info\n"
+        "  :goto col,row       jump to position (1-based)\n");
     gtk_dialog_run(GTK_DIALOG(dlg));
     gtk_widget_destroy(dlg);
     cmd_set("");
