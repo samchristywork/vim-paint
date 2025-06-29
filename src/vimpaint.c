@@ -710,6 +710,47 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strncmp(cmd_buf, ":find color ", 12) == 0) {
+    const char *val = cmd_buf + 12;
+    unsigned int rgb;
+    if (!parse_color(val, &rgb)) {
+      cmd_flash("Unknown color.");
+      return;
+    }
+    double pr = ((rgb >> 16) & 0xff) / 255.0;
+    double pg = ((rgb >> 8)  & 0xff) / 255.0;
+    double pb = (rgb & 0xff)         / 255.0;
+    /* Find the palette index closest to the requested color */
+    int target = 0;
+    double best_dist = 1e9;
+    for (int i = 0; i < PALETTE_SIZE; i++) {
+      double dr = pr - palette[i][0];
+      double dg = pg - palette[i][1];
+      double db = pb - palette[i][2];
+      double d = dr*dr + dg*dg + db*db;
+      if (d < best_dist) { best_dist = d; target = i; }
+    }
+    /* Find the nearest pixel (Manhattan) with that palette index */
+    int found_x = -1, found_y = -1, found_dist = INT_MAX;
+    for (int y = 0; y < CANVAS_H; y++) {
+      for (int x = 0; x < CANVAS_W; x++) {
+        if (PX(y, x) != (guchar)target) continue;
+        int d = abs(x - cursor_x) + abs(y - cursor_y);
+        if (d < found_dist) { found_dist = d; found_x = x; found_y = y; }
+      }
+    }
+    if (found_x < 0) {
+      cmd_flash("Color not found on canvas.");
+    } else {
+      cursor_x = found_x;
+      cursor_y = found_y;
+      status_update();
+      gtk_widget_queue_draw(main_canvas);
+    }
+    cmd_set("");
+    return;
+  }
+
   if (strncmp(cmd_buf, ":goto ", 6) == 0 && *arg) {
     int gx = 0, gy = 0;
     if (sscanf(arg, "%d,%d", &gx, &gy) != 2)
@@ -1022,7 +1063,8 @@ static void cmd_execute(void) {
         "  | (pipe)            toggle grid\n"
         "  :set zoom N         set cell size\n"
         "  Ctrl-G              show file info\n"
-        "  :goto col,row       jump to position (1-based)\n");
+        "  :goto col,row       jump to position (1-based)\n"
+        "  :find color <hex|name>  jump to nearest pixel of color\n");
     gtk_dialog_run(GTK_DIALOG(dlg));
     gtk_widget_destroy(dlg);
     cmd_set("");
@@ -1425,9 +1467,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
           }
         }
       } else {
-        /* Color name completion for :set bg and :set color */
+        /* Color name completion for :set bg, :set color, :find color */
         static const char *const color_pfxs[] = {
-            ":set bg ", ":set color ", NULL};
+            ":set bg ", ":set color ", ":find color ", NULL};
         const char *cpfx = NULL;
         for (int i = 0; color_pfxs[i]; i++) {
           size_t plen = strlen(color_pfxs[i]);
