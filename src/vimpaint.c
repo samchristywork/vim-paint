@@ -2017,7 +2017,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     }
     break;
   case GDK_KEY_p:
-    if (yank_buf) {
+    if (!yank_buf) {
+      cmd_flash("Nothing yanked.");
+    } else {
       begin_undo_action();
       for (int ey = 0; ey < yank_h; ey++)
         for (int ex = 0; ex < yank_w; ex++) {
@@ -2031,7 +2033,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     }
     break;
   case GDK_KEY_P:
-    if (yank_buf) {
+    if (!yank_buf) {
+      cmd_flash("Nothing yanked.");
+    } else {
       int ox = cursor_x - yank_w / 2;
       int oy = cursor_y - yank_h / 2;
       begin_undo_action();
