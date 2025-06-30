@@ -710,6 +710,48 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strncmp(cmd_buf, ":replace ", 9) == 0 && *arg) {
+    char from_s[64] = "", to_s[64] = "";
+    if (sscanf(arg, "%63s %63s", from_s, to_s) != 2) {
+      cmd_flash("Usage: :replace <from> <to>");
+      return;
+    }
+    unsigned int from_rgb, to_rgb;
+    if (!parse_color(from_s, &from_rgb) || !parse_color(to_s, &to_rgb))
+      return;
+    /* Find the closest palette indices for each color */
+    int from_idx = 0, to_idx = 0;
+    double best_from = 1e9, best_to = 1e9;
+    for (int i = 0; i < PALETTE_SIZE; i++) {
+      double r = palette[i][0], g = palette[i][1], b = palette[i][2];
+      double fr = ((from_rgb >> 16) & 0xff) / 255.0 - r;
+      double fg = ((from_rgb >>  8) & 0xff) / 255.0 - g;
+      double fb = (from_rgb & 0xff)          / 255.0 - b;
+      double df = fr*fr + fg*fg + fb*fb;
+      if (df < best_from) { best_from = df; from_idx = i; }
+      double tr = ((to_rgb >> 16) & 0xff) / 255.0 - r;
+      double tg = ((to_rgb >>  8) & 0xff) / 255.0 - g;
+      double tb = (to_rgb & 0xff)          / 255.0 - b;
+      double dt = tr*tr + tg*tg + tb*tb;
+      if (dt < best_to) { best_to = dt; to_idx = i; }
+    }
+    if (from_idx == to_idx) {
+      cmd_flash("Colors are the same.");
+      return;
+    }
+    begin_undo_action();
+    for (int y = 0; y < CANVAS_H; y++)
+      for (int x = 0; x < CANVAS_W; x++)
+        if (PX(y, x) == (guchar)from_idx) {
+          push_undo(x, y);
+          PX(y, x) = (guchar)to_idx;
+        }
+    commit_undo_action();
+    gtk_widget_queue_draw(main_canvas);
+    cmd_set("");
+    return;
+  }
+
   if (strncmp(cmd_buf, ":find color ", 12) == 0) {
     const char *val = cmd_buf + 12;
     unsigned int rgb;
@@ -1064,7 +1106,8 @@ static void cmd_execute(void) {
         "  :set zoom N         set cell size\n"
         "  Ctrl-G              show file info\n"
         "  :goto col,row       jump to position (1-based)\n"
-        "  :find color <hex|name>  jump to nearest pixel of color\n");
+        "  :find color <hex|name>  jump to nearest pixel of color\n"
+        "  :replace <from> <to>    replace all pixels of one color with another\n");
     gtk_dialog_run(GTK_DIALOG(dlg));
     gtk_widget_destroy(dlg);
     cmd_set("");
