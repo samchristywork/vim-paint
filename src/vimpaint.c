@@ -1055,6 +1055,51 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strcmp(cmd_buf, ":crop") == 0) {
+    int min_x = CANVAS_W, max_x = -1, min_y = CANVAS_H, max_y = -1;
+    for (int y = 0; y < CANVAS_H; y++)
+      for (int x = 0; x < CANVAS_W; x++)
+        if (PX(y, x)) {
+          if (x < min_x) min_x = x;
+          if (x > max_x) max_x = x;
+          if (y < min_y) min_y = y;
+          if (y > max_y) max_y = y;
+        }
+    if (max_x < 0) {
+      cmd_flash("Nothing to crop.");
+      return;
+    }
+    if (min_x == 0 && min_y == 0 && max_x == CANVAS_W - 1 && max_y == CANVAS_H - 1) {
+      cmd_flash("Already at content bounds.");
+      return;
+    }
+    int nW = max_x - min_x + 1, nH = max_y - min_y + 1;
+    guchar *before_snap = malloc(CANVAS_W * CANVAS_H);
+    guchar *np = calloc(nW * nH, 1);
+    if (!before_snap || !np) {
+      free(before_snap);
+      free(np);
+      cmd_flash("Out of memory.");
+      return;
+    }
+    memcpy(before_snap, pixels, CANVAS_W * CANVAS_H);
+    int bw = CANVAS_W, bh = CANVAS_H;
+    for (int y = min_y; y <= max_y; y++)
+      for (int x = min_x; x <= max_x; x++)
+        np[(y - min_y) * nW + (x - min_x)] = PX(y, x);
+    free(pixels);
+    pixels = np;
+    CANVAS_W = nW;
+    CANVAS_H = nH;
+    cursor_x = CLAMP(cursor_x - min_x, 0, CANVAS_W - 1);
+    cursor_y = CLAMP(cursor_y - min_y, 0, CANVAS_H - 1);
+    commit_canvas_snapshot(before_snap, bw, bh);
+    zoom_resize();
+    gtk_widget_queue_draw(main_canvas);
+    cmd_set("");
+    return;
+  }
+
   if (strcmp(cmd_buf, ":help") == 0) {
     GtkWidget *dlg = gtk_message_dialog_new(
         GTK_WINDOW(main_window),
@@ -1098,7 +1143,7 @@ static void cmd_execute(void) {
         "  :export <file>    export as BMP or PNG (by extension)\n"
         "\n"
         "Transform\n"
-        "  :resize WxH   :fliph   :flipv   :rotate   :center\n"
+        "  :resize WxH   :fliph   :flipv   :rotate   :center   :crop\n"
         "\n"
         "View\n"
         "  + / -               zoom in / out\n"
