@@ -1102,20 +1102,26 @@ static void cmd_execute(void) {
 
   if (strncmp(cmd_buf, ":text ", 6) == 0 && *arg) {
     int len = (int)strlen(arg);
-    int sw = len * 10 + 4, sh = 14;
+    int sw = len * 10 + 4, sh = 16;
+    /* Render black text on white ARGB32 surface.
+       Checking a color channel (not alpha) gives clean binary results
+       because CAIRO_ANTIALIAS_NONE only works reliably on opaque surfaces. */
     cairo_surface_t *tsurf =
         cairo_image_surface_create(CAIRO_FORMAT_ARGB32, sw, sh);
     cairo_t *tcr = cairo_create(tsurf);
-    cairo_set_antialias(tcr, CAIRO_ANTIALIAS_NONE);
-    cairo_set_source_rgba(tcr, 0, 0, 0, 0);
+    cairo_font_options_t *fo = cairo_font_options_create();
+    cairo_font_options_set_antialias(fo, CAIRO_ANTIALIAS_NONE);
+    cairo_font_options_set_hint_style(fo, CAIRO_HINT_STYLE_FULL);
+    cairo_set_font_options(tcr, fo);
+    cairo_font_options_destroy(fo);
+    cairo_set_source_rgb(tcr, 1, 1, 1);
     cairo_paint(tcr);
     cairo_select_font_face(tcr, "Monospace",
                            CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(tcr, 8.0);
-    /* Measure to get baseline offset */
+    cairo_set_font_size(tcr, 10.0);
     cairo_font_extents_t fe;
     cairo_font_extents(tcr, &fe);
-    cairo_set_source_rgba(tcr, 1, 1, 1, 1);
+    cairo_set_source_rgb(tcr, 0, 0, 0);
     cairo_move_to(tcr, 0, fe.ascent);
     cairo_show_text(tcr, arg);
     cairo_surface_flush(tsurf);
@@ -1124,9 +1130,9 @@ static void cmd_execute(void) {
     begin_undo_action();
     for (int ty = 0; ty < sh; ty++)
       for (int tx = 0; tx < sw; tx++) {
-        /* ARGB32: 4 bytes/pixel, alpha is the high byte stored last on LE */
-        unsigned char a = tdata[ty * tstride + tx * 4 + 3];
-        if (a < 128) continue;
+        /* ARGB32 on LE: [B, G, R, A]; check red channel — 0 = ink, 255 = paper */
+        unsigned char r = tdata[ty * tstride + tx * 4 + 2];
+        if (r > 128) continue;
         int cx = cursor_x + tx, cy = cursor_y + ty;
         if (cx < 0 || cx >= CANVAS_W || cy < 0 || cy >= CANVAS_H) continue;
         push_undo(cx, cy);
