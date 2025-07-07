@@ -1100,6 +1100,46 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strncmp(cmd_buf, ":text ", 6) == 0 && *arg) {
+    int len = (int)strlen(arg);
+    int sw = len * 10 + 4, sh = 14;
+    cairo_surface_t *tsurf =
+        cairo_image_surface_create(CAIRO_FORMAT_ARGB32, sw, sh);
+    cairo_t *tcr = cairo_create(tsurf);
+    cairo_set_antialias(tcr, CAIRO_ANTIALIAS_NONE);
+    cairo_set_source_rgba(tcr, 0, 0, 0, 0);
+    cairo_paint(tcr);
+    cairo_select_font_face(tcr, "Monospace",
+                           CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    cairo_set_font_size(tcr, 8.0);
+    /* Measure to get baseline offset */
+    cairo_font_extents_t fe;
+    cairo_font_extents(tcr, &fe);
+    cairo_set_source_rgba(tcr, 1, 1, 1, 1);
+    cairo_move_to(tcr, 0, fe.ascent);
+    cairo_show_text(tcr, arg);
+    cairo_surface_flush(tsurf);
+    unsigned char *tdata = cairo_image_surface_get_data(tsurf);
+    int tstride = cairo_image_surface_get_stride(tsurf);
+    begin_undo_action();
+    for (int ty = 0; ty < sh; ty++)
+      for (int tx = 0; tx < sw; tx++) {
+        /* ARGB32: 4 bytes/pixel, alpha is the high byte stored last on LE */
+        unsigned char a = tdata[ty * tstride + tx * 4 + 3];
+        if (a < 128) continue;
+        int cx = cursor_x + tx, cy = cursor_y + ty;
+        if (cx < 0 || cx >= CANVAS_W || cy < 0 || cy >= CANVAS_H) continue;
+        push_undo(cx, cy);
+        PX(cy, cx) = fg_color;
+      }
+    commit_undo_action();
+    cairo_destroy(tcr);
+    cairo_surface_destroy(tsurf);
+    gtk_widget_queue_draw(main_canvas);
+    cmd_set("");
+    return;
+  }
+
   if (strcmp(cmd_buf, ":help") == 0) {
     GtkWidget *dlg = gtk_message_dialog_new(
         GTK_WINDOW(main_window),
@@ -1122,6 +1162,7 @@ static void cmd_execute(void) {
         "  S                   flood fill\n"
         "  i                   insert mode (move to paint)\n"
         "  .                   repeat last paint / erase\n"
+        "  :text <string>      stamp text at cursor (8px Monospace)\n"
         "\n"
         "Visual mode  (v)\n"
         "  r / x               fill / erase selection\n"
