@@ -121,17 +121,23 @@ static void flash_color(int idx) {
 
 static void update_title(const char *filename) {
   char buf[4300];
-  snprintf(buf, sizeof(buf), "vim-paint - %s%s", filename,
-           canvas_dirty ? " [+]" : "");
+  snprintf(buf, sizeof(buf), "vim-paint - %s%s  %dx%d  (%d,%d)",
+           filename, canvas_dirty ? " [+]" : "",
+           CANVAS_W, CANVAS_H, cursor_x + 1, cursor_y + 1);
   gtk_window_set_title(GTK_WINDOW(main_window), buf);
 }
 
 static void title_refresh(void) {
+  char buf[512];
   if (*last_filename)
-    update_title(last_filename);
+    snprintf(buf, sizeof(buf), "vim-paint - %s%s  %dx%d  (%d,%d)",
+             last_filename, canvas_dirty ? " [+]" : "",
+             CANVAS_W, CANVAS_H, cursor_x + 1, cursor_y + 1);
   else
-    gtk_window_set_title(GTK_WINDOW(main_window),
-                         canvas_dirty ? "vim-paint [+]" : "vim-paint");
+    snprintf(buf, sizeof(buf), "vim-paint%s  %dx%d  (%d,%d)",
+             canvas_dirty ? " [+]" : "",
+             CANVAS_W, CANVAS_H, cursor_x + 1, cursor_y + 1);
+  gtk_window_set_title(GTK_WINDOW(main_window), buf);
 }
 
 static gboolean on_palette_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
@@ -174,6 +180,7 @@ static void status_update(void) {
            cursor_x + 1, cursor_y + 1, (int)fg_color, r, g, b,
            CANVAS_W, CANVAS_H);
   gtk_label_set_text(GTK_LABEL(cmd_label), buf);
+  title_refresh();
 }
 
 static gboolean on_flash_expire(gpointer data) {
