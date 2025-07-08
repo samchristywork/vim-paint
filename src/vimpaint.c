@@ -44,7 +44,8 @@ static gboolean visual_mode = FALSE;
 static int visual_anchor_x = 0;
 static int visual_anchor_y = 0;
 static gboolean insert_mode = FALSE;
-static gboolean show_grid = TRUE;
+static gboolean show_grid  = TRUE;
+static gboolean show_ruler = FALSE;
 static gboolean canvas_dirty = FALSE;
 static gboolean sym_h = FALSE;
 static gboolean sym_v = FALSE;
@@ -596,6 +597,14 @@ static void cmd_execute(void) {
       cmd_set("");
     } else if (strcmp(opt, "nogrid") == 0) {
       show_grid = FALSE;
+      gtk_widget_queue_draw(main_canvas);
+      cmd_set("");
+    } else if (strcmp(opt, "ruler") == 0) {
+      show_ruler = TRUE;
+      gtk_widget_queue_draw(main_canvas);
+      cmd_set("");
+    } else if (strcmp(opt, "noruler") == 0) {
+      show_ruler = FALSE;
       gtk_widget_queue_draw(main_canvas);
       cmd_set("");
     } else if (strncmp(opt, "zoom ", 5) == 0) {
@@ -1552,6 +1561,39 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
                     cursor_y * CELL_SIZE + inset, CELL_SIZE - 2 * inset,
                     CELL_SIZE - 2 * inset);
     cairo_stroke(cr);
+  }
+
+  /* Draw coordinate ruler overlay */
+  if (show_ruler) {
+    int step = 1;
+    if (CELL_SIZE < 20) step = 5;
+    if (CELL_SIZE < 8)  step = 10;
+    if (CELL_SIZE < 4)  step = 20;
+    cairo_select_font_face(cr, "Monospace",
+                           CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    cairo_set_font_size(cr, 7.0);
+    for (int x = 0; x < CANVAS_W; x += step) {
+      char buf[8];
+      snprintf(buf, sizeof(buf), "%d", x + 1);
+      double px = x * CELL_SIZE + 1, py = 7;
+      cairo_set_source_rgba(cr, 0, 0, 0, 0.65);
+      cairo_move_to(cr, px + 0.5, py + 0.5);
+      cairo_show_text(cr, buf);
+      cairo_set_source_rgba(cr, 1, 1, 1, 0.9);
+      cairo_move_to(cr, px, py);
+      cairo_show_text(cr, buf);
+    }
+    for (int y = 0; y < CANVAS_H; y += step) {
+      char buf[8];
+      snprintf(buf, sizeof(buf), "%d", y + 1);
+      double px = 1, py = y * CELL_SIZE + 7;
+      cairo_set_source_rgba(cr, 0, 0, 0, 0.65);
+      cairo_move_to(cr, px + 0.5, py + 0.5);
+      cairo_show_text(cr, buf);
+      cairo_set_source_rgba(cr, 1, 1, 1, 0.9);
+      cairo_move_to(cr, px, py);
+      cairo_show_text(cr, buf);
+    }
   }
 
   return FALSE;
