@@ -889,6 +889,62 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strncmp(cmd_buf, ":importp ", 9) == 0 && *arg) {
+    cairo_surface_t *surf = cairo_image_surface_create_from_png(arg);
+    if (cairo_surface_status(surf) != CAIRO_STATUS_SUCCESS) {
+      cmd_flash("Cannot open file.");
+      cairo_surface_destroy(surf);
+      return;
+    }
+    guchar *d = cairo_image_surface_get_data(surf);
+    int stride = cairo_image_surface_get_stride(surf);
+    int iw = cairo_image_surface_get_width(surf);
+    int ih = cairo_image_surface_get_height(surf);
+    /* Collect up to 256 unique RGB values from the image */
+    unsigned int seen[256];
+    int seen_count = 0;
+    for (int y = 0; y < ih && seen_count < 256; y++) {
+      for (int x = 0; x < iw && seen_count < 256; x++) {
+        unsigned int r = d[y * stride + x * 4 + 2];
+        unsigned int g = d[y * stride + x * 4 + 1];
+        unsigned int b = d[y * stride + x * 4 + 0];
+        unsigned int rgb = (r << 16) | (g << 8) | b;
+        int dup = 0;
+        for (int i = 0; i < seen_count; i++)
+          if (seen[i] == rgb) { dup = 1; break; }
+        if (!dup) seen[seen_count++] = rgb;
+      }
+    }
+    cairo_surface_destroy(surf);
+    /* Add colors not already in the palette */
+    int added = 0;
+    for (int s = 0; s < seen_count && PALETTE_SIZE < 256; s++) {
+      unsigned int sr = (seen[s] >> 16) & 0xff;
+      unsigned int sg = (seen[s] >>  8) & 0xff;
+      unsigned int sb =  seen[s]        & 0xff;
+      int dup = 0;
+      for (int i = 0; i < PALETTE_SIZE; i++) {
+        int pr, pg, pb;
+        palette_to_rgb(i, &pr, &pg, &pb);
+        if ((unsigned int)pr == sr && (unsigned int)pg == sg && (unsigned int)pb == sb)
+          { dup = 1; break; }
+      }
+      if (!dup && palette_reserve(palette_size + 1)) {
+        set_palette_rgb(palette_size++, seen[s]);
+        added++;
+      }
+    }
+    if (added == 0) {
+      cmd_flash("No new colors found.");
+    } else {
+      char msg[64];
+      snprintf(msg, sizeof(msg), "Added %d color(s) to palette.", added);
+      gtk_widget_queue_draw(palette_bar);
+      cmd_flash(msg);
+    }
+    return;
+  }
+
   if (strncmp(cmd_buf, ":delp ", 6) == 0 && *arg) {
     int idx = atoi(arg);
     if (idx <= 0 || idx >= PALETTE_SIZE) {
@@ -1183,6 +1239,7 @@ static void cmd_execute(void) {
         "  :set color <idx> <hex|name>    edit palette slot\n"
         "  :set bg <hex|name>             set background color\n"
         "  :savep / :loadp <file>         save / load palette\n"
+        "  :importp <file>               sample unique colors from PNG\n"
         "  :delp <idx>                    delete palette entry\n"
         "\n"
         "Files\n"
@@ -1562,8 +1619,8 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
       }
     } else if (event->keyval == GDK_KEY_Tab) {
       static const char *const file_pfxs[] = {":loadp ",  ":savep ", ":export ",
-                                              ":wq ",    ":w ",     ":e! ",
-                                              ":e ",     NULL};
+                                              ":importp ",":wq ",   ":w ",
+                                              ":e! ",    ":e ",     NULL};
       const char *pfx = NULL;
       for (int i = 0; file_pfxs[i]; i++) {
         size_t plen = strlen(file_pfxs[i]);
