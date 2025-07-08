@@ -1261,6 +1261,7 @@ static void cmd_execute(void) {
         "View\n"
         "  + / -               zoom in / out\n"
         "  | (pipe)            toggle grid\n"
+        "  %                   toggle coordinate ruler\n"
         "  :set zoom N         set cell size\n"
         "  Ctrl-G              show file info\n"
         "  :goto col,row       jump to position (1-based)\n"
@@ -2070,6 +2071,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     break;
   case GDK_KEY_bar:
     show_grid = !show_grid;
+    break;
+  case GDK_KEY_percent:
+    show_ruler = !show_ruler;
     break;
   case GDK_KEY_i:
     insert_mode = TRUE;
