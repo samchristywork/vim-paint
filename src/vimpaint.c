@@ -44,8 +44,9 @@ static gboolean visual_mode = FALSE;
 static int visual_anchor_x = 0;
 static int visual_anchor_y = 0;
 static gboolean insert_mode = FALSE;
-static gboolean show_grid  = TRUE;
-static gboolean show_ruler = FALSE;
+static gboolean show_grid    = TRUE;
+static gboolean show_ruler   = FALSE;
+static gboolean show_checker = FALSE;
 static gboolean canvas_dirty = FALSE;
 static gboolean sym_h = FALSE;
 static gboolean sym_v = FALSE;
@@ -737,6 +738,14 @@ static void cmd_execute(void) {
       show_ruler = FALSE;
       gtk_widget_queue_draw(main_canvas);
       cmd_set("");
+    } else if (strcmp(opt, "checker") == 0) {
+      show_checker = TRUE;
+      gtk_widget_queue_draw(main_canvas);
+      cmd_set("");
+    } else if (strcmp(opt, "nochecker") == 0) {
+      show_checker = FALSE;
+      gtk_widget_queue_draw(main_canvas);
+      cmd_set("");
     } else if (strncmp(opt, "zoom ", 5) == 0) {
       int v = atoi(opt + 5);
       if (v >= 4 && v <= 64) {
@@ -1393,6 +1402,7 @@ static void cmd_execute(void) {
         "  + / -               zoom in / out\n"
         "  | (pipe)            toggle grid\n"
         "  %                   toggle coordinate ruler\n"
+        "  #                   toggle checkerboard background\n"
         "  :set zoom N         set cell size\n"
         "  Ctrl-G              show file info\n"
         "  :goto col,row       jump to position (1-based)\n"
@@ -1639,8 +1649,16 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
   for (int y = 0; y < CANVAS_H; y++) {
     for (int x = 0; x < CANVAS_W; x++) {
       int idx = PX(y, x);
-      cairo_set_source_rgb(cr, palette[idx][0], palette[idx][1],
-                           palette[idx][2]);
+      if (idx == 0 && show_checker) {
+        /* Alternating light/dark squares to indicate transparent background */
+        if ((x + y) % 2 == 0)
+          cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
+        else
+          cairo_set_source_rgb(cr, 0.78, 0.78, 0.78);
+      } else {
+        cairo_set_source_rgb(cr, palette[idx][0], palette[idx][1],
+                             palette[idx][2]);
+      }
       cairo_rectangle(cr, x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
       cairo_fill(cr);
     }
@@ -2215,6 +2233,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     break;
   case GDK_KEY_percent:
     show_ruler = !show_ruler;
+    break;
+  case GDK_KEY_numbersign:
+    show_checker = !show_checker;
     break;
   case GDK_KEY_i:
     insert_mode = TRUE;
