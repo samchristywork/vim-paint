@@ -50,6 +50,17 @@ static gboolean canvas_dirty = FALSE;
 static gboolean sym_h = FALSE;
 static gboolean sym_v = FALSE;
 
+#define TAB_MAX 8
+typedef struct {
+  guchar *pixels;
+  int w, h, cx, cy;
+  char filename[4096];
+  gboolean dirty;
+} TabState;
+static TabState tabs[TAB_MAX];
+static int tab_count   = 1;
+static int tab_current = 0;
+
 static gboolean cmd_mode = FALSE;
 static char cmd_buf[4096];
 static int cmd_len = 0;
@@ -108,8 +119,11 @@ static void push_undo(int x, int y);
 static void commit_undo_action(void);
 static void commit_canvas_snapshot(guchar *before_snap, int bw, int bh);
 static void cmd_open(const char *filename);
+static void cmd_set(const char *text);
 static void title_refresh(void);
+static void status_update(void);
 static void paint_pixel(int x, int y, guchar color);
+static void tab_switch(int newidx);
 
 static void flash_color(int idx) {
   char buf[64];
@@ -129,15 +143,88 @@ static void update_title(const char *filename) {
 
 static void title_refresh(void) {
   char buf[512];
+  char tab_info[20] = "";
+  if (tab_count > 1)
+    snprintf(tab_info, sizeof(tab_info), "[%d/%d] ", tab_current + 1, tab_count);
   if (*last_filename)
-    snprintf(buf, sizeof(buf), "vim-paint - %s%s  %dx%d  (%d,%d)",
-             last_filename, canvas_dirty ? " [+]" : "",
+    snprintf(buf, sizeof(buf), "vim-paint %s- %s%s  %dx%d  (%d,%d)",
+             tab_info, last_filename, canvas_dirty ? " [+]" : "",
              CANVAS_W, CANVAS_H, cursor_x + 1, cursor_y + 1);
   else
-    snprintf(buf, sizeof(buf), "vim-paint%s  %dx%d  (%d,%d)",
-             canvas_dirty ? " [+]" : "",
+    snprintf(buf, sizeof(buf), "vim-paint %s%s  %dx%d  (%d,%d)",
+             tab_info, canvas_dirty ? "[+] " : "",
              CANVAS_W, CANVAS_H, cursor_x + 1, cursor_y + 1);
   gtk_window_set_title(GTK_WINDOW(main_window), buf);
+}
+
+static void tab_save(int idx) {
+  int sz = CANVAS_W * CANVAS_H;
+  if (!tabs[idx].pixels || tabs[idx].w != CANVAS_W || tabs[idx].h != CANVAS_H) {
+    free(tabs[idx].pixels);
+    tabs[idx].pixels = malloc(sz);
+    if (!tabs[idx].pixels) return;
+  }
+  memcpy(tabs[idx].pixels, pixels, sz);
+  tabs[idx].w     = CANVAS_W;
+  tabs[idx].h     = CANVAS_H;
+  tabs[idx].cx    = cursor_x;
+  tabs[idx].cy    = cursor_y;
+  tabs[idx].dirty = canvas_dirty;
+  snprintf(tabs[idx].filename, sizeof(tabs[idx].filename), "%s", last_filename);
+}
+
+static void tab_switch(int newidx) {
+  if (newidx < 0 || newidx >= tab_count || newidx == tab_current) return;
+  tab_save(tab_current);
+  tab_current = newidx;
+  TabState *t = &tabs[tab_current];
+  guchar *np = malloc(t->w * t->h);
+  if (!np) return;
+  memcpy(np, t->pixels, t->w * t->h);
+  free(pixels);
+  pixels   = np;
+  CANVAS_W = t->w;
+  CANVAS_H = t->h;
+  cursor_x = CLAMP(t->cx, 0, CANVAS_W - 1);
+  cursor_y = CLAMP(t->cy, 0, CANVAS_H - 1);
+  canvas_dirty  = t->dirty;
+  visual_mode   = FALSE;
+  insert_mode   = FALSE;
+  snprintf(last_filename, sizeof(last_filename), "%s", t->filename);
+  clear_history();
+  zoom_resize();
+  title_refresh();
+  status_update();
+  gtk_widget_queue_draw(main_canvas);
+}
+
+static void tab_close_current(void) {
+  free(tabs[tab_current].pixels);
+  for (int i = tab_current; i < tab_count - 1; i++)
+    tabs[i] = tabs[i + 1];
+  tabs[tab_count - 1].pixels = NULL;
+  tab_count--;
+  if (tab_current >= tab_count) tab_current = tab_count - 1;
+  TabState *t = &tabs[tab_current];
+  guchar *np = malloc(t->w * t->h);
+  if (!np) return;
+  memcpy(np, t->pixels, t->w * t->h);
+  free(pixels);
+  pixels   = np;
+  CANVAS_W = t->w;
+  CANVAS_H = t->h;
+  cursor_x = CLAMP(t->cx, 0, CANVAS_W - 1);
+  cursor_y = CLAMP(t->cy, 0, CANVAS_H - 1);
+  canvas_dirty  = t->dirty;
+  visual_mode   = FALSE;
+  insert_mode   = FALSE;
+  snprintf(last_filename, sizeof(last_filename), "%s", t->filename);
+  clear_history();
+  zoom_resize();
+  title_refresh();
+  status_update();
+  gtk_widget_queue_draw(main_canvas);
+  cmd_set("");
 }
 
 static gboolean on_palette_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
@@ -469,13 +556,49 @@ static void cmd_execute(void) {
   if (strcmp(cmd_buf, ":q") == 0) {
     if (canvas_dirty)
       cmd_flash("Unsaved changes. Use :q! to force quit or :wq to save and quit.");
+    else if (tab_count > 1)
+      tab_close_current();
     else
       gtk_main_quit();
     return;
   }
 
   if (strcmp(cmd_buf, ":q!") == 0) {
-    gtk_main_quit();
+    if (tab_count > 1)
+      tab_close_current();
+    else
+      gtk_main_quit();
+    return;
+  }
+
+  if (strncmp(cmd_buf, ":tabnew", 7) == 0) {
+    if (tab_count >= TAB_MAX) {
+      cmd_flash("Max tabs reached.");
+      return;
+    }
+    tab_save(tab_current);
+    guchar *np = calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, 1);
+    if (!np) { cmd_flash("Out of memory."); return; }
+    free(pixels);
+    pixels   = np;
+    CANVAS_W = DEFAULT_CANVAS_W;
+    CANVAS_H = DEFAULT_CANVAS_H;
+    cursor_x = cursor_y = 0;
+    canvas_dirty  = FALSE;
+    visual_mode   = FALSE;
+    insert_mode   = FALSE;
+    last_filename[0] = '\0';
+    clear_history();
+    tab_count++;
+    tab_current = tab_count - 1;
+    /* Also save the initial empty state into tabs[tab_current] */
+    tab_save(tab_current);
+    if (*arg) cmd_open(arg);
+    zoom_resize();
+    title_refresh();
+    status_update();
+    gtk_widget_queue_draw(main_canvas);
+    cmd_set("");
     return;
   }
 
@@ -1260,6 +1383,7 @@ static void cmd_execute(void) {
         "\n"
         "Files\n"
         "  :w [file]   :wq [file]   :e [file]   :new\n"
+        "  :tabnew [file]  open file in new tab  (gt / gT to switch)\n"
         "  :export <file>    export as BMP or PNG (by extension)\n"
         "\n"
         "Transform\n"
@@ -1810,6 +1934,14 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
       gtk_widget_queue_draw(GTK_WIDGET(data));
       return TRUE;
     }
+    if (event->keyval == GDK_KEY_t) {
+      tab_switch((tab_current + 1) % tab_count);
+      return TRUE;
+    }
+    if (event->keyval == GDK_KEY_T) {
+      tab_switch((tab_current - 1 + tab_count) % tab_count);
+      return TRUE;
+    }
   }
 
   if (pending_d) {
@@ -2060,6 +2192,8 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
   case GDK_KEY_q:
     if (canvas_dirty)
       cmd_flash("Unsaved changes. Use :q to quit or :wq to save and quit.");
+    else if (tab_count > 1)
+      tab_close_current();
     else
       gtk_main_quit();
     return TRUE;
