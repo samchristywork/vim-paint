@@ -1095,8 +1095,12 @@ static void cmd_execute(void) {
 
   if (strncmp(cmd_buf, ":delp ", 6) == 0 && *arg) {
     int idx = atoi(arg);
-    if (idx <= 0 || idx >= PALETTE_SIZE) {
-      cmd_flash("Invalid palette index (must be 1 or above).");
+    if (idx == 0) {
+      cmd_flash("Cannot delete background color (index 0).");
+      return;
+    }
+    if (idx < 0 || idx >= PALETTE_SIZE) {
+      cmd_flash("Invalid palette index.");
       return;
     }
     for (int i = 0; i < CANVAS_W * CANVAS_H; i++) {
