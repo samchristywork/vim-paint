@@ -1895,10 +1895,17 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
             color_tab_idx = (color_tab_idx + 1) % color_tab_count;
           }
           if (color_tab_valid) {
-            snprintf(cmd_buf, sizeof(cmd_buf), "%s%s", color_tab_prefix,
-                     named_colors[color_tab_matches[color_tab_idx]].name);
-            cmd_len = strlen(cmd_buf);
-            cmd_set(cmd_buf);
+            int written = snprintf(cmd_buf, sizeof(cmd_buf), "%s%s",
+                                   color_tab_prefix,
+                                   named_colors[color_tab_matches[color_tab_idx]].name);
+            if (written >= (int)sizeof(cmd_buf)) {
+              color_tab_valid = FALSE;
+              color_tab_count = 0;
+              cmd_flash("Color name too long.");
+            } else {
+              cmd_len = strlen(cmd_buf);
+              cmd_set(cmd_buf);
+            }
           }
         }
       }
