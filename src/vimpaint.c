@@ -51,12 +51,37 @@ static gboolean canvas_dirty = FALSE;
 static gboolean sym_h = FALSE;
 static gboolean sym_v = FALSE;
 
+#define UNDO_MAX 64
+typedef struct {
+  int x, y;
+  guchar before, after;
+} PixelChange;
+typedef struct {
+  PixelChange *changes;
+  int count;
+  /* Non-NULL for canvas-resizing ops */
+  guchar *before_snap;
+  int before_w, before_h;
+  guchar *after_snap;
+  int after_w, after_h;
+} UndoAction;
+static PixelChange *staged = NULL;
+static int staged_count = 0, staged_cap = 0;
+static UndoAction undo_stack[UNDO_MAX];
+static int undo_top = 0, undo_count = 0;
+static UndoAction redo_stack[UNDO_MAX];
+static int redo_top = 0, redo_count = 0;
+
 #define TAB_MAX 8
 typedef struct {
   guchar *pixels;
   int w, h, cx, cy;
   char filename[4096];
   gboolean dirty;
+  UndoAction undo_stack[UNDO_MAX];
+  int undo_top, undo_count;
+  UndoAction redo_stack[UNDO_MAX];
+  int redo_top, redo_count;
 } TabState;
 static TabState tabs[TAB_MAX];
 static int tab_count   = 1;
@@ -172,6 +197,18 @@ static void tab_save(int idx) {
   tabs[idx].cy    = cursor_y;
   tabs[idx].dirty = canvas_dirty;
   snprintf(tabs[idx].filename, sizeof(tabs[idx].filename), "%s", last_filename);
+  /* Transfer undo/redo ownership from globals to tab storage */
+  memcpy(tabs[idx].undo_stack, undo_stack, sizeof(undo_stack));
+  tabs[idx].undo_top   = undo_top;
+  tabs[idx].undo_count = undo_count;
+  memcpy(tabs[idx].redo_stack, redo_stack, sizeof(redo_stack));
+  tabs[idx].redo_top   = redo_top;
+  tabs[idx].redo_count = redo_count;
+  memset(undo_stack, 0, sizeof(undo_stack));
+  undo_top = 0; undo_count = 0;
+  memset(redo_stack, 0, sizeof(redo_stack));
+  redo_top = 0; redo_count = 0;
+  staged_count = 0;
 }
 
 static void tab_switch(int newidx) {
@@ -192,7 +229,18 @@ static void tab_switch(int newidx) {
   visual_mode   = FALSE;
   insert_mode   = FALSE;
   snprintf(last_filename, sizeof(last_filename), "%s", t->filename);
-  clear_history();
+  /* Restore undo/redo ownership from tab storage to globals */
+  memcpy(undo_stack, t->undo_stack, sizeof(undo_stack));
+  undo_top   = t->undo_top;
+  undo_count = t->undo_count;
+  memcpy(redo_stack, t->redo_stack, sizeof(redo_stack));
+  redo_top   = t->redo_top;
+  redo_count = t->redo_count;
+  memset(t->undo_stack, 0, sizeof(t->undo_stack));
+  t->undo_top = t->undo_count = 0;
+  memset(t->redo_stack, 0, sizeof(t->redo_stack));
+  t->redo_top = t->redo_count = 0;
+  staged_count = 0;
   zoom_resize();
   title_refresh();
   status_update();
@@ -200,9 +248,18 @@ static void tab_switch(int newidx) {
 }
 
 static void tab_close_current(void) {
+  /* Free the closing tab's undo history (currently in globals) */
+  clear_history();
   free(tabs[tab_current].pixels);
+  tabs[tab_current].pixels = NULL;
+  /* Shift remaining tabs down; zero the vacated trailing slot's undo pointers
+     to avoid aliased ownership after the struct copy. */
   for (int i = tab_current; i < tab_count - 1; i++)
     tabs[i] = tabs[i + 1];
+  memset(tabs[tab_count - 1].undo_stack, 0, sizeof(tabs[0].undo_stack));
+  tabs[tab_count - 1].undo_top = tabs[tab_count - 1].undo_count = 0;
+  memset(tabs[tab_count - 1].redo_stack, 0, sizeof(tabs[0].redo_stack));
+  tabs[tab_count - 1].redo_top = tabs[tab_count - 1].redo_count = 0;
   tabs[tab_count - 1].pixels = NULL;
   tab_count--;
   if (tab_current >= tab_count) tab_current = tab_count - 1;
@@ -220,7 +277,18 @@ static void tab_close_current(void) {
   visual_mode   = FALSE;
   insert_mode   = FALSE;
   snprintf(last_filename, sizeof(last_filename), "%s", t->filename);
-  clear_history();
+  /* Restore the new current tab's undo/redo history */
+  memcpy(undo_stack, t->undo_stack, sizeof(undo_stack));
+  undo_top   = t->undo_top;
+  undo_count = t->undo_count;
+  memcpy(redo_stack, t->redo_stack, sizeof(redo_stack));
+  redo_top   = t->redo_top;
+  redo_count = t->redo_count;
+  memset(t->undo_stack, 0, sizeof(t->undo_stack));
+  t->undo_top = t->undo_count = 0;
+  memset(t->redo_stack, 0, sizeof(t->redo_stack));
+  t->redo_top = t->redo_count = 0;
+  staged_count = 0;
   zoom_resize();
   title_refresh();
   status_update();
@@ -1424,29 +1492,6 @@ static void cmd_execute(void) {
 static guchar *yank_buf = NULL;
 static int yank_w = 0;
 static int yank_h = 0;
-
-#define UNDO_MAX 64
-typedef struct {
-  int x, y;
-  guchar before, after;
-} PixelChange;
-typedef struct {
-  PixelChange *changes;
-  int count;
-  /* Non-NULL for canvas-resizing ops (e.g. :rotate) */
-  guchar *before_snap;
-  int before_w, before_h;
-  guchar *after_snap;
-  int after_w, after_h;
-} UndoAction;
-
-static UndoAction undo_stack[UNDO_MAX];
-static int undo_top = 0, undo_count = 0;
-static UndoAction redo_stack[UNDO_MAX];
-static int redo_top = 0, redo_count = 0;
-
-static PixelChange *staged = NULL;
-static int staged_count = 0, staged_cap = 0;
 
 static void free_action(UndoAction *a) {
   free(a->changes);
