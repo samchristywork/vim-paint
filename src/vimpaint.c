@@ -2766,10 +2766,13 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  char *startup_file = (optind < argc) ? argv[optind] : NULL;
+  char **startup_files = (optind < argc) ? &argv[optind] : NULL;
+  int startup_count = argc - optind;
 
-  if (startup_file) {
-    cairo_surface_t *probe = cairo_image_surface_create_from_png(startup_file);
+  /* Size the initial canvas to match the first file if it is a valid PNG. */
+  if (startup_count > 0) {
+    cairo_surface_t *probe =
+        cairo_image_surface_create_from_png(startup_files[0]);
     if (cairo_surface_status(probe) == CAIRO_STATUS_SUCCESS) {
       if (!explicit_w)
         CANVAS_W = cairo_image_surface_get_width(probe);
@@ -2840,8 +2843,30 @@ int main(int argc, char *argv[]) {
   gtk_widget_show_all(window);
   status_update();
 
-  if (startup_file)
-    cmd_open(startup_file);
+  if (startup_count > 0) {
+    cmd_open(startup_files[0]);
+    for (int i = 1; i < startup_count && tab_count < TAB_MAX; i++) {
+      tab_save(tab_current);
+      guchar *np = calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, 1);
+      if (!np) break;
+      free(pixels);
+      pixels        = np;
+      CANVAS_W      = DEFAULT_CANVAS_W;
+      CANVAS_H      = DEFAULT_CANVAS_H;
+      cursor_x      = 0;
+      cursor_y      = 0;
+      canvas_dirty  = FALSE;
+      visual_mode   = FALSE;
+      insert_mode   = FALSE;
+      last_filename[0] = '\0';
+      tab_count++;
+      tab_current = tab_count - 1;
+      tab_save(tab_current);
+      cmd_open(startup_files[i]);
+    }
+    if (tab_count > 1)
+      tab_switch(0);
+  }
 
   gtk_main();
 
