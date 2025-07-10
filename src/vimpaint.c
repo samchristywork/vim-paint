@@ -1308,11 +1308,16 @@ static void cmd_execute(void) {
       cmd_flash("Already centered.");
       return;
     }
+    guchar *before_snap = malloc(CANVAS_W * CANVAS_H);
     guchar *np = calloc(CANVAS_W * CANVAS_H, 1);
-    if (!np) {
+    if (!before_snap || !np) {
+      free(before_snap);
+      free(np);
       cmd_flash("Out of memory.");
       return;
     }
+    memcpy(before_snap, pixels, CANVAS_W * CANVAS_H);
+    int bw = CANVAS_W, bh = CANVAS_H;
     for (int y = 0; y < CANVAS_H; y++)
       for (int x = 0; x < CANVAS_W; x++) {
         if (!PX(y, x))
@@ -1323,9 +1328,7 @@ static void cmd_execute(void) {
       }
     memcpy(pixels, np, CANVAS_W * CANVAS_H);
     free(np);
-    clear_history();
-    canvas_dirty = TRUE;
-    title_refresh();
+    commit_canvas_snapshot(before_snap, bw, bh);
     gtk_widget_queue_draw(main_canvas);
     cmd_set("");
     return;
