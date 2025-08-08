@@ -2160,6 +2160,13 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     yank_h = y1 - y0 + 1;
     free(yank_buf);
     yank_buf = malloc(yank_w * yank_h);
+    if (!yank_buf) {
+      cmd_flash("Out of memory.");
+      visual_mode = FALSE;
+      status_update();
+      gtk_widget_queue_draw(GTK_WIDGET(data));
+      return TRUE;
+    }
     for (int ey = 0; ey < yank_h; ey++)
       for (int ex = 0; ex < yank_w; ex++)
         yank_buf[ey * yank_w + ex] = PX(y0 + ey, x0 + ex);
