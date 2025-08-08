@@ -1670,13 +1670,16 @@ static void flood_fill(int sx, int sy, guchar fill_color) {
   if (target == fill_color)
     return;
   int total = CANVAS_W * CANVAS_H;
+  guchar *before_snap = malloc(total);
   int *queue = malloc(total * sizeof(int));
-  if (!queue)
+  if (!before_snap || !queue) {
+    free(before_snap);
+    free(queue);
     return;
-  begin_undo_action();
+  }
+  memcpy(before_snap, pixels, total);
   int head = 0, tail = 0;
   queue[tail++] = sy * CANVAS_W + sx;
-  push_undo(sx, sy);
   PX(sy, sx) = fill_color;
   while (head < tail) {
     int pos = queue[head++];
@@ -1688,13 +1691,12 @@ static void flood_fill(int sx, int sy, guchar fill_color) {
         continue;
       if (PX(ny, nx) != target)
         continue;
-      push_undo(nx, ny);
       PX(ny, nx) = fill_color;
       queue[tail++] = ny * CANVAS_W + nx;
     }
   }
   free(queue);
-  commit_undo_action();
+  commit_canvas_snapshot(before_snap, CANVAS_W, CANVAS_H);
 }
 
 static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
