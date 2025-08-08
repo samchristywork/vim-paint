@@ -1270,8 +1270,7 @@ static void cmd_execute(void) {
     size_t alen = strlen(arg);
     if (alen >= 4 && strcmp(arg + alen - 4, ".bmp") == 0) {
       cmd_export_bmp(arg);
-    } else {
-      /* Fall back to PNG for any other extension */
+    } else if (alen >= 4 && strcmp(arg + alen - 4, ".png") == 0) {
       cairo_surface_t *surf =
           cairo_image_surface_create(CAIRO_FORMAT_RGB24, CANVAS_W, CANVAS_H);
       guchar *d = cairo_image_surface_get_data(surf);
@@ -1288,6 +1287,8 @@ static void cmd_execute(void) {
           cairo_surface_write_to_png(surf, arg) == CAIRO_STATUS_SUCCESS;
       cairo_surface_destroy(surf);
       cmd_flash(ok ? "Exported." : "Export failed.");
+    } else {
+      cmd_flash("Unsupported format. Use .png or .bmp.");
     }
     return;
   }
