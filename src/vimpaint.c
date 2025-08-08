@@ -1033,11 +1033,16 @@ static void cmd_execute(void) {
       cmd_flash("Usage: :resize WxH");
       return;
     }
+    guchar *before_snap = malloc(CANVAS_W * CANVAS_H);
     guchar *np = calloc(nw * nh, 1);
-    if (!np) {
+    if (!before_snap || !np) {
+      free(before_snap);
+      free(np);
       cmd_flash("Out of memory.");
       return;
     }
+    memcpy(before_snap, pixels, CANVAS_W * CANVAS_H);
+    int bw = CANVAS_W, bh = CANVAS_H;
     int cw = MIN(CANVAS_W, nw), ch = MIN(CANVAS_H, nh);
     for (int y = 0; y < ch; y++)
       for (int x = 0; x < cw; x++)
@@ -1050,7 +1055,7 @@ static void cmd_execute(void) {
     cursor_y = CLAMP(cursor_y, 0, CANVAS_H - 1);
     visual_anchor_x = CLAMP(visual_anchor_x, 0, CANVAS_W - 1);
     visual_anchor_y = CLAMP(visual_anchor_y, 0, CANVAS_H - 1);
-    clear_history();
+    commit_canvas_snapshot(before_snap, bw, bh);
     zoom_resize();
     gtk_widget_queue_draw(main_canvas);
     cmd_set("");
