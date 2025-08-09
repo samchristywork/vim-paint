@@ -353,16 +353,26 @@ static void cmd_flash(const char *text) {
 }
 
 static gboolean cmd_write(const char *filename) {
+  cairo_format_t fmt =
+      show_checker ? CAIRO_FORMAT_ARGB32 : CAIRO_FORMAT_RGB24;
   cairo_surface_t *surf =
-      cairo_image_surface_create(CAIRO_FORMAT_RGB24, CANVAS_W, CANVAS_H);
+      cairo_image_surface_create(fmt, CANVAS_W, CANVAS_H);
   guchar *d = cairo_image_surface_get_data(surf);
   int stride = cairo_image_surface_get_stride(surf);
   for (int y = 0; y < CANVAS_H; y++)
     for (int x = 0; x < CANVAS_W; x++) {
       int idx = PX(y, x);
-      d[y * stride + x * 4 + 0] = (guchar)(palette[idx][2] * 255);
-      d[y * stride + x * 4 + 1] = (guchar)(palette[idx][1] * 255);
-      d[y * stride + x * 4 + 2] = (guchar)(palette[idx][0] * 255);
+      if (show_checker && idx == 0) {
+        d[y * stride + x * 4 + 0] = 0;
+        d[y * stride + x * 4 + 1] = 0;
+        d[y * stride + x * 4 + 2] = 0;
+        d[y * stride + x * 4 + 3] = 0;
+      } else {
+        d[y * stride + x * 4 + 0] = (guchar)(palette[idx][2] * 255);
+        d[y * stride + x * 4 + 1] = (guchar)(palette[idx][1] * 255);
+        d[y * stride + x * 4 + 2] = (guchar)(palette[idx][0] * 255);
+        d[y * stride + x * 4 + 3] = show_checker ? 255 : 0;
+      }
     }
   cairo_surface_mark_dirty(surf);
   gboolean ok =
@@ -1271,16 +1281,26 @@ static void cmd_execute(void) {
     if (alen >= 4 && strcmp(arg + alen - 4, ".bmp") == 0) {
       cmd_export_bmp(arg);
     } else if (alen >= 4 && strcmp(arg + alen - 4, ".png") == 0) {
+      cairo_format_t fmt =
+          show_checker ? CAIRO_FORMAT_ARGB32 : CAIRO_FORMAT_RGB24;
       cairo_surface_t *surf =
-          cairo_image_surface_create(CAIRO_FORMAT_RGB24, CANVAS_W, CANVAS_H);
+          cairo_image_surface_create(fmt, CANVAS_W, CANVAS_H);
       guchar *d = cairo_image_surface_get_data(surf);
       int st = cairo_image_surface_get_stride(surf);
       for (int y = 0; y < CANVAS_H; y++)
         for (int x = 0; x < CANVAS_W; x++) {
           int idx = PX(y, x);
-          d[y * st + x * 4 + 0] = (guchar)(palette[idx][2] * 255);
-          d[y * st + x * 4 + 1] = (guchar)(palette[idx][1] * 255);
-          d[y * st + x * 4 + 2] = (guchar)(palette[idx][0] * 255);
+          if (show_checker && idx == 0) {
+            d[y * st + x * 4 + 0] = 0;
+            d[y * st + x * 4 + 1] = 0;
+            d[y * st + x * 4 + 2] = 0;
+            d[y * st + x * 4 + 3] = 0;
+          } else {
+            d[y * st + x * 4 + 0] = (guchar)(palette[idx][2] * 255);
+            d[y * st + x * 4 + 1] = (guchar)(palette[idx][1] * 255);
+            d[y * st + x * 4 + 2] = (guchar)(palette[idx][0] * 255);
+            d[y * st + x * 4 + 3] = show_checker ? 255 : 0;
+          }
         }
       cairo_surface_mark_dirty(surf);
       gboolean ok =
