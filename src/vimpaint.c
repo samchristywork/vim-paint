@@ -1907,10 +1907,16 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
                     CELL_SIZE);
     cairo_fill(cr);
   } else {
-    if (PX(cursor_y, cursor_x) & 0xffffff00u) {
-      cairo_set_source_rgb(cr, 1, 1, 1);
-    } else {
-      cairo_set_source_rgb(cr, 1, 0, 0);
+    {
+      guint32 pv = PX(cursor_y, cursor_x);
+      int pr = (pv >> 24) & 0xff;
+      int pg = (pv >> 16) & 0xff;
+      int pb = (pv >>  8) & 0xff;
+      int lum = (pr * 299 + pg * 587 + pb * 114) / 1000;
+      if (lum > 128)
+        cairo_set_source_rgb(cr, 1, 0, 0);   /* red on bright pixels */
+      else
+        cairo_set_source_rgb(cr, 1, 1, 1);   /* white on dark pixels */
     }
     double lw = CLAMP(CELL_SIZE * 0.2, 1.0, 2.0);
     int inset = MAX(1, CELL_SIZE / 8);
