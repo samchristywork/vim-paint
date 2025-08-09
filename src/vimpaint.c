@@ -101,6 +101,17 @@ static gboolean cmd_mode = FALSE;
 static char cmd_buf[4096];
 static int cmd_len = 0;
 
+#define MACRO_MAX_EVENTS 4096
+typedef struct {
+  guint keyval;
+  GdkModifierType state;
+} MacroEvent;
+static MacroEvent macro_buf[26][MACRO_MAX_EVENTS];
+static int macro_len[26];
+static gboolean macro_recording = FALSE;
+static int macro_reg = -1;
+static gboolean macro_playing = FALSE;
+
 #define CMD_HISTORY_MAX 64
 static char cmd_history[CMD_HISTORY_MAX][4096];
 static int cmd_history_count = 0;
@@ -355,8 +366,14 @@ static void status_update(void) {
   guchar r = (fg_color >> 24) & 0xff;
   guchar g = (fg_color >> 16) & 0xff;
   guchar b = (fg_color >> 8) & 0xff;
-  snprintf(buf, sizeof(buf), " %s  col: %d  row: %d  #%02x%02x%02x  %dx%d",
-           mode, cursor_x + 1, cursor_y + 1, r, g, b, CANVAS_W, CANVAS_H);
+  if (macro_recording)
+    snprintf(buf, sizeof(buf),
+             " %s  recording @%c  col: %d  row: %d  #%02x%02x%02x  %dx%d", mode,
+             'a' + macro_reg, cursor_x + 1, cursor_y + 1, r, g, b, CANVAS_W,
+             CANVAS_H);
+  else
+    snprintf(buf, sizeof(buf), " %s  col: %d  row: %d  #%02x%02x%02x  %dx%d",
+             mode, cursor_x + 1, cursor_y + 1, r, g, b, CANVAS_W, CANVAS_H);
   gtk_label_set_text(GTK_LABEL(cmd_label), buf);
   title_refresh();
 }
@@ -1911,12 +1928,12 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
       guint32 pv = PX(cursor_y, cursor_x);
       int pr = (pv >> 24) & 0xff;
       int pg = (pv >> 16) & 0xff;
-      int pb = (pv >>  8) & 0xff;
+      int pb = (pv >> 8) & 0xff;
       int lum = (pr * 299 + pg * 587 + pb * 114) / 1000;
       if (lum > 128)
-        cairo_set_source_rgb(cr, 1, 0, 0);   /* red on bright pixels */
+        cairo_set_source_rgb(cr, 1, 0, 0); /* red on bright pixels */
       else
-        cairo_set_source_rgb(cr, 1, 1, 1);   /* white on dark pixels */
+        cairo_set_source_rgb(cr, 1, 1, 1); /* white on dark pixels */
     }
     double lw = CLAMP(CELL_SIZE * 0.2, 1.0, 2.0);
     int inset = MAX(1, CELL_SIZE / 8);
@@ -2143,13 +2160,71 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
   static gboolean pending_g = FALSE;
   static gboolean pending_d = FALSE;
   static gboolean pending_f = FALSE;
+  static gboolean pending_q = FALSE;
+  static gboolean pending_at = FALSE;
   static int d_count = 1;
   static int f_count = 1;
+
+  /* Stop recording: q while already recording */
+  if (macro_recording && event->keyval == GDK_KEY_q &&
+      !(event->state & (GDK_CONTROL_MASK | GDK_MOD1_MASK))) {
+    macro_recording = FALSE;
+    char msg[40];
+    snprintf(msg, sizeof(msg), "Recorded @%c  (%d events)", 'a' + macro_reg,
+             macro_len[macro_reg]);
+    cmd_flash(msg);
+    return TRUE;
+  }
+
+  /* Append to macro buffer while recording */
+  if (macro_recording && !macro_playing) {
+    if (macro_len[macro_reg] < MACRO_MAX_EVENTS) {
+      macro_buf[macro_reg][macro_len[macro_reg]].keyval = event->keyval;
+      macro_buf[macro_reg][macro_len[macro_reg]].state = event->state;
+      macro_len[macro_reg]++;
+    }
+  }
+
+  /* q<letter>: start recording */
+  if (pending_q) {
+    pending_q = FALSE;
+    if (event->keyval >= GDK_KEY_a && event->keyval <= GDK_KEY_z) {
+      macro_reg = event->keyval - GDK_KEY_a;
+      macro_len[macro_reg] = 0;
+      macro_recording = TRUE;
+      status_update();
+    }
+    return TRUE;
+  }
+
+  /* @<letter>: replay macro */
+  if (pending_at) {
+    pending_at = FALSE;
+    if (!macro_playing && event->keyval >= GDK_KEY_a &&
+        event->keyval <= GDK_KEY_z) {
+      int reg = event->keyval - GDK_KEY_a;
+      if (macro_len[reg] > 0) {
+        macro_playing = TRUE;
+        GdkEventKey fake = *event;
+        fake.send_event = TRUE;
+        for (int i = 0; i < macro_len[reg]; i++) {
+          fake.keyval = macro_buf[reg][i].keyval;
+          fake.state = macro_buf[reg][i].state;
+          on_key_press(widget, &fake, data);
+        }
+        macro_playing = FALSE;
+        gtk_widget_queue_draw(main_canvas);
+      }
+    }
+    return TRUE;
+  }
 
   if (event->keyval == GDK_KEY_colon) {
     pending_g = FALSE;
     pending_d = FALSE;
     pending_f = FALSE;
+    pending_q = FALSE;
+    pending_at = FALSE;
     cmd_mode = TRUE;
     cmd_buf[0] = ':';
     cmd_buf[1] = '\0';
@@ -2310,6 +2385,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     pending_g = FALSE;
     pending_d = FALSE;
     pending_f = FALSE;
+    pending_q = FALSE;
+    pending_at = FALSE;
+    macro_recording = FALSE;
     status_update();
     gtk_widget_queue_draw(GTK_WIDGET(data));
     return TRUE;
@@ -2483,12 +2561,10 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
 
   switch (event->keyval) {
   case GDK_KEY_q:
-    if (canvas_dirty)
-      cmd_flash("Unsaved changes. Use :q to quit or :wq to save and quit.");
-    else if (tab_count > 1)
-      tab_close_current();
-    else
-      gtk_main_quit();
+    pending_q = TRUE;
+    return TRUE;
+  case GDK_KEY_at:
+    pending_at = TRUE;
     return TRUE;
   case GDK_KEY_plus:
   case GDK_KEY_equal:
