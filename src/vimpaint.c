@@ -1489,6 +1489,7 @@ static void cmd_execute(void) {
         "  r / x               fill / erase selection\n"
         "  y / p / P           yank / paste / paste centered\n"
         "  \\                   draw line from anchor to cursor\n"
+        "  H / V               flip selection horizontally / vertically\n"
         "\n"
         "Palette\n"
         "  c / C               cycle color forward / backward\n"
@@ -2250,6 +2251,46 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     last_was_visual = TRUE;
     last_visual_dx = visual_anchor_x - cursor_x;
     last_visual_dy = visual_anchor_y - cursor_y;
+    visual_mode = FALSE;
+    status_update();
+    gtk_widget_queue_draw(GTK_WIDGET(data));
+    return TRUE;
+  }
+
+  if (visual_mode && (event->keyval == GDK_KEY_H || event->keyval == GDK_KEY_V)) {
+    int x0 = MIN(cursor_x, visual_anchor_x);
+    int x1 = MAX(cursor_x, visual_anchor_x);
+    int y0 = MIN(cursor_y, visual_anchor_y);
+    int y1 = MAX(cursor_y, visual_anchor_y);
+    begin_undo_action();
+    if (event->keyval == GDK_KEY_H) {
+      /* Flip selection horizontally */
+      for (int ey = y0; ey <= y1; ey++) {
+        for (int ex = x0; ex <= x0 + (x1 - x0) / 2; ex++) {
+          int ex2 = x1 - (ex - x0);
+          if (ex == ex2) continue;
+          push_undo(ex, ey);
+          push_undo(ex2, ey);
+          guchar tmp = PX(ey, ex);
+          PX(ey, ex) = PX(ey, ex2);
+          PX(ey, ex2) = tmp;
+        }
+      }
+    } else {
+      /* Flip selection vertically */
+      for (int ey = y0; ey <= y0 + (y1 - y0) / 2; ey++) {
+        int ey2 = y1 - (ey - y0);
+        if (ey == ey2) continue;
+        for (int ex = x0; ex <= x1; ex++) {
+          push_undo(ex, ey);
+          push_undo(ex, ey2);
+          guchar tmp = PX(ey, ex);
+          PX(ey, ex) = PX(ey2, ex);
+          PX(ey2, ex) = tmp;
+        }
+      }
+    }
+    commit_undo_action();
     visual_mode = FALSE;
     status_update();
     gtk_widget_queue_draw(GTK_WIDGET(data));
