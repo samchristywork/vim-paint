@@ -14,23 +14,32 @@ static int CELL_SIZE = 12;
    Pixel indices are stored as guchar, so the effective ceiling is 256. */
 static double (*palette)[3] = NULL;
 static int palette_size = 0;
-static int palette_cap  = 0;
+static int palette_cap = 0;
 #define PALETTE_SIZE palette_size
 
 static int palette_reserve(int needed) {
-  if (needed <= palette_cap) return 1;
+  if (needed <= palette_cap)
+    return 1;
   int nc = palette_cap ? palette_cap * 2 : 8;
-  while (nc < needed) nc *= 2;
+  while (nc < needed)
+    nc *= 2;
   double (*np)[3] = realloc(palette, (size_t)nc * sizeof(*np));
-  if (!np) return 0;
+  if (!np)
+    return 0;
   palette = np;
   palette_cap = nc;
   return 1;
 }
 
-static guchar *pixels =
-    NULL; /* flat [y * CANVAS_W + x], 0=background 1..7=palette */
-static guchar fg_color = 1; /* current foreground color index */
+#define PACK_RGBA(r, g, b, a)                                                  \
+  (((guint32)(r) << 24) | ((guint32)(g) << 16) | ((guint32)(b) << 8) |         \
+   (guint32)(a))
+
+static guint32 *pixels = NULL; /* flat [y * CANVAS_W + x], RRGGBBAA format */
+static guint32 fg_color =
+    0x000000ff; /* current foreground color (RGBA, opaque black) */
+static guint32 bg_color =
+    0xffffffff; /* background / erase color (RGBA, opaque white) */
 
 #define PX(y, x) pixels[(y) * CANVAS_W + (x)]
 #define RECT_BOUNDS(rad)                                                       \
@@ -44,8 +53,8 @@ static gboolean visual_mode = FALSE;
 static int visual_anchor_x = 0;
 static int visual_anchor_y = 0;
 static gboolean insert_mode = FALSE;
-static gboolean show_grid    = TRUE;
-static gboolean show_ruler   = FALSE;
+static gboolean show_grid = TRUE;
+static gboolean show_ruler = FALSE;
 static gboolean show_checker = FALSE;
 static gboolean canvas_dirty = FALSE;
 static gboolean sym_h = FALSE;
@@ -55,15 +64,15 @@ static int brush_size = 1;
 #define UNDO_MAX 64
 typedef struct {
   int x, y;
-  guchar before, after;
+  guint32 before, after;
 } PixelChange;
 typedef struct {
   PixelChange *changes;
   int count;
   /* Non-NULL for canvas-resizing ops */
-  guchar *before_snap;
+  guint32 *before_snap;
   int before_w, before_h;
-  guchar *after_snap;
+  guint32 *after_snap;
   int after_w, after_h;
 } UndoAction;
 static PixelChange *staged = NULL;
@@ -75,7 +84,7 @@ static int redo_top = 0, redo_count = 0;
 
 #define TAB_MAX 8
 typedef struct {
-  guchar *pixels;
+  guint32 *pixels;
   int w, h, cx, cy;
   char filename[4096];
   gboolean dirty;
@@ -85,7 +94,7 @@ typedef struct {
   int redo_top, redo_count;
 } TabState;
 static TabState tabs[TAB_MAX];
-static int tab_count   = 1;
+static int tab_count = 1;
 static int tab_current = 0;
 
 static gboolean cmd_mode = FALSE;
@@ -137,20 +146,20 @@ static void tab_reset(void) {
 }
 
 static void palette_to_rgb(int idx, int *r, int *g, int *b);
-static void draw_line(int x0, int y0, int x1, int y1, guchar color);
+static void draw_line(int x0, int y0, int x1, int y1, guint32 color);
 static void insert_paint(void);
 static void cmd_flash(const char *text);
 static void clear_history(void);
 static void begin_undo_action(void);
 static void push_undo(int x, int y);
 static void commit_undo_action(void);
-static void commit_canvas_snapshot(guchar *before_snap, int bw, int bh);
+static void commit_canvas_snapshot(guint32 *before_snap, int bw, int bh);
 static void cmd_open(const char *filename);
 static void cmd_set(const char *text);
 static void title_refresh(void);
 static void status_update(void);
-static void paint_pixel(int x, int y, guchar color);
-static void paint_brush(int x, int y, guchar color);
+static void paint_pixel(int x, int y, guint32 color);
+static void paint_brush(int x, int y, guint32 color);
 static void tab_switch(int newidx);
 
 static void flash_color(int idx) {
@@ -163,9 +172,9 @@ static void flash_color(int idx) {
 
 static void update_title(const char *filename) {
   char buf[4300];
-  snprintf(buf, sizeof(buf), "vim-paint - %s%s  %dx%d  (%d,%d)",
-           filename, canvas_dirty ? " [+]" : "",
-           CANVAS_W, CANVAS_H, cursor_x + 1, cursor_y + 1);
+  snprintf(buf, sizeof(buf), "vim-paint - %s%s  %dx%d  (%d,%d)", filename,
+           canvas_dirty ? " [+]" : "", CANVAS_W, CANVAS_H, cursor_x + 1,
+           cursor_y + 1);
   gtk_window_set_title(GTK_WINDOW(main_window), buf);
 }
 
@@ -173,70 +182,76 @@ static void title_refresh(void) {
   char buf[512];
   char tab_info[20] = "";
   if (tab_count > 1)
-    snprintf(tab_info, sizeof(tab_info), "[%d/%d] ", tab_current + 1, tab_count);
+    snprintf(tab_info, sizeof(tab_info), "[%d/%d] ", tab_current + 1,
+             tab_count);
   if (*last_filename)
-    snprintf(buf, sizeof(buf), "vim-paint %s- %s%s  %dx%d  (%d,%d)",
-             tab_info, last_filename, canvas_dirty ? " [+]" : "",
-             CANVAS_W, CANVAS_H, cursor_x + 1, cursor_y + 1);
+    snprintf(buf, sizeof(buf), "vim-paint %s- %s%s  %dx%d  (%d,%d)", tab_info,
+             last_filename, canvas_dirty ? " [+]" : "", CANVAS_W, CANVAS_H,
+             cursor_x + 1, cursor_y + 1);
   else
-    snprintf(buf, sizeof(buf), "vim-paint %s%s  %dx%d  (%d,%d)",
-             tab_info, canvas_dirty ? "[+] " : "",
-             CANVAS_W, CANVAS_H, cursor_x + 1, cursor_y + 1);
+    snprintf(buf, sizeof(buf), "vim-paint %s%s  %dx%d  (%d,%d)", tab_info,
+             canvas_dirty ? "[+] " : "", CANVAS_W, CANVAS_H, cursor_x + 1,
+             cursor_y + 1);
   gtk_window_set_title(GTK_WINDOW(main_window), buf);
 }
 
 static void tab_save(int idx) {
-  int sz = CANVAS_W * CANVAS_H;
+  int sz = CANVAS_W * CANVAS_H * sizeof(guint32);
   if (!tabs[idx].pixels || tabs[idx].w != CANVAS_W || tabs[idx].h != CANVAS_H) {
     free(tabs[idx].pixels);
     tabs[idx].pixels = malloc(sz);
-    if (!tabs[idx].pixels) return;
+    if (!tabs[idx].pixels)
+      return;
   }
   memcpy(tabs[idx].pixels, pixels, sz);
-  tabs[idx].w     = CANVAS_W;
-  tabs[idx].h     = CANVAS_H;
-  tabs[idx].cx    = cursor_x;
-  tabs[idx].cy    = cursor_y;
+  tabs[idx].w = CANVAS_W;
+  tabs[idx].h = CANVAS_H;
+  tabs[idx].cx = cursor_x;
+  tabs[idx].cy = cursor_y;
   tabs[idx].dirty = canvas_dirty;
   snprintf(tabs[idx].filename, sizeof(tabs[idx].filename), "%s", last_filename);
   /* Transfer undo/redo ownership from globals to tab storage */
   memcpy(tabs[idx].undo_stack, undo_stack, sizeof(undo_stack));
-  tabs[idx].undo_top   = undo_top;
+  tabs[idx].undo_top = undo_top;
   tabs[idx].undo_count = undo_count;
   memcpy(tabs[idx].redo_stack, redo_stack, sizeof(redo_stack));
-  tabs[idx].redo_top   = redo_top;
+  tabs[idx].redo_top = redo_top;
   tabs[idx].redo_count = redo_count;
   memset(undo_stack, 0, sizeof(undo_stack));
-  undo_top = 0; undo_count = 0;
+  undo_top = 0;
+  undo_count = 0;
   memset(redo_stack, 0, sizeof(redo_stack));
-  redo_top = 0; redo_count = 0;
+  redo_top = 0;
+  redo_count = 0;
   staged_count = 0;
 }
 
 static void tab_switch(int newidx) {
-  if (newidx < 0 || newidx >= tab_count || newidx == tab_current) return;
+  if (newidx < 0 || newidx >= tab_count || newidx == tab_current)
+    return;
   tab_save(tab_current);
   tab_current = newidx;
   TabState *t = &tabs[tab_current];
-  guchar *np = malloc(t->w * t->h);
-  if (!np) return;
-  memcpy(np, t->pixels, t->w * t->h);
+  guint32 *np = malloc(t->w * t->h * sizeof(guint32));
+  if (!np)
+    return;
+  memcpy(np, t->pixels, t->w * t->h * sizeof(guint32));
   free(pixels);
-  pixels   = np;
+  pixels = np;
   CANVAS_W = t->w;
   CANVAS_H = t->h;
   cursor_x = CLAMP(t->cx, 0, CANVAS_W - 1);
   cursor_y = CLAMP(t->cy, 0, CANVAS_H - 1);
-  canvas_dirty  = t->dirty;
-  visual_mode   = FALSE;
-  insert_mode   = FALSE;
+  canvas_dirty = t->dirty;
+  visual_mode = FALSE;
+  insert_mode = FALSE;
   snprintf(last_filename, sizeof(last_filename), "%s", t->filename);
   /* Restore undo/redo ownership from tab storage to globals */
   memcpy(undo_stack, t->undo_stack, sizeof(undo_stack));
-  undo_top   = t->undo_top;
+  undo_top = t->undo_top;
   undo_count = t->undo_count;
   memcpy(redo_stack, t->redo_stack, sizeof(redo_stack));
-  redo_top   = t->redo_top;
+  redo_top = t->redo_top;
   redo_count = t->redo_count;
   memset(t->undo_stack, 0, sizeof(t->undo_stack));
   t->undo_top = t->undo_count = 0;
@@ -264,27 +279,29 @@ static void tab_close_current(void) {
   tabs[tab_count - 1].redo_top = tabs[tab_count - 1].redo_count = 0;
   tabs[tab_count - 1].pixels = NULL;
   tab_count--;
-  if (tab_current >= tab_count) tab_current = tab_count - 1;
+  if (tab_current >= tab_count)
+    tab_current = tab_count - 1;
   TabState *t = &tabs[tab_current];
-  guchar *np = malloc(t->w * t->h);
-  if (!np) return;
-  memcpy(np, t->pixels, t->w * t->h);
+  guint32 *np = malloc(t->w * t->h * sizeof(guint32));
+  if (!np)
+    return;
+  memcpy(np, t->pixels, t->w * t->h * sizeof(guint32));
   free(pixels);
-  pixels   = np;
+  pixels = np;
   CANVAS_W = t->w;
   CANVAS_H = t->h;
   cursor_x = CLAMP(t->cx, 0, CANVAS_W - 1);
   cursor_y = CLAMP(t->cy, 0, CANVAS_H - 1);
-  canvas_dirty  = t->dirty;
-  visual_mode   = FALSE;
-  insert_mode   = FALSE;
+  canvas_dirty = t->dirty;
+  visual_mode = FALSE;
+  insert_mode = FALSE;
   snprintf(last_filename, sizeof(last_filename), "%s", t->filename);
   /* Restore the new current tab's undo/redo history */
   memcpy(undo_stack, t->undo_stack, sizeof(undo_stack));
-  undo_top   = t->undo_top;
+  undo_top = t->undo_top;
   undo_count = t->undo_count;
   memcpy(redo_stack, t->redo_stack, sizeof(redo_stack));
-  redo_top   = t->redo_top;
+  redo_top = t->redo_top;
   redo_count = t->redo_count;
   memset(t->undo_stack, 0, sizeof(t->undo_stack));
   t->undo_top = t->undo_count = 0;
@@ -303,7 +320,11 @@ static gboolean on_palette_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
     cairo_set_source_rgb(cr, palette[i][0], palette[i][1], palette[i][2]);
     cairo_rectangle(cr, i * SWATCH_W, 0, SWATCH_W, SWATCH_H);
     cairo_fill(cr);
-    if (i == fg_color) {
+    /* Highlight the swatch whose color matches fg_color */
+    int pr, pg, pb;
+    palette_to_rgb(i, &pr, &pg, &pb);
+    guint32 swatch_rgba = PACK_RGBA(pr, pg, pb, 255);
+    if (swatch_rgba == fg_color) {
       cairo_set_source_rgb(cr, 1.0, 0.0, 0.0);
       cairo_set_line_width(cr, 2.0);
       cairo_rectangle(cr, i * SWATCH_W + 1, 1, SWATCH_W - 2, SWATCH_H - 2);
@@ -331,12 +352,11 @@ static void status_update(void) {
     return;
   char buf[128];
   const char *mode = visual_mode ? "VISUAL" : insert_mode ? "INSERT" : "NORMAL";
-  int r, g, b;
-  palette_to_rgb(fg_color, &r, &g, &b);
-  snprintf(buf, sizeof(buf),
-           " %s  col: %d  row: %d  [%d] #%02x%02x%02x  %dx%d", mode,
-           cursor_x + 1, cursor_y + 1, (int)fg_color, r, g, b,
-           CANVAS_W, CANVAS_H);
+  guchar r = (fg_color >> 24) & 0xff;
+  guchar g = (fg_color >> 16) & 0xff;
+  guchar b = (fg_color >> 8) & 0xff;
+  snprintf(buf, sizeof(buf), " %s  col: %d  row: %d  #%02x%02x%02x  %dx%d",
+           mode, cursor_x + 1, cursor_y + 1, r, g, b, CANVAS_W, CANVAS_H);
   gtk_label_set_text(GTK_LABEL(cmd_label), buf);
   title_refresh();
 }
@@ -355,25 +375,27 @@ static void cmd_flash(const char *text) {
 }
 
 static gboolean cmd_write(const char *filename) {
-  cairo_format_t fmt =
-      show_checker ? CAIRO_FORMAT_ARGB32 : CAIRO_FORMAT_RGB24;
   cairo_surface_t *surf =
-      cairo_image_surface_create(fmt, CANVAS_W, CANVAS_H);
+      cairo_image_surface_create(CAIRO_FORMAT_ARGB32, CANVAS_W, CANVAS_H);
   guchar *d = cairo_image_surface_get_data(surf);
   int stride = cairo_image_surface_get_stride(surf);
   for (int y = 0; y < CANVAS_H; y++)
     for (int x = 0; x < CANVAS_W; x++) {
-      int idx = PX(y, x);
-      if (show_checker && idx == 0) {
+      guint32 px = PX(y, x);
+      guchar r = (px >> 24) & 0xff;
+      guchar g = (px >> 16) & 0xff;
+      guchar b = (px >> 8) & 0xff;
+      guchar a = px & 0xff;
+      if (show_checker && a == 0) {
         d[y * stride + x * 4 + 0] = 0;
         d[y * stride + x * 4 + 1] = 0;
         d[y * stride + x * 4 + 2] = 0;
         d[y * stride + x * 4 + 3] = 0;
       } else {
-        d[y * stride + x * 4 + 0] = (guchar)(palette[idx][2] * 255);
-        d[y * stride + x * 4 + 1] = (guchar)(palette[idx][1] * 255);
-        d[y * stride + x * 4 + 2] = (guchar)(palette[idx][0] * 255);
-        d[y * stride + x * 4 + 3] = show_checker ? 255 : 0;
+        d[y * stride + x * 4 + 0] = b; /* Cairo ARGB32: BGRA on LE */
+        d[y * stride + x * 4 + 1] = g;
+        d[y * stride + x * 4 + 2] = r;
+        d[y * stride + x * 4 + 3] = show_checker ? a : 255;
       }
     }
   cairo_surface_mark_dirty(surf);
@@ -405,29 +427,64 @@ static void cmd_export_bmp(const char *filename) {
 
   /* File header */
   unsigned char fh[14] = {
-      'B', 'M',
-      (unsigned char)(file_size),       (unsigned char)(file_size >> 8),
-      (unsigned char)(file_size >> 16), (unsigned char)(file_size >> 24),
-      0, 0, 0, 0,   /* reserved */
-      54, 0, 0, 0,  /* offset to pixel data */
+      'B',
+      'M',
+      (unsigned char)(file_size),
+      (unsigned char)(file_size >> 8),
+      (unsigned char)(file_size >> 16),
+      (unsigned char)(file_size >> 24),
+      0,
+      0,
+      0,
+      0, /* reserved */
+      54,
+      0,
+      0,
+      0, /* offset to pixel data */
   };
   /* Info header (BITMAPINFOHEADER) */
   int neg_h = -CANVAS_H; /* negative = top-down */
   unsigned char ih[40] = {
-      40, 0, 0, 0,  /* header size */
-      (unsigned char)(CANVAS_W),        (unsigned char)(CANVAS_W >> 8),
-      (unsigned char)(CANVAS_W >> 16),  (unsigned char)(CANVAS_W >> 24),
-      (unsigned char)(neg_h),           (unsigned char)(neg_h >> 8),
-      (unsigned char)(neg_h >> 16),     (unsigned char)(neg_h >> 24),
-      1, 0,         /* color planes */
-      24, 0,        /* bits per pixel */
-      0, 0, 0, 0,   /* compression (none) */
-      (unsigned char)(pixel_data_size),       (unsigned char)(pixel_data_size >> 8),
-      (unsigned char)(pixel_data_size >> 16), (unsigned char)(pixel_data_size >> 24),
-      0, 0, 0, 0,   /* x pixels/meter */
-      0, 0, 0, 0,   /* y pixels/meter */
-      0, 0, 0, 0,   /* colors in table */
-      0, 0, 0, 0,   /* important colors */
+      40,
+      0,
+      0,
+      0, /* header size */
+      (unsigned char)(CANVAS_W),
+      (unsigned char)(CANVAS_W >> 8),
+      (unsigned char)(CANVAS_W >> 16),
+      (unsigned char)(CANVAS_W >> 24),
+      (unsigned char)(neg_h),
+      (unsigned char)(neg_h >> 8),
+      (unsigned char)(neg_h >> 16),
+      (unsigned char)(neg_h >> 24),
+      1,
+      0, /* color planes */
+      24,
+      0, /* bits per pixel */
+      0,
+      0,
+      0,
+      0, /* compression (none) */
+      (unsigned char)(pixel_data_size),
+      (unsigned char)(pixel_data_size >> 8),
+      (unsigned char)(pixel_data_size >> 16),
+      (unsigned char)(pixel_data_size >> 24),
+      0,
+      0,
+      0,
+      0, /* x pixels/meter */
+      0,
+      0,
+      0,
+      0, /* y pixels/meter */
+      0,
+      0,
+      0,
+      0, /* colors in table */
+      0,
+      0,
+      0,
+      0, /* important colors */
   };
 
   fwrite(fh, 1, sizeof(fh), f);
@@ -442,10 +499,13 @@ static void cmd_export_bmp(const char *filename) {
   unsigned char padding[3] = {0, 0, 0};
   for (int y = 0; y < CANVAS_H; y++) {
     for (int x = 0; x < CANVAS_W; x++) {
-      int idx = PX(y, x);
-      row_buf[x * 3 + 0] = (unsigned char)(palette[idx][2] * 255 + 0.5);
-      row_buf[x * 3 + 1] = (unsigned char)(palette[idx][1] * 255 + 0.5);
-      row_buf[x * 3 + 2] = (unsigned char)(palette[idx][0] * 255 + 0.5);
+      guint32 px = PX(y, x);
+      guchar r = (px >> 24) & 0xff;
+      guchar g = (px >> 16) & 0xff;
+      guchar b = (px >> 8) & 0xff;
+      row_buf[x * 3 + 0] = b; /* BMP: BGR order */
+      row_buf[x * 3 + 1] = g;
+      row_buf[x * 3 + 2] = r;
     }
     fwrite(row_buf, 1, row_bytes, f);
     if (pad)
@@ -536,7 +596,7 @@ static void insert_paint(void) {
   }
 }
 
-static void draw_line(int x0, int y0, int x1, int y1, guchar color) {
+static void draw_line(int x0, int y0, int x1, int y1, guint32 color) {
   int dx = abs(x1 - x0), dy = abs(y1 - y0);
   int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
   int err = dx - dy;
@@ -593,28 +653,18 @@ static void cmd_open(const char *filename) {
     return;
   }
   guchar *d = cairo_image_surface_get_data(surf);
-  int stride = cairo_image_surface_get_stride(surf);
+  int st = cairo_image_surface_get_stride(surf);
   int w = MIN(cairo_image_surface_get_width(surf), CANVAS_W);
   int h = MIN(cairo_image_surface_get_height(surf), CANVAS_H);
-  memset(pixels, 0, CANVAS_W * CANVAS_H);
+  memset(pixels, 0, CANVAS_W * CANVAS_H * sizeof(guint32));
   for (int y = 0; y < h; y++)
     for (int x = 0; x < w; x++) {
-      double pr = d[y * stride + x * 4 + 2] / 255.0;
-      double pg = d[y * stride + x * 4 + 1] / 255.0;
-      double pb = d[y * stride + x * 4 + 0] / 255.0;
-      int best = 0;
-      double best_dist = 1e9;
-      for (int i = 0; i < PALETTE_SIZE; i++) {
-        double dr = pr - palette[i][0];
-        double dg = pg - palette[i][1];
-        double db = pb - palette[i][2];
-        double dist = dr * dr + dg * dg + db * db;
-        if (dist < best_dist) {
-          best_dist = dist;
-          best = i;
-        }
-      }
-      PX(y, x) = best;
+      /* Cairo ARGB32 on LE: bytes are B, G, R, A */
+      guchar b = d[y * st + x * 4 + 0];
+      guchar g = d[y * st + x * 4 + 1];
+      guchar r = d[y * st + x * 4 + 2];
+      guchar a = d[y * st + x * 4 + 3];
+      PX(y, x) = PACK_RGBA(r, g, b, a);
     }
   cairo_surface_destroy(surf);
   clear_history();
@@ -636,7 +686,8 @@ static void cmd_execute(void) {
 
   if (strcmp(cmd_buf, ":q") == 0) {
     if (canvas_dirty)
-      cmd_flash("Unsaved changes. Use :q! to force quit or :wq to save and quit.");
+      cmd_flash(
+          "Unsaved changes. Use :q! to force quit or :wq to save and quit.");
     else if (tab_count > 1)
       tab_close_current();
     else
@@ -658,23 +709,27 @@ static void cmd_execute(void) {
       return;
     }
     tab_save(tab_current);
-    guchar *np = calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, 1);
-    if (!np) { cmd_flash("Out of memory."); return; }
+    guint32 *np = calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, sizeof(guint32));
+    if (!np) {
+      cmd_flash("Out of memory.");
+      return;
+    }
     free(pixels);
-    pixels   = np;
+    pixels = np;
     CANVAS_W = DEFAULT_CANVAS_W;
     CANVAS_H = DEFAULT_CANVAS_H;
     cursor_x = cursor_y = 0;
-    canvas_dirty  = FALSE;
-    visual_mode   = FALSE;
-    insert_mode   = FALSE;
+    canvas_dirty = FALSE;
+    visual_mode = FALSE;
+    insert_mode = FALSE;
     last_filename[0] = '\0';
     clear_history();
     tab_count++;
     tab_current = tab_count - 1;
     /* Also save the initial empty state into tabs[tab_current] */
     tab_save(tab_current);
-    if (*arg) cmd_open(arg);
+    if (*arg)
+      cmd_open(arg);
     zoom_resize();
     title_refresh();
     status_update();
@@ -688,7 +743,7 @@ static void cmd_execute(void) {
       cmd_flash("Unsaved changes. Use :new! to discard or :w to save first.");
       return;
     }
-    guchar *np = calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, 1);
+    guint32 *np = calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, sizeof(guint32));
     if (!np) {
       cmd_flash("Out of memory.");
       return;
@@ -710,7 +765,7 @@ static void cmd_execute(void) {
   }
 
   if (strcmp(cmd_buf, ":new!") == 0) {
-    guchar *np = calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, 1);
+    guint32 *np = calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, sizeof(guint32));
     if (!np) {
       cmd_flash("Out of memory.");
       return;
@@ -847,8 +902,8 @@ static void cmd_execute(void) {
       const char *val = opt + 3;
       unsigned int rgb = 0;
       if (parse_color(val, &rgb)) {
-        set_palette_rgb(0, rgb);
-        gtk_widget_queue_draw(palette_bar);
+        bg_color =
+            PACK_RGBA((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff, 255);
         gtk_widget_queue_draw(main_canvas);
         cmd_set("");
       } else if (val[0] != '#') {
@@ -886,9 +941,11 @@ static void cmd_execute(void) {
         if (val[0] != '#') {
           int n = atoi(val);
           if (n > 0 && n < PALETTE_SIZE) {
-            fg_color = (guchar)n;
+            int pr2, pg2, pb2;
+            palette_to_rgb(n, &pr2, &pg2, &pb2);
+            fg_color = PACK_RGBA(pr2, pg2, pb2, 255);
             gtk_widget_queue_draw(palette_bar);
-            flash_color(fg_color);
+            flash_color(n);
           } else {
             cmd_flash("Unknown color.");
           }
@@ -914,14 +971,16 @@ static void cmd_execute(void) {
             found = palette_size;
             set_palette_rgb(found, rgb);
             palette_size++;
-            fg_color = (guchar)found;
+            fg_color = PACK_RGBA((rgb >> 16) & 0xff, (rgb >> 8) & 0xff,
+                                 rgb & 0xff, 255);
             gtk_widget_queue_draw(palette_bar);
-            flash_color(fg_color);
+            flash_color(found);
           }
         } else {
-          fg_color = (guchar)found;
+          fg_color =
+              PACK_RGBA((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff, 255);
           gtk_widget_queue_draw(palette_bar);
-          flash_color(fg_color);
+          flash_color(found);
         }
       }
     } else if (strcmp(opt, "sym h") == 0) {
@@ -955,32 +1014,20 @@ static void cmd_execute(void) {
     unsigned int from_rgb, to_rgb;
     if (!parse_color(from_s, &from_rgb) || !parse_color(to_s, &to_rgb))
       return;
-    /* Find the closest palette indices for each color */
-    int from_idx = 0, to_idx = 0;
-    double best_from = 1e9, best_to = 1e9;
-    for (int i = 0; i < PALETTE_SIZE; i++) {
-      double r = palette[i][0], g = palette[i][1], b = palette[i][2];
-      double fr = ((from_rgb >> 16) & 0xff) / 255.0 - r;
-      double fg = ((from_rgb >>  8) & 0xff) / 255.0 - g;
-      double fb = (from_rgb & 0xff)          / 255.0 - b;
-      double df = fr*fr + fg*fg + fb*fb;
-      if (df < best_from) { best_from = df; from_idx = i; }
-      double tr = ((to_rgb >> 16) & 0xff) / 255.0 - r;
-      double tg = ((to_rgb >>  8) & 0xff) / 255.0 - g;
-      double tb = (to_rgb & 0xff)          / 255.0 - b;
-      double dt = tr*tr + tg*tg + tb*tb;
-      if (dt < best_to) { best_to = dt; to_idx = i; }
-    }
-    if (from_idx == to_idx) {
+    guint32 from_px = PACK_RGBA((from_rgb >> 16) & 0xff, (from_rgb >> 8) & 0xff,
+                                from_rgb & 0xff, 255);
+    guint32 to_px = PACK_RGBA((to_rgb >> 16) & 0xff, (to_rgb >> 8) & 0xff,
+                              to_rgb & 0xff, 255);
+    if (from_px == to_px) {
       cmd_flash("Colors are the same.");
       return;
     }
     begin_undo_action();
     for (int y = 0; y < CANVAS_H; y++)
       for (int x = 0; x < CANVAS_W; x++)
-        if (PX(y, x) == (guchar)from_idx) {
+        if (PX(y, x) == from_px) {
           push_undo(x, y);
-          PX(y, x) = (guchar)to_idx;
+          PX(y, x) = to_px;
         }
     commit_undo_action();
     gtk_widget_queue_draw(main_canvas);
@@ -1000,35 +1047,31 @@ static void cmd_execute(void) {
       cmd_flash("Unknown color.");
       return;
     }
-    double r1 = ((rgb1 >> 16) & 0xff) / 255.0;
-    double g1 = ((rgb1 >>  8) & 0xff) / 255.0;
-    double b1 = (rgb1 & 0xff)          / 255.0;
-    double r2 = ((rgb2 >> 16) & 0xff) / 255.0;
-    double g2 = ((rgb2 >>  8) & 0xff) / 255.0;
-    double b2 = (rgb2 & 0xff)          / 255.0;
     int horiz = (dir[0] == 'h');
-    int span  = horiz ? CANVAS_W : CANVAS_H;
-    begin_undo_action();
-    for (int y = 0; y < CANVAS_H; y++) {
-      for (int x = 0; x < CANVAS_W; x++) {
-        double t  = span > 1 ? (horiz ? x : y) / (double)(span - 1) : 0.0;
-        double tr = r1 + t * (r2 - r1);
-        double tg = g1 + t * (g2 - g1);
-        double tb = b1 + t * (b2 - b1);
-        int best = 0;
-        double best_d = 1e9;
-        for (int i = 0; i < PALETTE_SIZE; i++) {
-          double dr = palette[i][0] - tr;
-          double dg = palette[i][1] - tg;
-          double db = palette[i][2] - tb;
-          double d  = dr*dr + dg*dg + db*db;
-          if (d < best_d) { best_d = d; best = i; }
-        }
-        push_undo(x, y);
-        PX(y, x) = (guchar)best;
-      }
+    int span = horiz ? CANVAS_W : CANVAS_H;
+    int r1i = (rgb1 >> 16) & 0xff, g1i = (rgb1 >> 8) & 0xff, b1i = rgb1 & 0xff;
+    int r2i = (rgb2 >> 16) & 0xff, g2i = (rgb2 >> 8) & 0xff, b2i = rgb2 & 0xff;
+    /* Pre-compute RGBA for each gradient position */
+    guint32 *pos_color = malloc(span * sizeof(guint32));
+    if (!pos_color) {
+      cmd_flash("Out of memory.");
+      return;
     }
+    for (int i = 0; i < span; i++) {
+      double t = span > 1 ? i / (double)(span - 1) : 0.0;
+      int ri = (int)(r1i + t * (r2i - r1i) + 0.5);
+      int gi = (int)(g1i + t * (g2i - g1i) + 0.5);
+      int bi = (int)(b1i + t * (b2i - b1i) + 0.5);
+      pos_color[i] = PACK_RGBA(ri, gi, bi, 255);
+    }
+    begin_undo_action();
+    for (int y = 0; y < CANVAS_H; y++)
+      for (int x = 0; x < CANVAS_W; x++) {
+        push_undo(x, y);
+        PX(y, x) = pos_color[horiz ? x : y];
+      }
     commit_undo_action();
+    free(pos_color);
     gtk_widget_queue_draw(main_canvas);
     cmd_set("");
     return;
@@ -1041,26 +1084,30 @@ static void cmd_execute(void) {
       cmd_flash("Unknown color.");
       return;
     }
-    double pr = ((rgb >> 16) & 0xff) / 255.0;
-    double pg = ((rgb >> 8)  & 0xff) / 255.0;
-    double pb = (rgb & 0xff)         / 255.0;
-    /* Find the palette index closest to the requested color */
-    int target = 0;
-    double best_dist = 1e9;
-    for (int i = 0; i < PALETTE_SIZE; i++) {
-      double dr = pr - palette[i][0];
-      double dg = pg - palette[i][1];
-      double db = pb - palette[i][2];
-      double d = dr*dr + dg*dg + db*db;
-      if (d < best_dist) { best_dist = d; target = i; }
-    }
-    /* Find the nearest pixel (Manhattan) with that palette index */
+    int tr = (rgb >> 16) & 0xff;
+    int tg = (rgb >> 8) & 0xff;
+    int tb = rgb & 0xff;
+    /* Find the nearest pixel (Manhattan) whose RGB is closest to the requested
+     * color */
     int found_x = -1, found_y = -1, found_dist = INT_MAX;
+    double found_color_dist = 1e9;
     for (int y = 0; y < CANVAS_H; y++) {
       for (int x = 0; x < CANVAS_W; x++) {
-        if (PX(y, x) != (guchar)target) continue;
-        int d = abs(x - cursor_x) + abs(y - cursor_y);
-        if (d < found_dist) { found_dist = d; found_x = x; found_y = y; }
+        guint32 px = PX(y, x);
+        int pr = (px >> 24) & 0xff;
+        int pg = (px >> 16) & 0xff;
+        int pb = (px >> 8) & 0xff;
+        double dr = (pr - tr) / 255.0, dg = (pg - tg) / 255.0,
+               db = (pb - tb) / 255.0;
+        double cdist = dr * dr + dg * dg + db * db;
+        int mdist = abs(x - cursor_x) + abs(y - cursor_y);
+        if (cdist < found_color_dist ||
+            (cdist == found_color_dist && mdist < found_dist)) {
+          found_color_dist = cdist;
+          found_dist = mdist;
+          found_x = x;
+          found_y = y;
+        }
       }
     }
     if (found_x < 0) {
@@ -1099,15 +1146,15 @@ static void cmd_execute(void) {
       cmd_flash("Usage: :resize WxH");
       return;
     }
-    guchar *before_snap = malloc(CANVAS_W * CANVAS_H);
-    guchar *np = calloc(nw * nh, 1);
+    guint32 *before_snap = malloc(CANVAS_W * CANVAS_H * sizeof(guint32));
+    guint32 *np = calloc(nw * nh, sizeof(guint32));
     if (!before_snap || !np) {
       free(before_snap);
       free(np);
       cmd_flash("Out of memory.");
       return;
     }
-    memcpy(before_snap, pixels, CANVAS_W * CANVAS_H);
+    memcpy(before_snap, pixels, CANVAS_W * CANVAS_H * sizeof(guint32));
     int bw = CANVAS_W, bh = CANVAS_H;
     int cw = MIN(CANVAS_W, nw), ch = MIN(CANVAS_H, nh);
     for (int y = 0; y < ch; y++)
@@ -1165,11 +1212,6 @@ static void cmd_execute(void) {
       return;
     }
     palette_size = count;
-    for (int i = 0; i < CANVAS_W * CANVAS_H; i++)
-      if (pixels[i] >= (guchar)palette_size)
-        pixels[i] = 0;
-    if (fg_color >= (guchar)palette_size)
-      fg_color = 1;
     gtk_widget_queue_draw(palette_bar);
     gtk_widget_queue_draw(main_canvas);
     cmd_flash("Palette loaded.");
@@ -1198,8 +1240,12 @@ static void cmd_execute(void) {
         unsigned int rgb = (r << 16) | (g << 8) | b;
         int dup = 0;
         for (int i = 0; i < seen_count; i++)
-          if (seen[i] == rgb) { dup = 1; break; }
-        if (!dup) seen[seen_count++] = rgb;
+          if (seen[i] == rgb) {
+            dup = 1;
+            break;
+          }
+        if (!dup)
+          seen[seen_count++] = rgb;
       }
     }
     cairo_surface_destroy(surf);
@@ -1207,14 +1253,17 @@ static void cmd_execute(void) {
     int added = 0;
     for (int s = 0; s < seen_count && PALETTE_SIZE < 256; s++) {
       unsigned int sr = (seen[s] >> 16) & 0xff;
-      unsigned int sg = (seen[s] >>  8) & 0xff;
-      unsigned int sb =  seen[s]        & 0xff;
+      unsigned int sg = (seen[s] >> 8) & 0xff;
+      unsigned int sb = seen[s] & 0xff;
       int dup = 0;
       for (int i = 0; i < PALETTE_SIZE; i++) {
         int pr, pg, pb;
         palette_to_rgb(i, &pr, &pg, &pb);
-        if ((unsigned int)pr == sr && (unsigned int)pg == sg && (unsigned int)pb == sb)
-          { dup = 1; break; }
+        if ((unsigned int)pr == sr && (unsigned int)pg == sg &&
+            (unsigned int)pb == sb) {
+          dup = 1;
+          break;
+        }
       }
       if (!dup && palette_reserve(palette_size + 1)) {
         set_palette_rgb(palette_size++, seen[s]);
@@ -1242,21 +1291,12 @@ static void cmd_execute(void) {
       cmd_flash("Invalid palette index.");
       return;
     }
-    for (int i = 0; i < CANVAS_W * CANVAS_H; i++) {
-      if (pixels[i] == (guchar)idx)
-        pixels[i] = 0;
-      else if (pixels[i] > (guchar)idx)
-        pixels[i]--;
-    }
     for (int i = idx; i < PALETTE_SIZE - 1; i++) {
       palette[i][0] = palette[i + 1][0];
       palette[i][1] = palette[i + 1][1];
       palette[i][2] = palette[i + 1][2];
     }
     palette_size--;
-    if (fg_color >= (guchar)PALETTE_SIZE)
-      fg_color = PALETTE_SIZE - 1;
-    clear_history();
     gtk_widget_queue_draw(palette_bar);
     gtk_widget_queue_draw(main_canvas);
     cmd_flash("Entry deleted.");
@@ -1272,7 +1312,7 @@ static void cmd_execute(void) {
       }
     for (int y = 0; y < CANVAS_H; y++)
       for (int x = 0; x < CANVAS_W / 2; x++) {
-        guchar tmp = PX(y, x);
+        guint32 tmp = PX(y, x);
         PX(y, x) = PX(y, CANVAS_W - 1 - x);
         PX(y, CANVAS_W - 1 - x) = tmp;
       }
@@ -1291,7 +1331,7 @@ static void cmd_execute(void) {
       }
     for (int y = 0; y < CANVAS_H / 2; y++)
       for (int x = 0; x < CANVAS_W; x++) {
-        guchar tmp = PX(y, x);
+        guint32 tmp = PX(y, x);
         PX(y, x) = PX(CANVAS_H - 1 - y, x);
         PX(CANVAS_H - 1 - y, x) = tmp;
       }
@@ -1303,14 +1343,14 @@ static void cmd_execute(void) {
 
   if (strcmp(cmd_buf, ":rotate") == 0) {
     int bw = CANVAS_W, bh = CANVAS_H;
-    guchar *before_snap = malloc(bw * bh);
+    guint32 *before_snap = malloc(bw * bh * sizeof(guint32));
     if (!before_snap) {
       cmd_flash("Out of memory.");
       return;
     }
-    memcpy(before_snap, pixels, bw * bh);
+    memcpy(before_snap, pixels, bw * bh * sizeof(guint32));
     int nW = CANVAS_H, nH = CANVAS_W;
-    guchar *np = malloc(nW * nH);
+    guint32 *np = malloc(nW * nH * sizeof(guint32));
     if (!np) {
       free(before_snap);
       cmd_flash("Out of memory.");
@@ -1337,25 +1377,27 @@ static void cmd_execute(void) {
     if (alen >= 4 && strcmp(arg + alen - 4, ".bmp") == 0) {
       cmd_export_bmp(arg);
     } else if (alen >= 4 && strcmp(arg + alen - 4, ".png") == 0) {
-      cairo_format_t fmt =
-          show_checker ? CAIRO_FORMAT_ARGB32 : CAIRO_FORMAT_RGB24;
       cairo_surface_t *surf =
-          cairo_image_surface_create(fmt, CANVAS_W, CANVAS_H);
+          cairo_image_surface_create(CAIRO_FORMAT_ARGB32, CANVAS_W, CANVAS_H);
       guchar *d = cairo_image_surface_get_data(surf);
       int st = cairo_image_surface_get_stride(surf);
       for (int y = 0; y < CANVAS_H; y++)
         for (int x = 0; x < CANVAS_W; x++) {
-          int idx = PX(y, x);
-          if (show_checker && idx == 0) {
+          guint32 px = PX(y, x);
+          guchar r = (px >> 24) & 0xff;
+          guchar g = (px >> 16) & 0xff;
+          guchar b = (px >> 8) & 0xff;
+          guchar a = px & 0xff;
+          if (show_checker && a == 0) {
             d[y * st + x * 4 + 0] = 0;
             d[y * st + x * 4 + 1] = 0;
             d[y * st + x * 4 + 2] = 0;
             d[y * st + x * 4 + 3] = 0;
           } else {
-            d[y * st + x * 4 + 0] = (guchar)(palette[idx][2] * 255);
-            d[y * st + x * 4 + 1] = (guchar)(palette[idx][1] * 255);
-            d[y * st + x * 4 + 2] = (guchar)(palette[idx][0] * 255);
-            d[y * st + x * 4 + 3] = show_checker ? 255 : 0;
+            d[y * st + x * 4 + 0] = b;
+            d[y * st + x * 4 + 1] = g;
+            d[y * st + x * 4 + 2] = r;
+            d[y * st + x * 4 + 3] = show_checker ? a : 255;
           }
         }
       cairo_surface_mark_dirty(surf);
@@ -1375,10 +1417,14 @@ static void cmd_execute(void) {
     for (int y = 0; y < CANVAS_H; y++)
       for (int x = 0; x < CANVAS_W; x++)
         if (PX(y, x)) {
-          if (x < min_x) min_x = x;
-          if (x > max_x) max_x = x;
-          if (y < min_y) min_y = y;
-          if (y > max_y) max_y = y;
+          if (x < min_x)
+            min_x = x;
+          if (x > max_x)
+            max_x = x;
+          if (y < min_y)
+            min_y = y;
+          if (y > max_y)
+            max_y = y;
         }
     if (max_x < 0) {
       cmd_flash("Nothing to center.");
@@ -1390,15 +1436,15 @@ static void cmd_execute(void) {
       cmd_flash("Already centered.");
       return;
     }
-    guchar *before_snap = malloc(CANVAS_W * CANVAS_H);
-    guchar *np = calloc(CANVAS_W * CANVAS_H, 1);
+    guint32 *before_snap = malloc(CANVAS_W * CANVAS_H * sizeof(guint32));
+    guint32 *np = calloc(CANVAS_W * CANVAS_H, sizeof(guint32));
     if (!before_snap || !np) {
       free(before_snap);
       free(np);
       cmd_flash("Out of memory.");
       return;
     }
-    memcpy(before_snap, pixels, CANVAS_W * CANVAS_H);
+    memcpy(before_snap, pixels, CANVAS_W * CANVAS_H * sizeof(guint32));
     int bw = CANVAS_W, bh = CANVAS_H;
     for (int y = 0; y < CANVAS_H; y++)
       for (int x = 0; x < CANVAS_W; x++) {
@@ -1408,7 +1454,7 @@ static void cmd_execute(void) {
         if (nx >= 0 && nx < CANVAS_W && ny >= 0 && ny < CANVAS_H)
           np[ny * CANVAS_W + nx] = PX(y, x);
       }
-    memcpy(pixels, np, CANVAS_W * CANVAS_H);
+    memcpy(pixels, np, CANVAS_W * CANVAS_H * sizeof(guint32));
     free(np);
     commit_canvas_snapshot(before_snap, bw, bh);
     gtk_widget_queue_draw(main_canvas);
@@ -1421,29 +1467,34 @@ static void cmd_execute(void) {
     for (int y = 0; y < CANVAS_H; y++)
       for (int x = 0; x < CANVAS_W; x++)
         if (PX(y, x)) {
-          if (x < min_x) min_x = x;
-          if (x > max_x) max_x = x;
-          if (y < min_y) min_y = y;
-          if (y > max_y) max_y = y;
+          if (x < min_x)
+            min_x = x;
+          if (x > max_x)
+            max_x = x;
+          if (y < min_y)
+            min_y = y;
+          if (y > max_y)
+            max_y = y;
         }
     if (max_x < 0) {
       cmd_flash("Nothing to crop.");
       return;
     }
-    if (min_x == 0 && min_y == 0 && max_x == CANVAS_W - 1 && max_y == CANVAS_H - 1) {
+    if (min_x == 0 && min_y == 0 && max_x == CANVAS_W - 1 &&
+        max_y == CANVAS_H - 1) {
       cmd_flash("Already at content bounds.");
       return;
     }
     int nW = max_x - min_x + 1, nH = max_y - min_y + 1;
-    guchar *before_snap = malloc(CANVAS_W * CANVAS_H);
-    guchar *np = calloc(nW * nH, 1);
+    guint32 *before_snap = malloc(CANVAS_W * CANVAS_H * sizeof(guint32));
+    guint32 *np = calloc(nW * nH, sizeof(guint32));
     if (!before_snap || !np) {
       free(before_snap);
       free(np);
       cmd_flash("Out of memory.");
       return;
     }
-    memcpy(before_snap, pixels, CANVAS_W * CANVAS_H);
+    memcpy(before_snap, pixels, CANVAS_W * CANVAS_H * sizeof(guint32));
     int bw = CANVAS_W, bh = CANVAS_H;
     for (int y = min_y; y <= max_y; y++)
       for (int x = min_x; x <= max_x; x++)
@@ -1477,8 +1528,8 @@ static void cmd_execute(void) {
     cairo_font_options_destroy(fo);
     cairo_set_source_rgb(tcr, 1, 1, 1);
     cairo_paint(tcr);
-    cairo_select_font_face(tcr, "Monospace",
-                           CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    cairo_select_font_face(tcr, "Monospace", CAIRO_FONT_SLANT_NORMAL,
+                           CAIRO_FONT_WEIGHT_NORMAL);
     cairo_set_font_size(tcr, 10.0);
     cairo_font_extents_t fe;
     cairo_font_extents(tcr, &fe);
@@ -1491,13 +1542,16 @@ static void cmd_execute(void) {
     begin_undo_action();
     for (int ty = 0; ty < sh; ty++)
       for (int tx = 0; tx < sw; tx++) {
-        /* ARGB32 on LE: [B, G, R, A]; check red channel — 0 = ink, 255 = paper */
-        unsigned char r = tdata[ty * tstride + tx * 4 + 2];
-        if (r > 128) continue;
-        int cx = cursor_x + tx, cy = cursor_y + ty;
-        if (cx < 0 || cx >= CANVAS_W || cy < 0 || cy >= CANVAS_H) continue;
-        push_undo(cx, cy);
-        PX(cy, cx) = fg_color;
+        /* ARGB32 on LE: [B, G, R, A]; check red channel — 0 = ink, 255 = paper
+         */
+        unsigned char tr = tdata[ty * tstride + tx * 4 + 2];
+        if (tr > 128)
+          continue;
+        int tcx = cursor_x + tx, tcy = cursor_y + ty;
+        if (tcx < 0 || tcx >= CANVAS_W || tcy < 0 || tcy >= CANVAS_H)
+          continue;
+        push_undo(tcx, tcy);
+        PX(tcy, tcx) = fg_color;
       }
     commit_undo_action();
     cairo_destroy(tcr);
@@ -1566,8 +1620,10 @@ static void cmd_execute(void) {
         "  Ctrl-G              show file info\n"
         "  :goto col,row       jump to position (1-based)\n"
         "  :find color <hex|name>  jump to nearest pixel of color\n"
-        "  :replace <from> <to>    replace all pixels of one color with another\n"
-        "  :gradient <c1> <c2> h|v  fill canvas with gradient between two colors\n");
+        "  :replace <from> <to>    replace all pixels of one color with "
+        "another\n"
+        "  :gradient <c1> <c2> h|v  fill canvas with gradient between two "
+        "colors\n");
     gtk_dialog_run(GTK_DIALOG(dlg));
     gtk_widget_destroy(dlg);
     cmd_set("");
@@ -1577,7 +1633,7 @@ static void cmd_execute(void) {
   cmd_flash("Unknown command.");
 }
 
-static guchar *yank_buf = NULL;
+static guint32 *yank_buf = NULL;
 static int yank_w = 0;
 static int yank_h = 0;
 
@@ -1651,10 +1707,10 @@ static void commit_undo_action(void) {
 }
 
 /* Record a full-canvas snapshot undo entry (for ops that change dimensions). */
-static void commit_canvas_snapshot(guchar *before_snap, int bw, int bh) {
-  guchar *after_snap = malloc(CANVAS_W * CANVAS_H);
+static void commit_canvas_snapshot(guint32 *before_snap, int bw, int bh) {
+  guint32 *after_snap = malloc(CANVAS_W * CANVAS_H * sizeof(guint32));
   if (after_snap)
-    memcpy(after_snap, pixels, CANVAS_W * CANVAS_H);
+    memcpy(after_snap, pixels, CANVAS_W * CANVAS_H * sizeof(guint32));
   for (int i = 0; i < redo_count; i++)
     free_action(
         &redo_stack[(redo_top - redo_count + i + UNDO_MAX * 2) % UNDO_MAX]);
@@ -1663,9 +1719,12 @@ static void commit_canvas_snapshot(guchar *before_snap, int bw, int bh) {
   int idx = undo_top % UNDO_MAX;
   if (undo_count == UNDO_MAX)
     free_action(&undo_stack[idx]);
-  undo_stack[idx] = (UndoAction){
-      .before_snap = before_snap, .before_w = bw, .before_h = bh,
-      .after_snap  = after_snap,  .after_w  = CANVAS_W, .after_h = CANVAS_H};
+  undo_stack[idx] = (UndoAction){.before_snap = before_snap,
+                                 .before_w = bw,
+                                 .before_h = bh,
+                                 .after_snap = after_snap,
+                                 .after_w = CANVAS_W,
+                                 .after_h = CANVAS_H};
   undo_top++;
   if (undo_count < UNDO_MAX)
     undo_count++;
@@ -1673,7 +1732,7 @@ static void commit_canvas_snapshot(guchar *before_snap, int bw, int bh) {
   title_refresh();
 }
 
-static void paint_pixel(int x, int y, guchar color) {
+static void paint_pixel(int x, int y, guint32 color) {
   if (x < 0 || x >= CANVAS_W || y < 0 || y >= CANVAS_H)
     return;
   push_undo(x, y);
@@ -1701,7 +1760,7 @@ static void paint_pixel(int x, int y, guchar color) {
   }
 }
 
-static void paint_brush(int x, int y, guchar color) {
+static void paint_brush(int x, int y, guint32 color) {
   int half = brush_size / 2;
   for (int dy = 0; dy < brush_size; dy++)
     for (int dx = 0; dx < brush_size; dx++)
@@ -1757,19 +1816,19 @@ static void find_up(void) {
     }
 }
 
-static void flood_fill(int sx, int sy, guchar fill_color) {
-  guchar target = PX(sy, sx);
+static void flood_fill(int sx, int sy, guint32 fill_color) {
+  guint32 target = PX(sy, sx);
   if (target == fill_color)
     return;
   int total = CANVAS_W * CANVAS_H;
-  guchar *before_snap = malloc(total);
+  guint32 *before_snap = malloc(total * sizeof(guint32));
   int *queue = malloc(total * sizeof(int));
   if (!before_snap || !queue) {
     free(before_snap);
     free(queue);
     return;
   }
-  memcpy(before_snap, pixels, total);
+  memcpy(before_snap, pixels, total * sizeof(guint32));
   int head = 0, tail = 0;
   queue[tail++] = sy * CANVAS_W + sx;
   PX(sy, sx) = fill_color;
@@ -1794,16 +1853,19 @@ static void flood_fill(int sx, int sy, guchar fill_color) {
 static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
   for (int y = 0; y < CANVAS_H; y++) {
     for (int x = 0; x < CANVAS_W; x++) {
-      int idx = PX(y, x);
-      if (idx == 0 && show_checker) {
+      guint32 px = PX(y, x);
+      guchar r = (px >> 24) & 0xff;
+      guchar g = (px >> 16) & 0xff;
+      guchar b = (px >> 8) & 0xff;
+      guchar a = px & 0xff;
+      if (show_checker && a == 0) {
         /* Alternating light/dark squares to indicate transparent background */
         if ((x + y) % 2 == 0)
           cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
         else
           cairo_set_source_rgb(cr, 0.78, 0.78, 0.78);
       } else {
-        cairo_set_source_rgb(cr, palette[idx][0], palette[idx][1],
-                             palette[idx][2]);
+        cairo_set_source_rgb(cr, r / 255.0, g / 255.0, b / 255.0);
       }
       cairo_rectangle(cr, x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
       cairo_fill(cr);
@@ -1845,7 +1907,7 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
                     CELL_SIZE);
     cairo_fill(cr);
   } else {
-    if (PX(cursor_y, cursor_x)) {
+    if (PX(cursor_y, cursor_x) & 0xffffff00u) {
       cairo_set_source_rgb(cr, 1, 1, 1);
     } else {
       cairo_set_source_rgb(cr, 1, 0, 0);
@@ -1862,11 +1924,14 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
   /* Draw coordinate ruler overlay */
   if (show_ruler) {
     int step = 1;
-    if (CELL_SIZE < 20) step = 5;
-    if (CELL_SIZE < 8)  step = 10;
-    if (CELL_SIZE < 4)  step = 20;
-    cairo_select_font_face(cr, "Monospace",
-                           CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    if (CELL_SIZE < 20)
+      step = 5;
+    if (CELL_SIZE < 8)
+      step = 10;
+    if (CELL_SIZE < 4)
+      step = 20;
+    cairo_select_font_face(cr, "Monospace", CAIRO_FONT_SLANT_NORMAL,
+                           CAIRO_FONT_WEIGHT_NORMAL);
     cairo_set_font_size(cr, 7.0);
     for (int x = 0; x < CANVAS_W; x += step) {
       char buf[8];
@@ -1938,8 +2003,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
       tab_reset();
       if (cmd_history_idx > 0) {
         cmd_history_idx--;
-        int hidx =
-            (cmd_history_count - 1 - cmd_history_idx) % CMD_HISTORY_MAX;
+        int hidx = (cmd_history_count - 1 - cmd_history_idx) % CMD_HISTORY_MAX;
         snprintf(cmd_buf, sizeof(cmd_buf), "%s", cmd_history[hidx]);
         cmd_len = strlen(cmd_buf);
         cmd_set(cmd_buf);
@@ -1956,9 +2020,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
         cmd_set(cmd_buf);
       }
     } else if (event->keyval == GDK_KEY_Tab) {
-      static const char *const file_pfxs[] = {":loadp ",  ":savep ", ":export ",
-                                              ":importp ",":wq ",   ":w ",
-                                              ":e! ",    ":e ",     NULL};
+      static const char *const file_pfxs[] = {
+          ":loadp ", ":savep ", ":export ", ":importp ", ":wq ",
+          ":w ",     ":e! ",    ":e ",      NULL};
       const char *pfx = NULL;
       for (int i = 0; file_pfxs[i]; i++) {
         size_t plen = strlen(file_pfxs[i]);
@@ -1985,9 +2049,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
           tab_glob_idx = (tab_glob_idx + 1) % (int)tab_glob.gl_pathc;
         }
         if (tab_glob_valid) {
-          int written = snprintf(cmd_buf, sizeof(cmd_buf), "%s%s",
-                                 tab_cmd_prefix,
-                                 tab_glob.gl_pathv[tab_glob_idx]);
+          int written =
+              snprintf(cmd_buf, sizeof(cmd_buf), "%s%s", tab_cmd_prefix,
+                       tab_glob.gl_pathv[tab_glob_idx]);
           if (written >= (int)sizeof(cmd_buf)) {
             tab_reset();
             cmd_flash("Path too long.");
@@ -1998,8 +2062,8 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
         }
       } else {
         /* Color name completion for :set bg, :set color, :find color */
-        static const char *const color_pfxs[] = {
-            ":set bg ", ":set color ", ":find color ", NULL};
+        static const char *const color_pfxs[] = {":set bg ", ":set color ",
+                                                 ":find color ", NULL};
         const char *cpfx = NULL;
         for (int i = 0; color_pfxs[i]; i++) {
           size_t plen = strlen(color_pfxs[i]);
@@ -2041,9 +2105,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
             color_tab_idx = (color_tab_idx + 1) % color_tab_count;
           }
           if (color_tab_valid) {
-            int written = snprintf(cmd_buf, sizeof(cmd_buf), "%s%s",
-                                   color_tab_prefix,
-                                   named_colors[color_tab_matches[color_tab_idx]].name);
+            int written =
+                snprintf(cmd_buf, sizeof(cmd_buf), "%s%s", color_tab_prefix,
+                         named_colors[color_tab_matches[color_tab_idx]].name);
             if (written >= (int)sizeof(cmd_buf)) {
               color_tab_valid = FALSE;
               color_tab_count = 0;
@@ -2159,10 +2223,10 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     if (whole_row) {
       for (int ey = y0; ey <= y1; ey++)
         for (int ex = 0; ex < CANVAS_W; ex++)
-          paint_pixel(ex, ey, 0);
+          paint_pixel(ex, ey, bg_color);
     } else {
       for (int ex = x0; ex <= x1; ex++)
-        paint_pixel(ex, cursor_y, 0);
+        paint_pixel(ex, cursor_y, bg_color);
     }
     commit_undo_action();
     last_action = GDK_KEY_x;
@@ -2195,13 +2259,15 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
   }
 
   /* Ctrl+1–9: select palette slot directly */
-  if ((event->state & GDK_CONTROL_MASK) &&
-      event->keyval >= GDK_KEY_1 && event->keyval <= GDK_KEY_9) {
+  if ((event->state & GDK_CONTROL_MASK) && event->keyval >= GDK_KEY_1 &&
+      event->keyval <= GDK_KEY_9) {
     int slot = event->keyval - GDK_KEY_0;
     if (slot < PALETTE_SIZE) {
-      fg_color = (guchar)slot;
+      int pr, pg, pb;
+      palette_to_rgb(slot, &pr, &pg, &pb);
+      fg_color = PACK_RGBA(pr, pg, pb, 255);
       gtk_widget_queue_draw(palette_bar);
-      flash_color(fg_color);
+      flash_color(slot);
     } else {
       cmd_flash("No such palette slot.");
     }
@@ -2251,7 +2317,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     yank_w = x1 - x0 + 1;
     yank_h = y1 - y0 + 1;
     free(yank_buf);
-    yank_buf = malloc(yank_w * yank_h);
+    yank_buf = malloc(yank_w * yank_h * sizeof(guint32));
     if (!yank_buf) {
       cmd_flash("Out of memory.");
       visual_mode = FALSE;
@@ -2274,7 +2340,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     int x1 = MAX(cursor_x, visual_anchor_x);
     int y0 = MIN(cursor_y, visual_anchor_y);
     int y1 = MAX(cursor_y, visual_anchor_y);
-    guchar val = (event->keyval == GDK_KEY_r) ? fg_color : 0;
+    guint32 val = (event->keyval == GDK_KEY_r) ? fg_color : bg_color;
     begin_undo_action();
     for (int ey = y0; ey <= y1; ey++)
       for (int ex = x0; ex <= x1; ex++)
@@ -2304,7 +2370,8 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     return TRUE;
   }
 
-  if (visual_mode && (event->keyval == GDK_KEY_H || event->keyval == GDK_KEY_V)) {
+  if (visual_mode &&
+      (event->keyval == GDK_KEY_H || event->keyval == GDK_KEY_V)) {
     int x0 = MIN(cursor_x, visual_anchor_x);
     int x1 = MAX(cursor_x, visual_anchor_x);
     int y0 = MIN(cursor_y, visual_anchor_y);
@@ -2315,10 +2382,11 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
       for (int ey = y0; ey <= y1; ey++) {
         for (int ex = x0; ex <= x0 + (x1 - x0) / 2; ex++) {
           int ex2 = x1 - (ex - x0);
-          if (ex == ex2) continue;
+          if (ex == ex2)
+            continue;
           push_undo(ex, ey);
           push_undo(ex2, ey);
-          guchar tmp = PX(ey, ex);
+          guint32 tmp = PX(ey, ex);
           PX(ey, ex) = PX(ey, ex2);
           PX(ey, ex2) = tmp;
         }
@@ -2327,11 +2395,12 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
       /* Flip selection vertically */
       for (int ey = y0; ey <= y0 + (y1 - y0) / 2; ey++) {
         int ey2 = y1 - (ey - y0);
-        if (ey == ey2) continue;
+        if (ey == ey2)
+          continue;
         for (int ex = x0; ex <= x1; ex++) {
           push_undo(ex, ey);
           push_undo(ex, ey2);
-          guchar tmp = PX(ey, ex);
+          guint32 tmp = PX(ey, ex);
           PX(ey, ex) = PX(ey2, ex);
           PX(ey2, ex) = tmp;
         }
@@ -2376,9 +2445,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
       if (undo_count < UNDO_MAX)
         undo_count++;
       if (a.after_snap) {
-        guchar *np = malloc(a.after_w * a.after_h);
+        guint32 *np = malloc(a.after_w * a.after_h * sizeof(guint32));
         if (np) {
-          memcpy(np, a.after_snap, a.after_w * a.after_h);
+          memcpy(np, a.after_snap, a.after_w * a.after_h * sizeof(guint32));
           free(pixels);
           pixels = np;
           CANVAS_W = a.after_w;
@@ -2520,21 +2589,57 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     pending_d = TRUE;
     d_count = n;
     return TRUE;
-  case GDK_KEY_c:
-    fg_color = (fg_color % (PALETTE_SIZE - 1)) + 1;
+  case GDK_KEY_c: {
+    /* Find the palette slot that matches fg_color, then cycle forward */
+    int cur_slot = -1;
+    for (int i = 0; i < PALETTE_SIZE; i++) {
+      int pr, pg, pb;
+      palette_to_rgb(i, &pr, &pg, &pb);
+      if (PACK_RGBA(pr, pg, pb, 255) == fg_color) {
+        cur_slot = i;
+        break;
+      }
+    }
+    if (cur_slot < 1)
+      cur_slot = 1;
+    int next_slot = (cur_slot % (PALETTE_SIZE - 1)) + 1;
+    int pr, pg, pb;
+    palette_to_rgb(next_slot, &pr, &pg, &pb);
+    fg_color = PACK_RGBA(pr, pg, pb, 255);
     gtk_widget_queue_draw(palette_bar);
-    flash_color(fg_color);
+    flash_color(next_slot);
     break;
-  case GDK_KEY_C:
-    fg_color = (fg_color - 2 + (PALETTE_SIZE - 1)) % (PALETTE_SIZE - 1) + 1;
+  }
+  case GDK_KEY_C: {
+    int cur_slot = -1;
+    for (int i = 0; i < PALETTE_SIZE; i++) {
+      int pr, pg, pb;
+      palette_to_rgb(i, &pr, &pg, &pb);
+      if (PACK_RGBA(pr, pg, pb, 255) == fg_color) {
+        cur_slot = i;
+        break;
+      }
+    }
+    if (cur_slot < 1)
+      cur_slot = 1;
+    int prev_slot =
+        (cur_slot - 2 + (PALETTE_SIZE - 1)) % (PALETTE_SIZE - 1) + 1;
+    int pr, pg, pb;
+    palette_to_rgb(prev_slot, &pr, &pg, &pb);
+    fg_color = PACK_RGBA(pr, pg, pb, 255);
     gtk_widget_queue_draw(palette_bar);
-    flash_color(fg_color);
+    flash_color(prev_slot);
     break;
+  }
   case GDK_KEY_e: {
-    guchar idx = PX(cursor_y, cursor_x);
-    fg_color = idx;
+    fg_color = PX(cursor_y, cursor_x); /* pick RGBA directly */
     gtk_widget_queue_draw(palette_bar);
-    flash_color(fg_color);
+    guchar er = (fg_color >> 24) & 0xff;
+    guchar eg = (fg_color >> 16) & 0xff;
+    guchar eb = (fg_color >> 8) & 0xff;
+    char ebuf[32];
+    snprintf(ebuf, sizeof(ebuf), "color #%02x%02x%02x", er, eg, eb);
+    cmd_flash(ebuf);
     break;
   }
   case GDK_KEY_o: {
@@ -2615,7 +2720,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
   case GDK_KEY_D:
     begin_undo_action();
     for (int ex = cursor_x; ex < CANVAS_W; ex++)
-      paint_pixel(ex, cursor_y, 0);
+      paint_pixel(ex, cursor_y, bg_color);
     commit_undo_action();
     last_action = GDK_KEY_x;
     last_was_visual = FALSE;
@@ -2628,7 +2733,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     begin_undo_action();
     for (int ey = y0; ey <= y1; ey++)
       for (int ex = x0; ex <= x1; ex++)
-        paint_pixel(ex, ey, 0);
+        paint_pixel(ex, ey, bg_color);
     commit_undo_action();
     last_action = GDK_KEY_x;
     last_radius = radius;
@@ -2643,7 +2748,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
       if (last_action == GDK_KEY_backslash) {
         draw_line(ax, ay, cursor_x, cursor_y, fg_color);
       } else {
-        guchar val = (last_action == GDK_KEY_r) ? fg_color : 0;
+        guint32 val = (last_action == GDK_KEY_r) ? fg_color : bg_color;
         int x0 = CLAMP(MIN(cursor_x, ax), 0, CANVAS_W - 1);
         int x1 = CLAMP(MAX(cursor_x, ax), 0, CANVAS_W - 1);
         int y0 = CLAMP(MIN(cursor_y, ay), 0, CANVAS_H - 1);
@@ -2667,7 +2772,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
           paint_pixel(x1, ey, fg_color);
         }
       } else {
-        guchar val = (last_action == GDK_KEY_r) ? fg_color : 0;
+        guint32 val = (last_action == GDK_KEY_r) ? fg_color : bg_color;
         for (int ey = y0; ey <= y1; ey++)
           for (int ex = x0; ex <= x1; ex++)
             paint_pixel(ex, ey, val);
@@ -2724,9 +2829,9 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
       if (redo_count < UNDO_MAX)
         redo_count++;
       if (a.before_snap) {
-        guchar *np = malloc(a.before_w * a.before_h);
+        guint32 *np = malloc(a.before_w * a.before_h * sizeof(guint32));
         if (np) {
-          memcpy(np, a.before_snap, a.before_w * a.before_h);
+          memcpy(np, a.before_snap, a.before_w * a.before_h * sizeof(guint32));
           free(pixels);
           pixels = np;
           CANVAS_W = a.before_w;
@@ -2757,16 +2862,18 @@ static gboolean on_palette_click(GtkWidget *widget, GdkEventButton *event,
                                  gpointer data) {
   int idx = (int)(event->x / SWATCH_W);
   if (idx > 0 && idx < PALETTE_SIZE) {
-    fg_color = (guchar)idx;
+    int pr, pg, pb;
+    palette_to_rgb(idx, &pr, &pg, &pb);
+    fg_color = PACK_RGBA(pr, pg, pb, 255);
     gtk_widget_queue_draw(widget);
-    flash_color(fg_color);
+    flash_color(idx);
   }
   return TRUE;
 }
 
 static gboolean drag_painting = FALSE;
 static gboolean drag_selecting = FALSE;
-static guchar drag_color = 0;
+static guint32 drag_color = 0;
 
 static gboolean on_button_press(GtkWidget *widget, GdkEventButton *event,
                                 gpointer data) {
@@ -2777,7 +2884,7 @@ static gboolean on_button_press(GtkWidget *widget, GdkEventButton *event,
   cursor_x = CLAMP(cx, 0, CANVAS_W - 1);
   cursor_y = CLAMP(cy, 0, CANVAS_H - 1);
   if (insert_mode) {
-    drag_color = (event->button == 3) ? 0 : fg_color;
+    drag_color = (event->button == 3) ? bg_color : fg_color;
     begin_undo_action();
     drag_painting = TRUE;
     paint_brush(cursor_x, cursor_y, drag_color);
@@ -2927,14 +3034,14 @@ int main(int argc, char *argv[]) {
   }
 
   static const double default_pal[8][3] = {
-      {1.0,1.0,1.0},{0.0,0.0,0.0},{0.8,0.1,0.1},{0.1,0.7,0.1},
-      {0.1,0.3,0.9},{0.9,0.8,0.0},{0.0,0.7,0.8},{0.7,0.0,0.8},
+      {1.0, 1.0, 1.0}, {0.0, 0.0, 0.0}, {0.8, 0.1, 0.1}, {0.1, 0.7, 0.1},
+      {0.1, 0.3, 0.9}, {0.9, 0.8, 0.0}, {0.0, 0.7, 0.8}, {0.7, 0.0, 0.8},
   };
   palette_reserve(8);
   memcpy(palette, default_pal, sizeof(default_pal));
   palette_size = 8;
 
-  pixels = calloc(CANVAS_W * CANVAS_H, 1);
+  pixels = calloc(CANVAS_W * CANVAS_H, sizeof(guint32));
 
   /* Pass only program name + positional args to gtk_init */
   char **gtk_argv = argv + optind - 1;
@@ -2991,17 +3098,19 @@ int main(int argc, char *argv[]) {
     cmd_open(startup_files[0]);
     for (int i = 1; i < startup_count && tab_count < TAB_MAX; i++) {
       tab_save(tab_current);
-      guchar *np = calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, 1);
-      if (!np) break;
+      guint32 *np =
+          calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, sizeof(guint32));
+      if (!np)
+        break;
       free(pixels);
-      pixels        = np;
-      CANVAS_W      = DEFAULT_CANVAS_W;
-      CANVAS_H      = DEFAULT_CANVAS_H;
-      cursor_x      = 0;
-      cursor_y      = 0;
-      canvas_dirty  = FALSE;
-      visual_mode   = FALSE;
-      insert_mode   = FALSE;
+      pixels = np;
+      CANVAS_W = DEFAULT_CANVAS_W;
+      CANVAS_H = DEFAULT_CANVAS_H;
+      cursor_x = 0;
+      cursor_y = 0;
+      canvas_dirty = FALSE;
+      visual_mode = FALSE;
+      insert_mode = FALSE;
       last_filename[0] = '\0';
       tab_count++;
       tab_current = tab_count - 1;
