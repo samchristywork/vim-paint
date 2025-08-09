@@ -988,6 +988,52 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strncmp(cmd_buf, ":gradient ", 10) == 0 && *arg) {
+    char c1s[64] = "", c2s[64] = "", dir[4] = "";
+    if (sscanf(arg, "%63s %63s %3s", c1s, c2s, dir) != 3 ||
+        (strcmp(dir, "h") != 0 && strcmp(dir, "v") != 0)) {
+      cmd_flash("Usage: :gradient <color1> <color2> h|v");
+      return;
+    }
+    unsigned int rgb1, rgb2;
+    if (!parse_color(c1s, &rgb1) || !parse_color(c2s, &rgb2)) {
+      cmd_flash("Unknown color.");
+      return;
+    }
+    double r1 = ((rgb1 >> 16) & 0xff) / 255.0;
+    double g1 = ((rgb1 >>  8) & 0xff) / 255.0;
+    double b1 = (rgb1 & 0xff)          / 255.0;
+    double r2 = ((rgb2 >> 16) & 0xff) / 255.0;
+    double g2 = ((rgb2 >>  8) & 0xff) / 255.0;
+    double b2 = (rgb2 & 0xff)          / 255.0;
+    int horiz = (dir[0] == 'h');
+    int span  = horiz ? CANVAS_W : CANVAS_H;
+    begin_undo_action();
+    for (int y = 0; y < CANVAS_H; y++) {
+      for (int x = 0; x < CANVAS_W; x++) {
+        double t  = span > 1 ? (horiz ? x : y) / (double)(span - 1) : 0.0;
+        double tr = r1 + t * (r2 - r1);
+        double tg = g1 + t * (g2 - g1);
+        double tb = b1 + t * (b2 - b1);
+        int best = 0;
+        double best_d = 1e9;
+        for (int i = 0; i < PALETTE_SIZE; i++) {
+          double dr = palette[i][0] - tr;
+          double dg = palette[i][1] - tg;
+          double db = palette[i][2] - tb;
+          double d  = dr*dr + dg*dg + db*db;
+          if (d < best_d) { best_d = d; best = i; }
+        }
+        push_undo(x, y);
+        PX(y, x) = (guchar)best;
+      }
+    }
+    commit_undo_action();
+    gtk_widget_queue_draw(main_canvas);
+    cmd_set("");
+    return;
+  }
+
   if (strncmp(cmd_buf, ":find color ", 12) == 0) {
     const char *val = cmd_buf + 12;
     unsigned int rgb;
@@ -1520,7 +1566,8 @@ static void cmd_execute(void) {
         "  Ctrl-G              show file info\n"
         "  :goto col,row       jump to position (1-based)\n"
         "  :find color <hex|name>  jump to nearest pixel of color\n"
-        "  :replace <from> <to>    replace all pixels of one color with another\n");
+        "  :replace <from> <to>    replace all pixels of one color with another\n"
+        "  :gradient <c1> <c2> h|v  fill canvas with gradient between two colors\n");
     gtk_dialog_run(GTK_DIALOG(dlg));
     gtk_widget_destroy(dlg);
     cmd_set("");
