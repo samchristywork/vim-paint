@@ -50,6 +50,7 @@ static gboolean show_checker = FALSE;
 static gboolean canvas_dirty = FALSE;
 static gboolean sym_h = FALSE;
 static gboolean sym_v = FALSE;
+static int brush_size = 1;
 
 #define UNDO_MAX 64
 typedef struct {
@@ -149,6 +150,7 @@ static void cmd_set(const char *text);
 static void title_refresh(void);
 static void status_update(void);
 static void paint_pixel(int x, int y, guchar color);
+static void paint_brush(int x, int y, guchar color);
 static void tab_switch(int newidx);
 
 static void flash_color(int idx) {
@@ -529,7 +531,7 @@ static void set_palette_rgb(int slot, unsigned int rgb) {
 static void insert_paint(void) {
   if (insert_mode) {
     begin_undo_action();
-    paint_pixel(cursor_x, cursor_y, fg_color);
+    paint_brush(cursor_x, cursor_y, fg_color);
     commit_undo_action();
   }
 }
@@ -832,6 +834,14 @@ static void cmd_execute(void) {
         cmd_set("");
       } else {
         cmd_flash("Zoom must be 4-64.");
+      }
+    } else if (strncmp(opt, "brush ", 6) == 0) {
+      int v = atoi(opt + 6);
+      if (v >= 1 && v <= 16) {
+        brush_size = v;
+        cmd_set("");
+      } else {
+        cmd_flash("Brush size must be 1-16.");
       }
     } else if (strncmp(opt, "bg ", 3) == 0) {
       const char *val = opt + 3;
@@ -1505,6 +1515,7 @@ static void cmd_execute(void) {
         "  %                   toggle coordinate ruler\n"
         "  #                   toggle checkerboard background\n"
         "  :set zoom N         set cell size\n"
+        "  :set brush N        set brush size (1-16)\n"
         "  Ctrl-G              show file info\n"
         "  :goto col,row       jump to position (1-based)\n"
         "  :find color <hex|name>  jump to nearest pixel of color\n"
@@ -1640,6 +1651,13 @@ static void paint_pixel(int x, int y, guchar color) {
       }
     }
   }
+}
+
+static void paint_brush(int x, int y, guchar color) {
+  int half = brush_size / 2;
+  for (int dy = 0; dy < brush_size; dy++)
+    for (int dx = 0; dx < brush_size; dx++)
+      paint_pixel(x - half + dx, y - half + dy, color);
 }
 
 static void find_right(void) {
@@ -2674,7 +2692,7 @@ static gboolean on_button_press(GtkWidget *widget, GdkEventButton *event,
     drag_color = (event->button == 3) ? 0 : fg_color;
     begin_undo_action();
     drag_painting = TRUE;
-    paint_pixel(cursor_x, cursor_y, drag_color);
+    paint_brush(cursor_x, cursor_y, drag_color);
   } else if (event->button == 1) {
     visual_mode = TRUE;
     visual_anchor_x = cursor_x;
@@ -2717,7 +2735,7 @@ static gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event,
   cursor_x = cx;
   cursor_y = cy;
   if (insert_mode && drag_painting)
-    paint_pixel(cursor_x, cursor_y, drag_color);
+    paint_brush(cursor_x, cursor_y, drag_color);
   status_update();
   gtk_widget_queue_draw(widget);
   return TRUE;
