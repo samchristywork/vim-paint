@@ -406,17 +406,10 @@ static gboolean cmd_write(const char *filename) {
       guchar g = (px >> 16) & 0xff;
       guchar b = (px >> 8) & 0xff;
       guchar a = px & 0xff;
-      if (show_checker && a == 0) {
-        d[y * stride + x * 4 + 0] = 0;
-        d[y * stride + x * 4 + 1] = 0;
-        d[y * stride + x * 4 + 2] = 0;
-        d[y * stride + x * 4 + 3] = 0;
-      } else {
-        d[y * stride + x * 4 + 0] = b; /* Cairo ARGB32: BGRA on LE */
-        d[y * stride + x * 4 + 1] = g;
-        d[y * stride + x * 4 + 2] = r;
-        d[y * stride + x * 4 + 3] = show_checker ? a : 255;
-      }
+      d[y * stride + x * 4 + 0] = b; /* Cairo ARGB32: BGRA on LE */
+      d[y * stride + x * 4 + 1] = g;
+      d[y * stride + x * 4 + 2] = r;
+      d[y * stride + x * 4 + 3] = a;
     }
   cairo_surface_mark_dirty(surf);
   gboolean ok =
