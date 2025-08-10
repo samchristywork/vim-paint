@@ -719,13 +719,31 @@ static void cmd_open(const char *filename) {
     cairo_surface_destroy(surf);
     return;
   }
+  int iw = cairo_image_surface_get_width(surf);
+  int ih = cairo_image_surface_get_height(surf);
+  if (iw > CANVAS_W || ih > CANVAS_H) {
+    int nw = MAX(iw, CANVAS_W), nh = MAX(ih, CANVAS_H);
+    guint32 *np = calloc(nw * nh, sizeof(guint32));
+    if (!np) {
+      cmd_flash("Out of memory.");
+      cairo_surface_destroy(surf);
+      return;
+    }
+    free(pixels);
+    pixels = np;
+    CANVAS_W = nw;
+    CANVAS_H = nh;
+    cursor_x = CLAMP(cursor_x, 0, CANVAS_W - 1);
+    cursor_y = CLAMP(cursor_y, 0, CANVAS_H - 1);
+    visual_anchor_x = CLAMP(visual_anchor_x, 0, CANVAS_W - 1);
+    visual_anchor_y = CLAMP(visual_anchor_y, 0, CANVAS_H - 1);
+    zoom_resize();
+  }
   guchar *d = cairo_image_surface_get_data(surf);
   int st = cairo_image_surface_get_stride(surf);
-  int w = MIN(cairo_image_surface_get_width(surf), CANVAS_W);
-  int h = MIN(cairo_image_surface_get_height(surf), CANVAS_H);
   memset(pixels, 0, CANVAS_W * CANVAS_H * sizeof(guint32));
-  for (int y = 0; y < h; y++)
-    for (int x = 0; x < w; x++) {
+  for (int y = 0; y < ih; y++)
+    for (int x = 0; x < iw; x++) {
       /* Cairo ARGB32 on LE: bytes are B, G, R, A */
       guchar b = d[y * st + x * 4 + 0];
       guchar g = d[y * st + x * 4 + 1];
