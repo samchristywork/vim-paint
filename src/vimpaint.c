@@ -429,11 +429,12 @@ static gboolean cmd_write(const char *filename) {
   return ok;
 }
 
-static void cmd_export_bmp(const char *filename) {
-  int row_bytes = CANVAS_W * 3;
+static void cmd_export_bmp(const char *filename, int scale) {
+  int out_w = CANVAS_W * scale, out_h = CANVAS_H * scale;
+  int row_bytes = out_w * 3;
   int pad = (4 - (row_bytes % 4)) % 4;
   int stride = row_bytes + pad;
-  int pixel_data_size = stride * CANVAS_H;
+  int pixel_data_size = stride * out_h;
   int file_size = 14 + 40 + pixel_data_size;
 
   FILE *f = fopen(filename, "wb");
@@ -460,16 +461,16 @@ static void cmd_export_bmp(const char *filename) {
       0, /* offset to pixel data */
   };
   /* Info header (BITMAPINFOHEADER) */
-  int neg_h = -CANVAS_H; /* negative = top-down */
+  int neg_h = -out_h; /* negative = top-down */
   unsigned char ih[40] = {
       40,
       0,
       0,
       0, /* header size */
-      (unsigned char)(CANVAS_W),
-      (unsigned char)(CANVAS_W >> 8),
-      (unsigned char)(CANVAS_W >> 16),
-      (unsigned char)(CANVAS_W >> 24),
+      (unsigned char)(out_w),
+      (unsigned char)(out_w >> 8),
+      (unsigned char)(out_w >> 16),
+      (unsigned char)(out_w >> 24),
       (unsigned char)(neg_h),
       (unsigned char)(neg_h >> 8),
       (unsigned char)(neg_h >> 16),
@@ -520,13 +521,18 @@ static void cmd_export_bmp(const char *filename) {
       guchar r = (px >> 24) & 0xff;
       guchar g = (px >> 16) & 0xff;
       guchar b = (px >> 8) & 0xff;
-      row_buf[x * 3 + 0] = b; /* BMP: BGR order */
-      row_buf[x * 3 + 1] = g;
-      row_buf[x * 3 + 2] = r;
+      for (int xs = 0; xs < scale; xs++) {
+        int ox = x * scale + xs;
+        row_buf[ox * 3 + 0] = b; /* BMP: BGR order */
+        row_buf[ox * 3 + 1] = g;
+        row_buf[ox * 3 + 2] = r;
+      }
     }
-    fwrite(row_buf, 1, row_bytes, f);
-    if (pad)
-      fwrite(padding, 1, pad, f);
+    for (int ys = 0; ys < scale; ys++) {
+      fwrite(row_buf, 1, row_bytes, f);
+      if (pad)
+        fwrite(padding, 1, pad, f);
+    }
   }
   free(row_buf);
   fclose(f);
@@ -1390,12 +1396,28 @@ static void cmd_execute(void) {
   }
 
   if (strncmp(cmd_buf, ":export ", 8) == 0 && *arg) {
+    /* Parse optional scale: ":export file.png 4" */
+    char fname[4096];
+    int scale = 1;
+    const char *sp = strrchr(arg, ' ');
+    if (sp && sp != arg) {
+      char *end;
+      long sv = strtol(sp + 1, &end, 10);
+      if (*end == '\0' && sv >= 1 && sv <= 32) {
+        scale = (int)sv;
+        size_t flen = (size_t)(sp - arg);
+        memcpy(fname, arg, flen);
+        fname[flen] = '\0';
+        arg = fname;
+      }
+    }
     size_t alen = strlen(arg);
     if (alen >= 4 && strcmp(arg + alen - 4, ".bmp") == 0) {
-      cmd_export_bmp(arg);
+      cmd_export_bmp(arg, scale);
     } else if (alen >= 4 && strcmp(arg + alen - 4, ".png") == 0) {
+      int sw = CANVAS_W * scale, sh = CANVAS_H * scale;
       cairo_surface_t *surf =
-          cairo_image_surface_create(CAIRO_FORMAT_ARGB32, CANVAS_W, CANVAS_H);
+          cairo_image_surface_create(CAIRO_FORMAT_ARGB32, sw, sh);
       guchar *d = cairo_image_surface_get_data(surf);
       int st = cairo_image_surface_get_stride(surf);
       for (int y = 0; y < CANVAS_H; y++)
@@ -1405,17 +1427,20 @@ static void cmd_execute(void) {
           guchar g = (px >> 16) & 0xff;
           guchar b = (px >> 8) & 0xff;
           guchar a = px & 0xff;
+          guchar wb, wg, wr, wa;
           if (show_checker && a == 0) {
-            d[y * st + x * 4 + 0] = 0;
-            d[y * st + x * 4 + 1] = 0;
-            d[y * st + x * 4 + 2] = 0;
-            d[y * st + x * 4 + 3] = 0;
+            wb = wg = wr = wa = 0;
           } else {
-            d[y * st + x * 4 + 0] = b;
-            d[y * st + x * 4 + 1] = g;
-            d[y * st + x * 4 + 2] = r;
-            d[y * st + x * 4 + 3] = show_checker ? a : 255;
+            wb = b; wg = g; wr = r; wa = show_checker ? a : 255;
           }
+          for (int dy = 0; dy < scale; dy++)
+            for (int dx = 0; dx < scale; dx++) {
+              int oy = y * scale + dy, ox = x * scale + dx;
+              d[oy * st + ox * 4 + 0] = wb;
+              d[oy * st + ox * 4 + 1] = wg;
+              d[oy * st + ox * 4 + 2] = wr;
+              d[oy * st + ox * 4 + 3] = wa;
+            }
         }
       cairo_surface_mark_dirty(surf);
       gboolean ok =
