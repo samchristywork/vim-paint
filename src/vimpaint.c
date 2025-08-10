@@ -1,5 +1,6 @@
 #include <glob.h>
 #include <gtk/gtk.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -642,6 +643,54 @@ static void draw_line(int x0, int y0, int x1, int y1, guint32 color) {
   }
 }
 
+static void rgb_to_hsl(double r, double g, double b, double *h, double *s,
+                       double *l) {
+  double mx = r > g ? (r > b ? r : b) : (g > b ? g : b);
+  double mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
+  *l = (mx + mn) / 2.0;
+  if (mx == mn) {
+    *h = *s = 0.0;
+    return;
+  }
+  double d = mx - mn;
+  *s = *l > 0.5 ? d / (2.0 - mx - mn) : d / (mx + mn);
+  if (mx == r)
+    *h = (g - b) / d + (g < b ? 6.0 : 0.0);
+  else if (mx == g)
+    *h = (b - r) / d + 2.0;
+  else
+    *h = (r - g) / d + 4.0;
+  *h *= 60.0;
+}
+
+static double hue_to_rgb(double p, double q, double t) {
+  if (t < 0)
+    t += 1;
+  if (t > 1)
+    t -= 1;
+  if (t < 1.0 / 6)
+    return p + (q - p) * 6 * t;
+  if (t < 0.5)
+    return q;
+  if (t < 2.0 / 3)
+    return p + (q - p) * (2.0 / 3 - t) * 6;
+  return p;
+}
+
+static void hsl_to_rgb(double h, double s, double l, double *r, double *g,
+                       double *b) {
+  if (s == 0.0) {
+    *r = *g = *b = l;
+    return;
+  }
+  h /= 360.0;
+  double q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  double p = 2 * l - q;
+  *r = hue_to_rgb(p, q, h + 1.0 / 3);
+  *g = hue_to_rgb(p, q, h);
+  *b = hue_to_rgb(p, q, h - 1.0 / 3);
+}
+
 static gboolean parse_color(const char *val, unsigned int *out_rgb) {
   if (val[0] == '#') {
     size_t len = strlen(val);
@@ -1134,6 +1183,48 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strncmp(cmd_buf, ":hue ", 5) == 0 || strncmp(cmd_buf, ":sat ", 5) == 0 ||
+      strncmp(cmd_buf, ":bright ", 8) == 0) {
+    double delta = atof(arg);
+    int is_hue = (cmd_buf[1] == 'h');
+    int is_sat = (cmd_buf[1] == 's');
+    int x0 = 0, y0 = 0, x1 = CANVAS_W - 1, y1 = CANVAS_H - 1;
+    if (visual_mode) {
+      x0 = MIN(cursor_x, visual_anchor_x);
+      x1 = MAX(cursor_x, visual_anchor_x);
+      y0 = MIN(cursor_y, visual_anchor_y);
+      y1 = MAX(cursor_y, visual_anchor_y);
+    }
+    begin_undo_action();
+    for (int y = y0; y <= y1; y++)
+      for (int x = x0; x <= x1; x++) {
+        guint32 px = PX(y, x);
+        guchar a = px & 0xff;
+        if (a == 0)
+          continue;
+        double r = ((px >> 24) & 0xff) / 255.0;
+        double g = ((px >> 16) & 0xff) / 255.0;
+        double b = ((px >> 8) & 0xff) / 255.0;
+        double h, s, l;
+        rgb_to_hsl(r, g, b, &h, &s, &l);
+        if (is_hue)
+          h = fmod(h + delta + 720.0, 360.0);
+        else if (is_sat)
+          s = CLAMP(s + delta / 100.0, 0.0, 1.0);
+        else
+          l = CLAMP(l + delta / 100.0, 0.0, 1.0);
+        hsl_to_rgb(h, s, l, &r, &g, &b);
+        push_undo(x, y);
+        PX(y, x) = PACK_RGBA((int)(r * 255 + 0.5), (int)(g * 255 + 0.5),
+                             (int)(b * 255 + 0.5), a);
+      }
+    commit_undo_action();
+    visual_mode = FALSE;
+    gtk_widget_queue_draw(main_canvas);
+    cmd_set("");
+    return;
+  }
+
   if (strncmp(cmd_buf, ":find color ", 12) == 0) {
     const char *val = cmd_buf + 12;
     unsigned int rgb;
@@ -1465,7 +1556,10 @@ static void cmd_execute(void) {
           if (show_checker && a == 0) {
             wb = wg = wr = wa = 0;
           } else {
-            wb = b; wg = g; wr = r; wa = show_checker ? a : 255;
+            wb = b;
+            wg = g;
+            wr = r;
+            wa = show_checker ? a : 255;
           }
           for (int dy = 0; dy < scale; dy++)
             for (int dx = 0; dx < scale; dx++) {
@@ -1590,7 +1684,8 @@ static void cmd_execute(void) {
 
   if (strncmp(cmd_buf, ":text ", 6) == 0 && *arg) {
     int len = (int)strlen(arg);
-    int sw = (int)(len * text_font_size + 4), sh = (int)(text_font_size * 2 + 4);
+    int sw = (int)(len * text_font_size + 4),
+        sh = (int)(text_font_size * 2 + 4);
     /* Render black text on white ARGB32 surface.
        Checking a color channel (not alpha) gives clean binary results
        because CAIRO_ANTIALIAS_NONE only works reliably on opaque surfaces. */
