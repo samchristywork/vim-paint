@@ -60,6 +60,8 @@ static gboolean canvas_dirty = FALSE;
 static gboolean sym_h = FALSE;
 static gboolean sym_v = FALSE;
 static int brush_size = 1;
+static char text_font_family[256] = "Monospace";
+static double text_font_size = 10.0;
 
 #define UNDO_MAX 64
 typedef struct {
@@ -1022,6 +1024,38 @@ static void cmd_execute(void) {
       sym_h = FALSE;
       sym_v = FALSE;
       cmd_flash("Symmetry: off");
+    } else if (strncmp(opt, "font ", 5) == 0) {
+      /* :set font <family> <size>  or  :set font <family> */
+      const char *farg = opt + 5;
+      /* Try to find a trailing number for size */
+      const char *last_sp = strrchr(farg, ' ');
+      if (last_sp && last_sp[1] != '\0') {
+        char *end;
+        double sz = strtod(last_sp + 1, &end);
+        if (*end == '\0' && sz >= 1.0 && sz <= 256.0) {
+          size_t flen = (size_t)(last_sp - farg);
+          if (flen > 0 && flen < sizeof(text_font_family)) {
+            memcpy(text_font_family, farg, flen);
+            text_font_family[flen] = '\0';
+          }
+          text_font_size = sz;
+          char msg[320];
+          snprintf(msg, sizeof(msg), "Font: %s %.4gpt", text_font_family,
+                   text_font_size);
+          cmd_flash(msg);
+          return;
+        }
+      }
+      /* No size given - just update family */
+      if (strlen(farg) > 0 && strlen(farg) < sizeof(text_font_family)) {
+        snprintf(text_font_family, sizeof(text_font_family), "%s", farg);
+        char msg[320];
+        snprintf(msg, sizeof(msg), "Font: %s %.4gpt", text_font_family,
+                 text_font_size);
+        cmd_flash(msg);
+      } else {
+        cmd_flash("Invalid font family.");
+      }
     } else {
       cmd_flash("Unknown option.");
     }
@@ -1556,7 +1590,7 @@ static void cmd_execute(void) {
 
   if (strncmp(cmd_buf, ":text ", 6) == 0 && *arg) {
     int len = (int)strlen(arg);
-    int sw = len * 10 + 4, sh = 16;
+    int sw = (int)(len * text_font_size + 4), sh = (int)(text_font_size * 2 + 4);
     /* Render black text on white ARGB32 surface.
        Checking a color channel (not alpha) gives clean binary results
        because CAIRO_ANTIALIAS_NONE only works reliably on opaque surfaces. */
@@ -1570,9 +1604,9 @@ static void cmd_execute(void) {
     cairo_font_options_destroy(fo);
     cairo_set_source_rgb(tcr, 1, 1, 1);
     cairo_paint(tcr);
-    cairo_select_font_face(tcr, "Monospace", CAIRO_FONT_SLANT_NORMAL,
+    cairo_select_font_face(tcr, text_font_family, CAIRO_FONT_SLANT_NORMAL,
                            CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(tcr, 10.0);
+    cairo_set_font_size(tcr, text_font_size);
     cairo_font_extents_t fe;
     cairo_font_extents(tcr, &fe);
     cairo_set_source_rgb(tcr, 0, 0, 0);
@@ -1584,7 +1618,7 @@ static void cmd_execute(void) {
     begin_undo_action();
     for (int ty = 0; ty < sh; ty++)
       for (int tx = 0; tx < sw; tx++) {
-        /* ARGB32 on LE: [B, G, R, A]; check red channel — 0 = ink, 255 = paper
+        /* ARGB32 on LE: [B, G, R, A]; check red channel - 0 = ink, 255 = paper
          */
         unsigned char tr = tdata[ty * tstride + tx * 4 + 2];
         if (tr > 128)
@@ -3014,7 +3048,7 @@ static gboolean on_button_release(GtkWidget *widget, GdkEventButton *event,
   }
   if (drag_selecting) {
     drag_selecting = FALSE;
-    /* Collapse to a point click — cancel visual mode */
+    /* Collapse to a point click - cancel visual mode */
     if (cursor_x == visual_anchor_x && cursor_y == visual_anchor_y) {
       visual_mode = FALSE;
       status_update();
