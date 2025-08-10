@@ -1154,10 +1154,16 @@ static void cmd_execute(void) {
       return;
     }
     int horiz = (dir[0] == 'h');
-    int span = horiz ? CANVAS_W : CANVAS_H;
+    int x0 = 0, y0 = 0, x1 = CANVAS_W - 1, y1 = CANVAS_H - 1;
+    if (visual_mode) {
+      x0 = MIN(cursor_x, visual_anchor_x);
+      x1 = MAX(cursor_x, visual_anchor_x);
+      y0 = MIN(cursor_y, visual_anchor_y);
+      y1 = MAX(cursor_y, visual_anchor_y);
+    }
+    int span = horiz ? (x1 - x0 + 1) : (y1 - y0 + 1);
     int r1i = (rgb1 >> 16) & 0xff, g1i = (rgb1 >> 8) & 0xff, b1i = rgb1 & 0xff;
     int r2i = (rgb2 >> 16) & 0xff, g2i = (rgb2 >> 8) & 0xff, b2i = rgb2 & 0xff;
-    /* Pre-compute RGBA for each gradient position */
     guint32 *pos_color = malloc(span * sizeof(guint32));
     if (!pos_color) {
       cmd_flash("Out of memory.");
@@ -1171,13 +1177,14 @@ static void cmd_execute(void) {
       pos_color[i] = PACK_RGBA(ri, gi, bi, 255);
     }
     begin_undo_action();
-    for (int y = 0; y < CANVAS_H; y++)
-      for (int x = 0; x < CANVAS_W; x++) {
+    for (int y = y0; y <= y1; y++)
+      for (int x = x0; x <= x1; x++) {
         push_undo(x, y);
-        PX(y, x) = pos_color[horiz ? x : y];
+        PX(y, x) = pos_color[horiz ? (x - x0) : (y - y0)];
       }
     commit_undo_action();
     free(pos_color);
+    visual_mode = FALSE;
     gtk_widget_queue_draw(main_canvas);
     cmd_set("");
     return;
