@@ -6,7 +6,7 @@ all: build/vimpaint
 
 build/vimpaint: src/vimpaint.c
 	mkdir -p build/
-	${CC} ${CFLAGS} src/vimpaint.c -o $@ ${LIBS}
+	${CC} ${CFLAGS} src/vimpaint.c -o $@ ${LIBS} -lm
 
 clean:
 	rm -rf build/
