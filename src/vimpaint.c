@@ -1225,6 +1225,121 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strncmp(cmd_buf, ":dither ", 8) == 0 && *arg) {
+    char c1s[64] = "", c2s[64] = "", pat[16] = "";
+    if (sscanf(arg, "%63s %63s %15s", c1s, c2s, pat) != 3 ||
+        (strcmp(pat, "ordered") != 0 && strcmp(pat, "fs") != 0)) {
+      cmd_flash("Usage: :dither <color1> <color2> ordered|fs");
+      return;
+    }
+    unsigned int rgb1, rgb2;
+    if (!parse_color(c1s, &rgb1) || !parse_color(c2s, &rgb2)) {
+      cmd_flash("Unknown color.");
+      return;
+    }
+    int r1 = (rgb1 >> 16) & 0xff, g1 = (rgb1 >> 8) & 0xff, b1 = rgb1 & 0xff;
+    int r2 = (rgb2 >> 16) & 0xff, g2 = (rgb2 >> 8) & 0xff, b2 = rgb2 & 0xff;
+    guint32 px1 = PACK_RGBA(r1, g1, b1, 255);
+    guint32 px2 = PACK_RGBA(r2, g2, b2, 255);
+    int x0 = 0, y0 = 0, x1 = CANVAS_W - 1, y1 = CANVAS_H - 1;
+    if (visual_mode) {
+      x0 = MIN(cursor_x, visual_anchor_x);
+      x1 = MAX(cursor_x, visual_anchor_x);
+      y0 = MIN(cursor_y, visual_anchor_y);
+      y1 = MAX(cursor_y, visual_anchor_y);
+    }
+    guint32 *before_snap = malloc(CANVAS_W * CANVAS_H * sizeof(guint32));
+    if (!before_snap) {
+      cmd_flash("Out of memory.");
+      return;
+    }
+    memcpy(before_snap, pixels, CANVAS_W * CANVAS_H * sizeof(guint32));
+
+    if (strcmp(pat, "ordered") == 0) {
+      static const int bayer[4][4] = {
+          {0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
+      for (int y = y0; y <= y1; y++)
+        for (int x = x0; x <= x1; x++) {
+          guint32 px = PX(y, x);
+          if ((px & 0xff) == 0)
+            continue;
+          int pr = (px >> 24) & 0xff, pg = (px >> 16) & 0xff,
+              pb = (px >> 8) & 0xff;
+          int dr1 = pr - r1, dg1 = pg - g1, db1 = pb - b1;
+          int dr2 = pr - r2, dg2 = pg - g2, db2 = pb - b2;
+          double d1 = dr1 * dr1 + dg1 * dg1 + db1 * db1;
+          double d2 = dr2 * dr2 + dg2 * dg2 + db2 * db2;
+          double t = (d1 + d2 > 0) ? d1 / (d1 + d2) : 0.5;
+          PX(y, x) = (t >= (bayer[y % 4][x % 4] + 0.5) / 16.0) ? px2 : px1;
+        }
+    } else {
+      int W = x1 - x0 + 1, H = y1 - y0 + 1;
+      double *er = calloc(W * H, sizeof(double));
+      double *eg = calloc(W * H, sizeof(double));
+      double *eb = calloc(W * H, sizeof(double));
+      if (!er || !eg || !eb) {
+        free(er);
+        free(eg);
+        free(eb);
+        free(before_snap);
+        cmd_flash("Out of memory.");
+        return;
+      }
+      for (int y = y0; y <= y1; y++) {
+        for (int x = x0; x <= x1; x++) {
+          guint32 px = PX(y, x);
+          if ((px & 0xff) == 0)
+            continue;
+          int ey = y - y0, ex = x - x0, idx = ey * W + ex;
+          double nr = ((px >> 24) & 0xff) + er[idx];
+          double ng = ((px >> 16) & 0xff) + eg[idx];
+          double nb = ((px >> 8) & 0xff) + eb[idx];
+          int dr1 = (int)nr - r1, dg1 = (int)ng - g1, db1 = (int)nb - b1;
+          int dr2 = (int)nr - r2, dg2 = (int)ng - g2, db2 = (int)nb - b2;
+          guint32 chosen;
+          int cr, cg, cb;
+          if (dr1 * dr1 + dg1 * dg1 + db1 * db1 <=
+              dr2 * dr2 + dg2 * dg2 + db2 * db2) {
+            chosen = px1;
+            cr = r1;
+            cg = g1;
+            cb = b1;
+          } else {
+            chosen = px2;
+            cr = r2;
+            cg = g2;
+            cb = b2;
+          }
+          PX(y, x) = chosen;
+          double qr = nr - cr, qg = ng - cg, qb = nb - cb;
+#define SPREAD(dy, dx, w)                                                      \
+  do {                                                                         \
+    int ny = ey + (dy), nx = ex + (dx);                                        \
+    if (ny >= 0 && ny < H && nx >= 0 && nx < W) {                              \
+      int ni = ny * W + nx;                                                    \
+      er[ni] += qr * (w);                                                      \
+      eg[ni] += qg * (w);                                                      \
+      eb[ni] += qb * (w);                                                      \
+    }                                                                          \
+  } while (0)
+          SPREAD(0, 1, 7.0 / 16);
+          SPREAD(1, -1, 3.0 / 16);
+          SPREAD(1, 0, 5.0 / 16);
+          SPREAD(1, 1, 1.0 / 16);
+#undef SPREAD
+        }
+      }
+      free(er);
+      free(eg);
+      free(eb);
+    }
+    commit_canvas_snapshot(before_snap, CANVAS_W, CANVAS_H);
+    visual_mode = FALSE;
+    gtk_widget_queue_draw(main_canvas);
+    cmd_set("");
+    return;
+  }
+
   if (strncmp(cmd_buf, ":find color ", 12) == 0) {
     const char *val = cmd_buf + 12;
     unsigned int rgb;
