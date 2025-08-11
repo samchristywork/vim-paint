@@ -1564,6 +1564,7 @@ static void cmd_execute(void) {
       char msg[64];
       snprintf(msg, sizeof(msg), "Added %d color(s) to palette.", added);
       gtk_widget_queue_draw(palette_bar);
+      gtk_widget_queue_draw(main_canvas);
       cmd_flash(msg);
     }
     return;
