@@ -1423,8 +1423,8 @@ static void cmd_execute(void) {
     int nw = 0, nh = 0;
     if (sscanf(arg, "%dx%d", &nw, &nh) != 2)
       sscanf(arg, "%d %d", &nw, &nh);
-    if (nw < 1 || nh < 1) {
-      cmd_flash("Usage: :resize WxH");
+    if (nw < 1 || nh < 1 || nw > 16384 || nh > 16384) {
+      cmd_flash("Usage: :resize WxH  (max 16384)");
       return;
     }
     guint32 *before_snap = malloc(CANVAS_W * CANVAS_H * sizeof(guint32));
