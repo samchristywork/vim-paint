@@ -2412,7 +2412,8 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
             color_tab_idx = 0;
             size_t plen = strlen(partial);
             for (int i = 0; i < NAMED_COLORS_COUNT; i++)
-              if (strncmp(named_colors[i].name, partial, plen) == 0)
+              if (color_tab_count < 256 &&
+                  strncmp(named_colors[i].name, partial, plen) == 0)
                 color_tab_matches[color_tab_count++] = i;
             if (color_tab_count > 0) {
               color_tab_valid = TRUE;
