@@ -532,7 +532,14 @@ static void cmd_export_bmp(const char *filename, int scale) {
   }
   free(row_buf);
   fclose(f);
-  cmd_flash("Exported.");
+  gboolean has_alpha = FALSE;
+  for (int i = 0; i < CANVAS_W * CANVAS_H && !has_alpha; i++)
+    if ((pixels[i] & 0xff) != 0xff)
+      has_alpha = TRUE;
+  if (has_alpha)
+    cmd_flash("Exported (warning: transparency lost, BMP has no alpha).");
+  else
+    cmd_flash("Exported.");
 }
 
 // clang-format off
