@@ -2477,6 +2477,8 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
       macro_buf[macro_reg][macro_len[macro_reg]].keyval = event->keyval;
       macro_buf[macro_reg][macro_len[macro_reg]].state = event->state;
       macro_len[macro_reg]++;
+    } else {
+      cmd_flash("Macro buffer full.");
     }
   }
 
