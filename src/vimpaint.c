@@ -64,7 +64,8 @@ static int brush_size = 1;
 static char text_font_family[256] = "Monospace";
 static double text_font_size = 10.0;
 
-#define UNDO_MAX 64
+#define UNDO_MAX 256
+static int undo_levels = 64;
 typedef struct {
   int x, y;
   guint32 before, after;
@@ -981,6 +982,17 @@ static void cmd_execute(void) {
         cmd_set("");
       } else {
         cmd_flash("Zoom must be 4-64.");
+      }
+    } else if (strncmp(opt, "undolevels ", 11) == 0) {
+      int v = atoi(opt + 11);
+      if (v >= 1 && v <= UNDO_MAX) {
+        clear_history();
+        undo_levels = v;
+        cmd_flash("Undo levels set (history cleared).");
+      } else {
+        char msg[64];
+        snprintf(msg, sizeof(msg), "Undo levels must be 1-%d.", UNDO_MAX);
+        cmd_flash(msg);
       }
     } else if (strncmp(opt, "brush ", 6) == 0) {
       int v = atoi(opt + 6);
@@ -1929,6 +1941,7 @@ static void cmd_execute(void) {
         "  #                   toggle checkerboard background\n"
         "  :set zoom N         set cell size\n"
         "  :set brush N        set brush size (1-16)\n"
+        "  :set undolevels N   set undo history depth (1-256, clears history)\n"
         "  Ctrl-G              show file info\n"
         "  :goto col,row       jump to position (1-based)\n"
         "  :find color <hex|name>  jump to nearest pixel of color\n"
@@ -1962,12 +1975,12 @@ static void free_action(UndoAction *a) {
 static void clear_history(void) {
   for (int i = 0; i < undo_count; i++)
     free_action(
-        &undo_stack[(undo_top - undo_count + i + UNDO_MAX * 2) % UNDO_MAX]);
+        &undo_stack[(undo_top - undo_count + i + undo_levels * 2) % undo_levels]);
   undo_top = 0;
   undo_count = 0;
   for (int i = 0; i < redo_count; i++)
     free_action(
-        &redo_stack[(redo_top - redo_count + i + UNDO_MAX * 2) % UNDO_MAX]);
+        &redo_stack[(redo_top - redo_count + i + undo_levels * 2) % undo_levels]);
   redo_top = 0;
   redo_count = 0;
   staged_count = 0;
@@ -1977,7 +1990,7 @@ static void begin_undo_action(void) {
   staged_count = 0;
   for (int i = 0; i < redo_count; i++)
     free_action(
-        &redo_stack[(redo_top - redo_count + i + UNDO_MAX * 2) % UNDO_MAX]);
+        &redo_stack[(redo_top - redo_count + i + undo_levels * 2) % undo_levels]);
   redo_top = 0;
   redo_count = 0;
 }
@@ -2002,8 +2015,8 @@ static void commit_undo_action(void) {
     return;
   for (int i = 0; i < staged_count; i++)
     staged[i].after = PX(staged[i].y, staged[i].x);
-  int idx = undo_top % UNDO_MAX;
-  if (undo_count == UNDO_MAX)
+  int idx = undo_top % undo_levels;
+  if (undo_count == undo_levels)
     free_action(&undo_stack[idx]);
   PixelChange *copy = malloc(staged_count * sizeof(PixelChange));
   if (!copy)
@@ -2011,7 +2024,7 @@ static void commit_undo_action(void) {
   memcpy(copy, staged, staged_count * sizeof(PixelChange));
   undo_stack[idx] = (UndoAction){copy, staged_count};
   undo_top++;
-  if (undo_count < UNDO_MAX)
+  if (undo_count < undo_levels)
     undo_count++;
   staged_count = 0;
   canvas_dirty = TRUE;
@@ -2025,11 +2038,11 @@ static void commit_canvas_snapshot(guint32 *before_snap, int bw, int bh) {
     memcpy(after_snap, pixels, CANVAS_W * CANVAS_H * sizeof(guint32));
   for (int i = 0; i < redo_count; i++)
     free_action(
-        &redo_stack[(redo_top - redo_count + i + UNDO_MAX * 2) % UNDO_MAX]);
+        &redo_stack[(redo_top - redo_count + i + undo_levels * 2) % undo_levels]);
   redo_top = 0;
   redo_count = 0;
-  int idx = undo_top % UNDO_MAX;
-  if (undo_count == UNDO_MAX)
+  int idx = undo_top % undo_levels;
+  if (undo_count == undo_levels)
     free_action(&undo_stack[idx]);
   undo_stack[idx] = (UndoAction){.before_snap = before_snap,
                                  .before_w = bw,
@@ -2038,7 +2051,7 @@ static void commit_canvas_snapshot(guint32 *before_snap, int bw, int bh) {
                                  .after_w = CANVAS_W,
                                  .after_h = CANVAS_H};
   undo_top++;
-  if (undo_count < UNDO_MAX)
+  if (undo_count < undo_levels)
     undo_count++;
   canvas_dirty = TRUE;
   title_refresh();
@@ -2816,15 +2829,15 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     if (redo_count > 0) {
       redo_top--;
       redo_count--;
-      int ridx = redo_top % UNDO_MAX;
+      int ridx = redo_top % undo_levels;
       UndoAction a = redo_stack[ridx];
       redo_stack[ridx] = (UndoAction){NULL, 0};
-      int uidx = undo_top % UNDO_MAX;
-      if (undo_count == UNDO_MAX)
+      int uidx = undo_top % undo_levels;
+      if (undo_count == undo_levels)
         free_action(&undo_stack[uidx]);
       undo_stack[uidx] = a;
       undo_top++;
-      if (undo_count < UNDO_MAX)
+      if (undo_count < undo_levels)
         undo_count++;
       if (a.after_snap) {
         guint32 *np = malloc(a.after_w * a.after_h * sizeof(guint32));
@@ -3198,15 +3211,15 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     if (undo_count > 0) {
       undo_top--;
       undo_count--;
-      int uidx = undo_top % UNDO_MAX;
+      int uidx = undo_top % undo_levels;
       UndoAction a = undo_stack[uidx];
       undo_stack[uidx] = (UndoAction){NULL, 0};
-      int ridx = redo_top % UNDO_MAX;
-      if (redo_count == UNDO_MAX)
+      int ridx = redo_top % undo_levels;
+      if (redo_count == undo_levels)
         free_action(&redo_stack[ridx]);
       redo_stack[ridx] = a;
       redo_top++;
-      if (redo_count < UNDO_MAX)
+      if (redo_count < undo_levels)
         redo_count++;
       if (a.before_snap) {
         guint32 *np = malloc(a.before_w * a.before_h * sizeof(guint32));
