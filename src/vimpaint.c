@@ -3328,18 +3328,17 @@ static gboolean on_scroll(GtkWidget *widget, GdkEventScroll *event,
     double dx;
     gdk_event_get_scroll_deltas((GdkEvent *)event, &dx, &dy);
     accum += dy;
-    if (accum > -3.0 && accum < 3.0)
+    if (accum > -1.5 && accum < 1.5)
       return TRUE;
     dy = accum;
     accum = 0;
   }
-  if (dy < 0 && CELL_SIZE < 64) {
-    CELL_SIZE += 2;
-    zoom_resize();
-  } else if (dy > 0 && CELL_SIZE > 4) {
-    CELL_SIZE -= 2;
-    zoom_resize();
-  }
+  int delta = 2 * MAX(1, (int)(fabs(dy) / 1.5));
+  if (dy < 0)
+    CELL_SIZE = MIN(64, CELL_SIZE + delta);
+  else if (dy > 0)
+    CELL_SIZE = MAX(4, CELL_SIZE - delta);
+  zoom_resize();
   return TRUE;
 }
 
