@@ -1958,6 +1958,7 @@ static void cmd_execute(void) {
         "  y / p / P           yank / paste / paste centered\n"
         "  \\                   draw line from anchor to cursor\n"
         "  H / V               flip selection horizontally / vertically\n"
+        "  R                   rotate selection 90° clockwise\n"
         "  :scale N            scale selection N× in place (N = 2..8)\n"
         "\n"
         "Palette\n"
@@ -2846,6 +2847,36 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
         }
       }
     }
+    commit_undo_action();
+    visual_mode = FALSE;
+    status_update();
+    gtk_widget_queue_draw(GTK_WIDGET(data));
+    return TRUE;
+  }
+
+  if (visual_mode && event->keyval == GDK_KEY_R) {
+    int x0 = MIN(cursor_x, visual_anchor_x);
+    int x1 = MAX(cursor_x, visual_anchor_x);
+    int y0 = MIN(cursor_y, visual_anchor_y);
+    int y1 = MAX(cursor_y, visual_anchor_y);
+    int W = x1 - x0 + 1, H = y1 - y0 + 1;
+    guint32 *tmp = malloc(W * H * sizeof(guint32));
+    if (!tmp) {
+      cmd_flash("Out of memory.");
+      visual_mode = FALSE;
+      status_update();
+      gtk_widget_queue_draw(GTK_WIDGET(data));
+      return TRUE;
+    }
+    /* 90° CW: dst[dr][dc] = src[H-1-dc][dr], new dims = H wide × W tall */
+    for (int dr = 0; dr < W; dr++)
+      for (int dc = 0; dc < H; dc++)
+        tmp[dr * H + dc] = PX(y0 + (H - 1 - dc), x0 + dr);
+    begin_undo_action();
+    for (int dr = 0; dr < W && y0 + dr < CANVAS_H; dr++)
+      for (int dc = 0; dc < H && x0 + dc < CANVAS_W; dc++)
+        paint_pixel(x0 + dc, y0 + dr, tmp[dr * H + dc]);
+    free(tmp);
     commit_undo_action();
     visual_mode = FALSE;
     status_update();
