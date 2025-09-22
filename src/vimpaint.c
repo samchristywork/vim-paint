@@ -1438,6 +1438,50 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strncmp(cmd_buf, ":scale ", 7) == 0 && *arg) {
+    int n = atoi(arg);
+    if (n < 2 || n > 8) {
+      cmd_flash("Usage: :scale N  (N = 2..8, requires visual selection)");
+      return;
+    }
+    if (!visual_mode) {
+      cmd_flash(":scale requires a visual selection.");
+      return;
+    }
+    int x0 = MIN(cursor_x, visual_anchor_x);
+    int x1 = MAX(cursor_x, visual_anchor_x);
+    int y0 = MIN(cursor_y, visual_anchor_y);
+    int y1 = MAX(cursor_y, visual_anchor_y);
+    int W = x1 - x0 + 1, H = y1 - y0 + 1;
+    guint32 *tmp = malloc(W * H * sizeof(guint32));
+    if (!tmp) {
+      cmd_flash("Out of memory.");
+      return;
+    }
+    for (int sy = 0; sy < H; sy++)
+      for (int sx = 0; sx < W; sx++)
+        tmp[sy * W + sx] = PX(y0 + sy, x0 + sx);
+    begin_undo_action();
+    for (int sy = 0; sy < H; sy++)
+      for (int sx = 0; sx < W; sx++) {
+        guint32 col = tmp[sy * W + sx];
+        for (int dy = 0; dy < n; dy++)
+          for (int dx = 0; dx < n; dx++) {
+            int px = x0 + sx * n + dx;
+            int py = y0 + sy * n + dy;
+            if (px < CANVAS_W && py < CANVAS_H)
+              paint_pixel(px, py, col);
+          }
+      }
+    free(tmp);
+    commit_undo_action();
+    visual_mode = FALSE;
+    status_update();
+    gtk_widget_queue_draw(main_canvas);
+    cmd_set("");
+    return;
+  }
+
   if (strncmp(cmd_buf, ":resize ", 8) == 0 && *arg) {
     int nw = 0, nh = 0;
     if (sscanf(arg, "%dx%d", &nw, &nh) != 2)
@@ -1914,6 +1958,7 @@ static void cmd_execute(void) {
         "  y / p / P           yank / paste / paste centered\n"
         "  \\                   draw line from anchor to cursor\n"
         "  H / V               flip selection horizontally / vertically\n"
+        "  :scale N            scale selection N× in place (N = 2..8)\n"
         "\n"
         "Palette\n"
         "  c / C               cycle color forward / backward\n"
