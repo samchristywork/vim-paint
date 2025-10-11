@@ -61,6 +61,7 @@ static gboolean canvas_dirty = FALSE;
 static gboolean sym_h = FALSE;
 static gboolean sym_v = FALSE;
 static int brush_size = 1;
+static int brush_shape = 0; /* 0 = square, 1 = circle */
 static char text_font_family[256] = "Monospace";
 static double text_font_size = 10.0;
 
@@ -1001,6 +1002,17 @@ static void cmd_execute(void) {
         cmd_set("");
       } else {
         cmd_flash("Brush size must be 1-16.");
+      }
+    } else if (strncmp(opt, "brushshape ", 11) == 0) {
+      const char *shape = opt + 11;
+      if (strcmp(shape, "circle") == 0) {
+        brush_shape = 1;
+        cmd_set("");
+      } else if (strcmp(shape, "square") == 0) {
+        brush_shape = 0;
+        cmd_set("");
+      } else {
+        cmd_flash("Usage: :set brushshape square|circle");
       }
     } else if (strncmp(opt, "bg ", 3) == 0) {
       const char *val = opt + 3;
@@ -1987,6 +1999,7 @@ static void cmd_execute(void) {
         "  #                   toggle checkerboard background\n"
         "  :set zoom N         set cell size\n"
         "  :set brush N        set brush size (1-16)\n"
+        "  :set brushshape square|circle  set brush shape\n"
         "  :set undolevels N   set undo history depth (1-256, clears history)\n"
         "  Ctrl-G              show file info\n"
         "  :goto col,row       jump to position (1-based)\n"
@@ -2134,8 +2147,14 @@ static void paint_pixel(int x, int y, guint32 color) {
 static void paint_brush(int x, int y, guint32 color) {
   int half = brush_size / 2;
   for (int dy = 0; dy < brush_size; dy++)
-    for (int dx = 0; dx < brush_size; dx++)
+    for (int dx = 0; dx < brush_size; dx++) {
+      if (brush_shape == 1) {
+        int cdx = dx - half, cdy = dy - half;
+        if (cdx * cdx + cdy * cdy > half * half)
+          continue;
+      }
       paint_pixel(x - half + dx, y - half + dy, color);
+    }
 }
 
 static void find_right(void) {
