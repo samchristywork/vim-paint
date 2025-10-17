@@ -61,7 +61,8 @@ static gboolean canvas_dirty = FALSE;
 static gboolean sym_h = FALSE;
 static gboolean sym_v = FALSE;
 static int brush_size = 1;
-static int brush_shape = 0; /* 0 = square, 1 = circle */
+static int brush_shape = 0;    /* 0 = square, 1 = circle */
+static int spray_density = 0;  /* 0 = off, 1-100 = % of pixels painted */
 static char text_font_family[256] = "Monospace";
 static double text_font_size = 10.0;
 
@@ -1013,6 +1014,20 @@ static void cmd_execute(void) {
         cmd_set("");
       } else {
         cmd_flash("Usage: :set brushshape square|circle");
+      }
+    } else if (strncmp(opt, "spray ", 6) == 0) {
+      const char *val = opt + 6;
+      if (strcmp(val, "off") == 0) {
+        spray_density = 0;
+        cmd_set("");
+      } else {
+        int v = atoi(val);
+        if (v >= 1 && v <= 100) {
+          spray_density = v;
+          cmd_set("");
+        } else {
+          cmd_flash("Usage: :set spray <1-100>|off");
+        }
       }
     } else if (strncmp(opt, "bg ", 3) == 0) {
       const char *val = opt + 3;
@@ -2000,6 +2015,7 @@ static void cmd_execute(void) {
         "  :set zoom N         set cell size\n"
         "  :set brush N        set brush size (1-16)\n"
         "  :set brushshape square|circle  set brush shape\n"
+        "  :set spray <1-100>|off  airbrush density (% pixels per stroke)\n"
         "  :set undolevels N   set undo history depth (1-256, clears history)\n"
         "  Ctrl-G              show file info\n"
         "  :goto col,row       jump to position (1-based)\n"
@@ -2153,6 +2169,8 @@ static void paint_brush(int x, int y, guint32 color) {
         if (cdx * cdx + cdy * cdy > half * half)
           continue;
       }
+      if (spray_density > 0 && (rand() % 100) >= spray_density)
+        continue;
       paint_pixel(x - half + dx, y - half + dy, color);
     }
 }
