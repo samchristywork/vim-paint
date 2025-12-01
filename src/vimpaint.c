@@ -55,6 +55,7 @@ static int visual_anchor_x = 0;
 static int visual_anchor_y = 0;
 static gboolean insert_mode = FALSE;
 static gboolean show_grid = TRUE;
+static guint32 grid_color = 0xccccccff; /* RRGGBBAA */
 static gboolean show_ruler = FALSE;
 static gboolean show_checker = FALSE;
 static gboolean canvas_dirty = FALSE;
@@ -960,6 +961,13 @@ static void cmd_execute(void) {
       show_grid = FALSE;
       gtk_widget_queue_draw(main_canvas);
       cmd_set("");
+    } else if (strncmp(opt, "gridcolor ", 10) == 0) {
+      unsigned int rgb = 0;
+      if (parse_color(opt + 10, &rgb)) {
+        grid_color = PACK_RGBA((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff, 255);
+        gtk_widget_queue_draw(main_canvas);
+        cmd_set("");
+      }
     } else if (strcmp(opt, "ruler") == 0) {
       show_ruler = TRUE;
       gtk_widget_queue_draw(main_canvas);
@@ -2012,6 +2020,7 @@ static void cmd_execute(void) {
         "  | (pipe)            toggle grid\n"
         "  %                   toggle coordinate ruler\n"
         "  #                   toggle checkerboard background\n"
+        "  :set gridcolor <hex|name>  set grid line colour\n"
         "  :set zoom N         set cell size\n"
         "  :set brush N        set brush size (1-16)\n"
         "  :set brushshape square|circle  set brush shape\n"
@@ -2282,7 +2291,11 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
 
   /* Draw grid lines */
   if (show_grid) {
-    cairo_set_source_rgba(cr, 0.8, 0.8, 0.8, 1.0);
+    cairo_set_source_rgba(cr,
+                          ((grid_color >> 24) & 0xff) / 255.0,
+                          ((grid_color >> 16) & 0xff) / 255.0,
+                          ((grid_color >>  8) & 0xff) / 255.0,
+                          ( grid_color        & 0xff) / 255.0);
     cairo_set_line_width(cr, 0.5);
     for (int x = 0; x <= CANVAS_W; x++) {
       cairo_move_to(cr, x * CELL_SIZE, 0);
