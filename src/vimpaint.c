@@ -89,6 +89,63 @@ static int undo_top = 0, undo_count = 0;
 static UndoAction redo_stack[UNDO_MAX];
 static int redo_top = 0, redo_count = 0;
 
+#define LAYER_MAX 8
+static guint32 *layer_bufs[LAYER_MAX];
+static gboolean layer_visible[LAYER_MAX];
+static char layer_name[LAYER_MAX][32];
+static int layer_count = 1;
+static int layer_active = 0;
+
+/* Composite all visible layers (bottom to top) into dst buffer */
+static void layers_composite(guint32 *dst, int total) {
+  memset(dst, 0, total * sizeof(guint32));
+  for (int li = 0; li < layer_count; li++) {
+    if (!layer_visible[li] || !layer_bufs[li])
+      continue;
+    for (int i = 0; i < total; i++) {
+      guint32 src = layer_bufs[li][i];
+      double sa = (src & 0xff) / 255.0;
+      if (sa == 0.0)
+        continue;
+      guint32 d = dst[i];
+      double da = (d & 0xff) / 255.0;
+      double ra = sa + da * (1.0 - sa);
+      if (ra < 1e-6) {
+        dst[i] = 0;
+        continue;
+      }
+      double inv = 1.0 - sa;
+      int rr = (int)(((src >> 24 & 0xff) / 255.0 * sa + (d >> 24 & 0xff) / 255.0 * da * inv) / ra * 255.0 + 0.5);
+      int rg = (int)(((src >> 16 & 0xff) / 255.0 * sa + (d >> 16 & 0xff) / 255.0 * da * inv) / ra * 255.0 + 0.5);
+      int rb = (int)(((src >>  8 & 0xff) / 255.0 * sa + (d >>  8 & 0xff) / 255.0 * da * inv) / ra * 255.0 + 0.5);
+      dst[i] = PACK_RGBA(CLAMP(rr, 0, 255), CLAMP(rg, 0, 255), CLAMP(rb, 0, 255),
+                         CLAMP((int)(ra * 255.0 + 0.5), 0, 255));
+    }
+  }
+}
+
+/* Flatten all layers into layer 0 and reset to single layer. */
+static void layers_flatten(void) {
+  if (layer_count <= 1) {
+    layer_visible[0] = TRUE;
+    return;
+  }
+  int total = CANVAS_W * CANVAS_H;
+  guint32 *flat = calloc(total, sizeof(guint32));
+  if (flat)
+    layers_composite(flat, total);
+  for (int li = 0; li < layer_count; li++) {
+    free(layer_bufs[li]);
+    layer_bufs[li] = NULL;
+  }
+  layer_bufs[0] = flat ? flat : calloc(total, sizeof(guint32));
+  pixels = layer_bufs[0];
+  layer_count = 1;
+  layer_active = 0;
+  layer_visible[0] = TRUE;
+  snprintf(layer_name[0], 32, "Layer 1");
+}
+
 #define TAB_MAX 8
 typedef struct {
   guint32 *pixels;
@@ -214,6 +271,7 @@ static void title_refresh(void) {
 }
 
 static void tab_save(int idx) {
+  layers_flatten();
   int sz = CANVAS_W * CANVAS_H * sizeof(guint32);
   if (!tabs[idx].pixels || tabs[idx].w != CANVAS_W || tabs[idx].h != CANVAS_H) {
     free(tabs[idx].pixels);
@@ -256,6 +314,11 @@ static void tab_switch(int newidx) {
   memcpy(np, t->pixels, t->w * t->h * sizeof(guint32));
   free(pixels);
   pixels = np;
+  layer_bufs[0] = pixels;
+  layer_count = 1;
+  layer_active = 0;
+  layer_visible[0] = TRUE;
+  snprintf(layer_name[0], 32, "Layer 1");
   CANVAS_W = t->w;
   CANVAS_H = t->h;
   cursor_x = CLAMP(t->cx, 0, CANVAS_W - 1);
@@ -306,6 +369,11 @@ static void tab_close_current(void) {
   memcpy(np, t->pixels, t->w * t->h * sizeof(guint32));
   free(pixels);
   pixels = np;
+  layer_bufs[0] = pixels;
+  layer_count = 1;
+  layer_active = 0;
+  layer_visible[0] = TRUE;
+  snprintf(layer_name[0], 32, "Layer 1");
   CANVAS_W = t->w;
   CANVAS_H = t->h;
   cursor_x = CLAMP(t->cx, 0, CANVAS_W - 1);
@@ -373,14 +441,18 @@ static void status_update(void) {
   guchar r = (fg_color >> 24) & 0xff;
   guchar g = (fg_color >> 16) & 0xff;
   guchar b = (fg_color >> 8) & 0xff;
+  char layer_info[24] = "";
+  if (layer_count > 1)
+    snprintf(layer_info, sizeof(layer_info), "  L%d/%d", layer_active + 1, layer_count);
   if (macro_recording)
     snprintf(buf, sizeof(buf),
-             " %s  recording @%c  col: %d  row: %d  #%02x%02x%02x  %dx%d", mode,
+             " %s  recording @%c  col: %d  row: %d  #%02x%02x%02x  %dx%d%s", mode,
              'a' + macro_reg, cursor_x + 1, cursor_y + 1, r, g, b, CANVAS_W,
-             CANVAS_H);
+             CANVAS_H, layer_info);
   else
-    snprintf(buf, sizeof(buf), " %s  col: %d  row: %d  #%02x%02x%02x  %dx%d",
-             mode, cursor_x + 1, cursor_y + 1, r, g, b, CANVAS_W, CANVAS_H);
+    snprintf(buf, sizeof(buf), " %s  col: %d  row: %d  #%02x%02x%02x  %dx%d%s",
+             mode, cursor_x + 1, cursor_y + 1, r, g, b, CANVAS_W, CANVAS_H,
+             layer_info);
   gtk_label_set_text(GTK_LABEL(cmd_label), buf);
   title_refresh();
 }
@@ -399,13 +471,17 @@ static void cmd_flash(const char *text) {
 }
 
 static gboolean cmd_write(const char *filename) {
+  int total = CANVAS_W * CANVAS_H;
+  guint32 *composite = malloc(total * sizeof(guint32));
+  if (composite)
+    layers_composite(composite, total);
   cairo_surface_t *surf =
       cairo_image_surface_create(CAIRO_FORMAT_ARGB32, CANVAS_W, CANVAS_H);
   guchar *d = cairo_image_surface_get_data(surf);
   int stride = cairo_image_surface_get_stride(surf);
   for (int y = 0; y < CANVAS_H; y++)
     for (int x = 0; x < CANVAS_W; x++) {
-      guint32 px = PX(y, x);
+      guint32 px = composite ? composite[y * CANVAS_W + x] : PX(y, x);
       guchar r = (px >> 24) & 0xff;
       guchar g = (px >> 16) & 0xff;
       guchar b = (px >> 8) & 0xff;
@@ -419,6 +495,7 @@ static gboolean cmd_write(const char *filename) {
   gboolean ok =
       cairo_surface_write_to_png(surf, filename) == CAIRO_STATUS_SUCCESS;
   cairo_surface_destroy(surf);
+  free(composite);
   if (ok) {
     canvas_dirty = FALSE;
     title_refresh();
@@ -763,6 +840,8 @@ static void cmd_open(const char *filename) {
       PX(y, x) = PACK_RGBA(r, g, b, a);
     }
   cairo_surface_destroy(surf);
+  layers_flatten();
+  layer_bufs[0] = pixels;
   clear_history();
   canvas_dirty = FALSE;
   snprintf(last_filename, sizeof(last_filename), "%s", filename);
@@ -2014,6 +2093,8 @@ static void cmd_execute(void) {
         "\n"
         "Transform\n"
         "  :resize WxH   :fliph   :flipv   :rotate   :center   :crop\n"
+        "  :layer N               switch to layer N (1-based)\n"
+        "  :layervis N            toggle visibility of layer N\n"
         "\n"
         "View\n"
         "  + / -               zoom in / out\n"
@@ -2268,9 +2349,13 @@ static void flood_fill(int sx, int sy, guint32 fill_color) {
 }
 
 static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
+  int total = CANVAS_W * CANVAS_H;
+  guint32 *composite = malloc(total * sizeof(guint32));
+  if (composite)
+    layers_composite(composite, total);
   for (int y = 0; y < CANVAS_H; y++) {
     for (int x = 0; x < CANVAS_W; x++) {
-      guint32 px = PX(y, x);
+      guint32 px = composite ? composite[y * CANVAS_W + x] : PX(y, x);
       guchar r = (px >> 24) & 0xff;
       guchar g = (px >> 16) & 0xff;
       guchar b = (px >> 8) & 0xff;
@@ -2288,6 +2373,7 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
       cairo_fill(cr);
     }
   }
+  free(composite);
 
   /* Draw grid lines */
   if (show_grid) {
@@ -3560,6 +3646,11 @@ int main(int argc, char *argv[]) {
   palette_size = 8;
 
   pixels = calloc(CANVAS_W * CANVAS_H, sizeof(guint32));
+  layer_bufs[0] = pixels;
+  layer_visible[0] = TRUE;
+  snprintf(layer_name[0], 32, "Layer 1");
+  layer_count = 1;
+  layer_active = 0;
 
   /* Pass only program name + positional args to gtk_init */
   char **gtk_argv = argv + optind - 1;
