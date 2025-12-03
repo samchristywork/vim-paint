@@ -1596,6 +1596,39 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strcmp(cmd_buf, ":newlayer") == 0) {
+    if (layer_count >= LAYER_MAX) {
+      cmd_flash("Layer limit reached.");
+      return;
+    }
+    int total = CANVAS_W * CANVAS_H;
+    guint32 *buf = calloc(total, sizeof(guint32));
+    if (!buf) {
+      cmd_flash("Out of memory.");
+      return;
+    }
+    /* Insert new layer above active layer */
+    int ins = layer_active + 1;
+    for (int li = layer_count; li > ins; li--) {
+      layer_bufs[li] = layer_bufs[li - 1];
+      layer_visible[li] = layer_visible[li - 1];
+      memcpy(layer_name[li], layer_name[li - 1], 32);
+    }
+    layer_bufs[ins] = buf;
+    layer_visible[ins] = TRUE;
+    snprintf(layer_name[ins], 32, "Layer %d", layer_count + 1);
+    layer_count++;
+    layer_active = ins;
+    pixels = layer_bufs[layer_active];
+    clear_history();
+    status_update();
+    gtk_widget_queue_draw(main_canvas);
+    char msg[64];
+    snprintf(msg, sizeof(msg), "New layer %d/%d", layer_active + 1, layer_count);
+    cmd_flash(msg);
+    return;
+  }
+
   if (strncmp(cmd_buf, ":resize ", 8) == 0 && *arg) {
     int nw = 0, nh = 0;
     if (sscanf(arg, "%dx%d", &nw, &nh) != 2)
@@ -2093,6 +2126,7 @@ static void cmd_execute(void) {
         "\n"
         "Transform\n"
         "  :resize WxH   :fliph   :flipv   :rotate   :center   :crop\n"
+        "  :newlayer              add transparent layer above active\n"
         "  :layer N               switch to layer N (1-based)\n"
         "  :layervis N            toggle visibility of layer N\n"
         "\n"
