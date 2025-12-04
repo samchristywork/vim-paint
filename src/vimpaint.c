@@ -1692,6 +1692,21 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strncmp(cmd_buf, ":layervis ", 10) == 0 && *arg) {
+    int n = atoi(arg) - 1; /* 1-based input */
+    if (n < 0 || n >= layer_count) {
+      cmd_flash("Invalid layer number.");
+      return;
+    }
+    layer_visible[n] = !layer_visible[n];
+    gtk_widget_queue_draw(main_canvas);
+    char msg[64];
+    snprintf(msg, sizeof(msg), "Layer %d %s", n + 1,
+             layer_visible[n] ? "visible" : "hidden");
+    cmd_flash(msg);
+    return;
+  }
+
   if (strncmp(cmd_buf, ":resize ", 8) == 0 && *arg) {
     int nw = 0, nh = 0;
     if (sscanf(arg, "%dx%d", &nw, &nh) != 2)
