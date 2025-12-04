@@ -1629,6 +1629,52 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strcmp(cmd_buf, ":mergedown") == 0) {
+    if (layer_active == 0) {
+      cmd_flash("Already at bottom layer.");
+      return;
+    }
+    int total = CANVAS_W * CANVAS_H;
+    guint32 *dst = layer_bufs[layer_active - 1];
+    guint32 *src = layer_bufs[layer_active];
+    guint32 *before = malloc(total * sizeof(guint32));
+    if (!before) {
+      cmd_flash("Out of memory.");
+      return;
+    }
+    memcpy(before, dst, total * sizeof(guint32));
+    /* Composite active layer over the layer below */
+    for (int i = 0; i < total; i++) {
+      guint32 s = src[i];
+      double sa = (s & 0xff) / 255.0;
+      if (sa == 0.0)
+        continue;
+      guint32 d = dst[i];
+      double da = (d & 0xff) / 255.0;
+      double ra = sa + da * (1.0 - sa);
+      if (ra < 1e-6) { dst[i] = 0; continue; }
+      double inv = 1.0 - sa;
+      int rr = (int)(((s>>24&0xff)/255.0*sa + (d>>24&0xff)/255.0*da*inv)/ra*255+0.5);
+      int rg = (int)(((s>>16&0xff)/255.0*sa + (d>>16&0xff)/255.0*da*inv)/ra*255+0.5);
+      int rb = (int)(((s>> 8&0xff)/255.0*sa + (d>> 8&0xff)/255.0*da*inv)/ra*255+0.5);
+      dst[i] = PACK_RGBA(CLAMP(rr,0,255),CLAMP(rg,0,255),CLAMP(rb,0,255),CLAMP((int)(ra*255+0.5),0,255));
+    }
+    free(layer_bufs[layer_active]);
+    for (int li = layer_active; li < layer_count - 1; li++) {
+      layer_bufs[li] = layer_bufs[li + 1];
+      layer_visible[li] = layer_visible[li + 1];
+      memcpy(layer_name[li], layer_name[li + 1], 32);
+    }
+    layer_count--;
+    layer_active--;
+    pixels = layer_bufs[layer_active];
+    commit_canvas_snapshot(before, CANVAS_W, CANVAS_H);
+    status_update();
+    gtk_widget_queue_draw(main_canvas);
+    cmd_flash("Merged down.");
+    return;
+  }
+
   if (strncmp(cmd_buf, ":resize ", 8) == 0 && *arg) {
     int nw = 0, nh = 0;
     if (sscanf(arg, "%dx%d", &nw, &nh) != 2)
@@ -2127,6 +2173,7 @@ static void cmd_execute(void) {
         "Transform\n"
         "  :resize WxH   :fliph   :flipv   :rotate   :center   :crop\n"
         "  :newlayer              add transparent layer above active\n"
+        "  :mergedown             composite active layer into layer below\n"
         "  :layer N               switch to layer N (1-based)\n"
         "  :layervis N            toggle visibility of layer N\n"
         "\n"
