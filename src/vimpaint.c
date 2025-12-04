@@ -1675,6 +1675,23 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strncmp(cmd_buf, ":layer ", 7) == 0 && *arg) {
+    int n = atoi(arg) - 1; /* 1-based input */
+    if (n < 0 || n >= layer_count) {
+      cmd_flash("Invalid layer number.");
+      return;
+    }
+    layer_active = n;
+    pixels = layer_bufs[layer_active];
+    clear_history();
+    status_update();
+    gtk_widget_queue_draw(main_canvas);
+    char msg[64];
+    snprintf(msg, sizeof(msg), "Layer %d/%d", layer_active + 1, layer_count);
+    cmd_flash(msg);
+    return;
+  }
+
   if (strncmp(cmd_buf, ":resize ", 8) == 0 && *arg) {
     int nw = 0, nh = 0;
     if (sscanf(arg, "%dx%d", &nw, &nh) != 2)
