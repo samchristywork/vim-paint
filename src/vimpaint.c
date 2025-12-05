@@ -1666,6 +1666,8 @@ static void cmd_execute(void) {
       memcpy(layer_name[li], layer_name[li + 1], 32);
     }
     layer_count--;
+    layer_bufs[layer_count] = NULL;
+    layer_visible[layer_count] = FALSE;
     layer_active--;
     pixels = layer_bufs[layer_active];
     commit_canvas_snapshot(before, CANVAS_W, CANVAS_H);
