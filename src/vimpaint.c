@@ -2314,8 +2314,11 @@ static void commit_undo_action(void) {
 /* Record a full-canvas snapshot undo entry (for ops that change dimensions). */
 static void commit_canvas_snapshot(guint32 *before_snap, int bw, int bh) {
   guint32 *after_snap = malloc(CANVAS_W * CANVAS_H * sizeof(guint32));
-  if (after_snap)
-    memcpy(after_snap, pixels, CANVAS_W * CANVAS_H * sizeof(guint32));
+  if (!after_snap) {
+    free(before_snap);
+    return;
+  }
+  memcpy(after_snap, pixels, CANVAS_W * CANVAS_H * sizeof(guint32));
   for (int i = 0; i < redo_count; i++)
     free_action(
         &redo_stack[(redo_top - redo_count + i + undo_levels * 2) % undo_levels]);
