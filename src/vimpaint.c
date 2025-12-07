@@ -130,7 +130,7 @@ static void layers_flatten(void) {
     layer_visible[0] = TRUE;
     return;
   }
-  int total = CANVAS_W * CANVAS_H;
+  size_t total = (size_t)CANVAS_W * CANVAS_H;
   guint32 *flat = calloc(total, sizeof(guint32));
   if (flat)
     layers_composite(flat, total);
@@ -471,7 +471,7 @@ static void cmd_flash(const char *text) {
 }
 
 static gboolean cmd_write(const char *filename) {
-  int total = CANVAS_W * CANVAS_H;
+  size_t total = (size_t)CANVAS_W * CANVAS_H;
   guint32 *composite = malloc(total * sizeof(guint32));
   if (composite)
     layers_composite(composite, total);
@@ -1601,7 +1601,7 @@ static void cmd_execute(void) {
       cmd_flash("Layer limit reached.");
       return;
     }
-    int total = CANVAS_W * CANVAS_H;
+    size_t total = (size_t)CANVAS_W * CANVAS_H;
     guint32 *buf = calloc(total, sizeof(guint32));
     if (!buf) {
       cmd_flash("Out of memory.");
@@ -1634,7 +1634,7 @@ static void cmd_execute(void) {
       cmd_flash("Already at bottom layer.");
       return;
     }
-    int total = CANVAS_W * CANVAS_H;
+    size_t total = (size_t)CANVAS_W * CANVAS_H;
     guint32 *dst = layer_bufs[layer_active - 1];
     guint32 *src = layer_bufs[layer_active];
     guint32 *before = malloc(total * sizeof(guint32));
@@ -2436,7 +2436,7 @@ static void flood_fill(int sx, int sy, guint32 fill_color) {
   guint32 target = PX(sy, sx);
   if (target == fill_color)
     return;
-  int total = CANVAS_W * CANVAS_H;
+  size_t total = (size_t)CANVAS_W * CANVAS_H;
   guint32 *before_snap = malloc(total * sizeof(guint32));
   int *queue = malloc(total * sizeof(int));
   if (!before_snap || !queue) {
@@ -2467,7 +2467,7 @@ static void flood_fill(int sx, int sy, guint32 fill_color) {
 }
 
 static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
-  int total = CANVAS_W * CANVAS_H;
+  size_t total = (size_t)CANVAS_W * CANVAS_H;
   guint32 *composite = malloc(total * sizeof(guint32));
   if (composite)
     layers_composite(composite, total);
