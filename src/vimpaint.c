@@ -272,7 +272,7 @@ static void title_refresh(void) {
 
 static void tab_save(int idx) {
   layers_flatten();
-  int sz = CANVAS_W * CANVAS_H * sizeof(guint32);
+  size_t sz = (size_t)(size_t)CANVAS_W * CANVAS_H * sizeof(guint32);
   if (!tabs[idx].pixels || tabs[idx].w != CANVAS_W || tabs[idx].h != CANVAS_H) {
     free(tabs[idx].pixels);
     tabs[idx].pixels = malloc(sz);
@@ -811,7 +811,7 @@ static void cmd_open(const char *filename) {
   int ih = cairo_image_surface_get_height(surf);
   if (iw > CANVAS_W || ih > CANVAS_H) {
     int nw = MAX(iw, CANVAS_W), nh = MAX(ih, CANVAS_H);
-    guint32 *np = calloc(nw * nh, sizeof(guint32));
+    guint32 *np = calloc((size_t)nw * nh, sizeof(guint32));
     if (!np) {
       cmd_flash("Out of memory.");
       cairo_surface_destroy(surf);
@@ -829,7 +829,7 @@ static void cmd_open(const char *filename) {
   }
   guchar *d = cairo_image_surface_get_data(surf);
   int st = cairo_image_surface_get_stride(surf);
-  memset(pixels, 0, CANVAS_W * CANVAS_H * sizeof(guint32));
+  memset(pixels, 0, (size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
   for (int y = 0; y < ih; y++)
     for (int x = 0; x < iw; x++) {
       /* Cairo ARGB32 on LE: bytes are B, G, R, A */
@@ -1399,12 +1399,12 @@ static void cmd_execute(void) {
       y0 = MIN(cursor_y, visual_anchor_y);
       y1 = MAX(cursor_y, visual_anchor_y);
     }
-    guint32 *before_snap = malloc(CANVAS_W * CANVAS_H * sizeof(guint32));
+    guint32 *before_snap = malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
     if (!before_snap) {
       cmd_flash("Out of memory.");
       return;
     }
-    memcpy(before_snap, pixels, CANVAS_W * CANVAS_H * sizeof(guint32));
+    memcpy(before_snap, pixels, (size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
 
     if (strcmp(pat, "ordered") == 0) {
       static const int bayer[4][4] = {
@@ -1425,9 +1425,9 @@ static void cmd_execute(void) {
         }
     } else {
       int W = x1 - x0 + 1, H = y1 - y0 + 1;
-      double *er = calloc(W * H, sizeof(double));
-      double *eg = calloc(W * H, sizeof(double));
-      double *eb = calloc(W * H, sizeof(double));
+      double *er = calloc((size_t)W * H, sizeof(double));
+      double *eg = calloc((size_t)W * H, sizeof(double));
+      double *eb = calloc((size_t)W * H, sizeof(double));
       if (!er || !eg || !eb) {
         free(er);
         free(eg);
@@ -1567,7 +1567,7 @@ static void cmd_execute(void) {
     int y0 = MIN(cursor_y, visual_anchor_y);
     int y1 = MAX(cursor_y, visual_anchor_y);
     int W = x1 - x0 + 1, H = y1 - y0 + 1;
-    guint32 *tmp = malloc(W * H * sizeof(guint32));
+    guint32 *tmp = malloc((size_t)W * H * sizeof(guint32));
     if (!tmp) {
       cmd_flash("Out of memory.");
       return;
@@ -1717,15 +1717,15 @@ static void cmd_execute(void) {
       cmd_flash("Usage: :resize WxH  (max 16384)");
       return;
     }
-    guint32 *before_snap = malloc(CANVAS_W * CANVAS_H * sizeof(guint32));
-    guint32 *np = calloc(nw * nh, sizeof(guint32));
+    guint32 *before_snap = malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
+    guint32 *np = calloc((size_t)nw * nh, sizeof(guint32));
     if (!before_snap || !np) {
       free(before_snap);
       free(np);
       cmd_flash("Out of memory.");
       return;
     }
-    memcpy(before_snap, pixels, CANVAS_W * CANVAS_H * sizeof(guint32));
+    memcpy(before_snap, pixels, (size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
     int bw = CANVAS_W, bh = CANVAS_H;
     int cw = MIN(CANVAS_W, nw), ch = MIN(CANVAS_H, nh);
     for (int y = 0; y < ch; y++)
@@ -1915,14 +1915,14 @@ static void cmd_execute(void) {
 
   if (strcmp(cmd_buf, ":rotate") == 0) {
     int bw = CANVAS_W, bh = CANVAS_H;
-    guint32 *before_snap = malloc(bw * bh * sizeof(guint32));
+    guint32 *before_snap = malloc((size_t)bw * bh * sizeof(guint32));
     if (!before_snap) {
       cmd_flash("Out of memory.");
       return;
     }
-    memcpy(before_snap, pixels, bw * bh * sizeof(guint32));
+    memcpy(before_snap, pixels, (size_t)bw * bh * sizeof(guint32));
     int nW = CANVAS_H, nH = CANVAS_W;
-    guint32 *np = malloc(nW * nH * sizeof(guint32));
+    guint32 *np = malloc((size_t)nW * nH * sizeof(guint32));
     if (!np) {
       free(before_snap);
       cmd_flash("Out of memory.");
@@ -2030,15 +2030,15 @@ static void cmd_execute(void) {
       cmd_flash("Already centered.");
       return;
     }
-    guint32 *before_snap = malloc(CANVAS_W * CANVAS_H * sizeof(guint32));
-    guint32 *np = calloc(CANVAS_W * CANVAS_H, sizeof(guint32));
+    guint32 *before_snap = malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
+    guint32 *np = calloc((size_t)CANVAS_W * CANVAS_H, sizeof(guint32));
     if (!before_snap || !np) {
       free(before_snap);
       free(np);
       cmd_flash("Out of memory.");
       return;
     }
-    memcpy(before_snap, pixels, CANVAS_W * CANVAS_H * sizeof(guint32));
+    memcpy(before_snap, pixels, (size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
     int bw = CANVAS_W, bh = CANVAS_H;
     for (int y = 0; y < CANVAS_H; y++)
       for (int x = 0; x < CANVAS_W; x++) {
@@ -2048,7 +2048,7 @@ static void cmd_execute(void) {
         if (nx >= 0 && nx < CANVAS_W && ny >= 0 && ny < CANVAS_H)
           np[ny * CANVAS_W + nx] = PX(y, x);
       }
-    memcpy(pixels, np, CANVAS_W * CANVAS_H * sizeof(guint32));
+    memcpy(pixels, np, (size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
     free(np);
     commit_canvas_snapshot(before_snap, bw, bh);
     gtk_widget_queue_draw(main_canvas);
@@ -2080,15 +2080,15 @@ static void cmd_execute(void) {
       return;
     }
     int nW = max_x - min_x + 1, nH = max_y - min_y + 1;
-    guint32 *before_snap = malloc(CANVAS_W * CANVAS_H * sizeof(guint32));
-    guint32 *np = calloc(nW * nH, sizeof(guint32));
+    guint32 *before_snap = malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
+    guint32 *np = calloc((size_t)nW * nH, sizeof(guint32));
     if (!before_snap || !np) {
       free(before_snap);
       free(np);
       cmd_flash("Out of memory.");
       return;
     }
-    memcpy(before_snap, pixels, CANVAS_W * CANVAS_H * sizeof(guint32));
+    memcpy(before_snap, pixels, (size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
     int bw = CANVAS_W, bh = CANVAS_H;
     for (int y = min_y; y <= max_y; y++)
       for (int x = min_x; x <= max_x; x++)
@@ -2313,12 +2313,12 @@ static void commit_undo_action(void) {
 
 /* Record a full-canvas snapshot undo entry (for ops that change dimensions). */
 static void commit_canvas_snapshot(guint32 *before_snap, int bw, int bh) {
-  guint32 *after_snap = malloc(CANVAS_W * CANVAS_H * sizeof(guint32));
+  guint32 *after_snap = malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
   if (!after_snap) {
     free(before_snap);
     return;
   }
-  memcpy(after_snap, pixels, CANVAS_W * CANVAS_H * sizeof(guint32));
+  memcpy(after_snap, pixels, (size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
   for (int i = 0; i < redo_count; i++)
     free_action(
         &redo_stack[(redo_top - redo_count + i + undo_levels * 2) % undo_levels]);
@@ -3114,7 +3114,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     int y0 = MIN(cursor_y, visual_anchor_y);
     int y1 = MAX(cursor_y, visual_anchor_y);
     int W = x1 - x0 + 1, H = y1 - y0 + 1;
-    guint32 *tmp = malloc(W * H * sizeof(guint32));
+    guint32 *tmp = malloc((size_t)W * H * sizeof(guint32));
     if (!tmp) {
       cmd_flash("Out of memory.");
       visual_mode = FALSE;
@@ -3763,7 +3763,7 @@ int main(int argc, char *argv[]) {
   memcpy(palette, default_pal, sizeof(default_pal));
   palette_size = 8;
 
-  pixels = calloc(CANVAS_W * CANVAS_H, sizeof(guint32));
+  pixels = calloc((size_t)CANVAS_W * CANVAS_H, sizeof(guint32));
   layer_bufs[0] = pixels;
   layer_visible[0] = TRUE;
   snprintf(layer_name[0], 32, "Layer 1");
