@@ -305,6 +305,7 @@ static void tab_save(int idx) {
 static void tab_switch(int newidx) {
   if (newidx < 0 || newidx >= tab_count || newidx == tab_current)
     return;
+  macro_recording = FALSE;
   tab_save(tab_current);
   tab_current = newidx;
   TabState *t = &tabs[tab_current];
