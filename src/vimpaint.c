@@ -1718,6 +1718,8 @@ static void cmd_execute(void) {
       cmd_flash("Usage: :resize WxH  (max 16384)");
       return;
     }
+    if (layer_count > 1)
+      layers_flatten();
     guint32 *before_snap = malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
     guint32 *np = calloc((size_t)nw * nh, sizeof(guint32));
     if (!before_snap || !np) {
@@ -1734,6 +1736,7 @@ static void cmd_execute(void) {
         np[y * nw + x] = PX(y, x);
     free(pixels);
     pixels = np;
+    layer_bufs[layer_active] = pixels;
     CANVAS_W = nw;
     CANVAS_H = nh;
     cursor_x = CLAMP(cursor_x, 0, CANVAS_W - 1);
@@ -1915,6 +1918,8 @@ static void cmd_execute(void) {
   }
 
   if (strcmp(cmd_buf, ":rotate") == 0) {
+    if (layer_count > 1)
+      layers_flatten();
     int bw = CANVAS_W, bh = CANVAS_H;
     guint32 *before_snap = malloc((size_t)bw * bh * sizeof(guint32));
     if (!before_snap) {
@@ -1934,6 +1939,7 @@ static void cmd_execute(void) {
         np[x * nW + (CANVAS_H - 1 - y)] = PX(y, x);
     free(pixels);
     pixels = np;
+    layer_bufs[layer_active] = pixels;
     CANVAS_W = nW;
     CANVAS_H = nH;
     cursor_x = CLAMP(cursor_x, 0, CANVAS_W - 1);
@@ -2058,6 +2064,8 @@ static void cmd_execute(void) {
   }
 
   if (strcmp(cmd_buf, ":crop") == 0) {
+    if (layer_count > 1)
+      layers_flatten();
     int min_x = CANVAS_W, max_x = -1, min_y = CANVAS_H, max_y = -1;
     for (int y = 0; y < CANVAS_H; y++)
       for (int x = 0; x < CANVAS_W; x++)
@@ -2096,6 +2104,7 @@ static void cmd_execute(void) {
         np[(y - min_y) * nW + (x - min_x)] = PX(y, x);
     free(pixels);
     pixels = np;
+    layer_bufs[layer_active] = pixels;
     CANVAS_W = nW;
     CANVAS_H = nH;
     cursor_x = CLAMP(cursor_x - min_x, 0, CANVAS_W - 1);
@@ -3178,6 +3187,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
           memcpy(np, a.after_snap, a.after_w * a.after_h * sizeof(guint32));
           free(pixels);
           pixels = np;
+          layer_bufs[layer_active] = pixels;
           CANVAS_W = a.after_w;
           CANVAS_H = a.after_h;
           cursor_x = CLAMP(cursor_x, 0, CANVAS_W - 1);
@@ -3560,6 +3570,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
           memcpy(np, a.before_snap, a.before_w * a.before_h * sizeof(guint32));
           free(pixels);
           pixels = np;
+          layer_bufs[layer_active] = pixels;
           CANVAS_W = a.before_w;
           CANVAS_H = a.before_h;
           cursor_x = CLAMP(cursor_x, 0, CANVAS_W - 1);
