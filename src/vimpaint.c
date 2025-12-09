@@ -2561,13 +2561,15 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
       step = 10;
     if (CELL_SIZE < 4)
       step = 20;
+    double fsize = CLAMP(CELL_SIZE * 0.75, 5.0, 11.0);
+    double baseline = CLAMP(fsize, 5.0, (double)CELL_SIZE - 1.0);
     cairo_select_font_face(cr, "Monospace", CAIRO_FONT_SLANT_NORMAL,
                            CAIRO_FONT_WEIGHT_NORMAL);
-    cairo_set_font_size(cr, 7.0);
+    cairo_set_font_size(cr, fsize);
     for (int x = 0; x < CANVAS_W; x += step) {
       char buf[8];
       snprintf(buf, sizeof(buf), "%d", x + 1);
-      double px = x * CELL_SIZE + 1, py = 7;
+      double px = x * CELL_SIZE + 1, py = baseline;
       cairo_set_source_rgba(cr, 0, 0, 0, 0.65);
       cairo_move_to(cr, px + 0.5, py + 0.5);
       cairo_show_text(cr, buf);
@@ -2578,7 +2580,7 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
     for (int y = 0; y < CANVAS_H; y += step) {
       char buf[8];
       snprintf(buf, sizeof(buf), "%d", y + 1);
-      double px = 1, py = y * CELL_SIZE + 7;
+      double px = 1, py = y * CELL_SIZE + baseline;
       cairo_set_source_rgba(cr, 0, 0, 0, 0.65);
       cairo_move_to(cr, px + 0.5, py + 0.5);
       cairo_show_text(cr, buf);
