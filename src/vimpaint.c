@@ -2278,11 +2278,6 @@ static void clear_history(void) {
 
 static void begin_undo_action(void) {
   staged_count = 0;
-  for (int i = 0; i < redo_count; i++)
-    free_action(
-        &redo_stack[(redo_top - redo_count + i + undo_levels * 2) % undo_levels]);
-  redo_top = 0;
-  redo_count = 0;
 }
 
 static void push_undo(int x, int y) {
@@ -2303,6 +2298,11 @@ static void push_undo(int x, int y) {
 static void commit_undo_action(void) {
   if (staged_count == 0)
     return;
+  for (int i = 0; i < redo_count; i++)
+    free_action(
+        &redo_stack[(redo_top - redo_count + i + undo_levels * 2) % undo_levels]);
+  redo_top = 0;
+  redo_count = 0;
   for (int i = 0; i < staged_count; i++)
     staged[i].after = PX(staged[i].y, staged[i].x);
   int idx = undo_top % undo_levels;
