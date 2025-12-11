@@ -685,6 +685,7 @@ static const struct { const char *name; unsigned int rgb; } named_colors[] = {
    malformed. Returns FALSE without flashing if val is neither a valid hex nor a
    known name. */
 static void palette_to_rgb(int idx, int *r, int *g, int *b) {
+  if (idx < 0 || idx >= PALETTE_SIZE) { *r = *g = *b = 0; return; }
   *r = (int)(palette[idx][0] * 255 + 0.5);
   *g = (int)(palette[idx][1] * 255 + 0.5);
   *b = (int)(palette[idx][2] * 255 + 0.5);
@@ -1159,7 +1160,7 @@ static void cmd_execute(void) {
       if (!parse_color(val, &rgb)) {
         if (val[0] != '#') {
           int n = atoi(val);
-          if (n > 0 && n < PALETTE_SIZE) {
+          if (n >= 0 && n < PALETTE_SIZE) {
             int pr2, pg2, pb2;
             palette_to_rgb(n, &pr2, &pg2, &pb2);
             fg_color = PACK_RGBA(pr2, pg2, pb2, 255);
@@ -3327,6 +3328,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     return TRUE;
   case GDK_KEY_c: {
     /* Find the palette slot that matches fg_color, then cycle forward */
+    if (PALETTE_SIZE <= 1) break;
     int cur_slot = -1;
     for (int i = 0; i < PALETTE_SIZE; i++) {
       int pr, pg, pb;
@@ -3347,6 +3349,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     break;
   }
   case GDK_KEY_C: {
+    if (PALETTE_SIZE <= 1) break;
     int cur_slot = -1;
     for (int i = 0; i < PALETTE_SIZE; i++) {
       int pr, pg, pb;
@@ -3598,7 +3601,7 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
 static gboolean on_palette_click(GtkWidget *widget, GdkEventButton *event,
                                  gpointer data) {
   int idx = (int)(event->x / SWATCH_W);
-  if (idx > 0 && idx < PALETTE_SIZE) {
+  if (idx >= 0 && idx < PALETTE_SIZE) {
     int pr, pg, pb;
     palette_to_rgb(idx, &pr, &pg, &pb);
     fg_color = PACK_RGBA(pr, pg, pb, 255);
