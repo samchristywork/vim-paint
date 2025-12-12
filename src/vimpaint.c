@@ -2178,7 +2178,10 @@ static void cmd_execute(void) {
     cairo_destroy(tcr);
     cairo_surface_destroy(tsurf);
     gtk_widget_queue_draw(main_canvas);
-    cmd_set("");
+    char tmsg[320];
+    snprintf(tmsg, sizeof(tmsg), "Text [%s %.4gpt]", text_font_family,
+             text_font_size);
+    cmd_flash(tmsg);
     return;
   }
 
