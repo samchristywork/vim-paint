@@ -794,7 +794,7 @@ static gboolean parse_color(const char *val, unsigned int *out_rgb) {
     return FALSE;
   }
   for (int i = 0; i < NAMED_COLORS_COUNT; i++) {
-    if (strcmp(val, named_colors[i].name) == 0) {
+    if (strcasecmp(val, named_colors[i].name) == 0) {
       *out_rgb = named_colors[i].rgb;
       return TRUE;
     }
