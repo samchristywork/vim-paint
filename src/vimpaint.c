@@ -2118,9 +2118,24 @@ static void cmd_execute(void) {
   }
 
   if (strncmp(cmd_buf, ":text ", 6) == 0 && *arg) {
-    int len = (int)strlen(arg);
-    int sw = (int)(len * text_font_size + 4),
-        sh = (int)(text_font_size * 2 + 4);
+    /* Measure actual text extents before allocating the surface so that
+       proportional fonts and long strings are never clipped. */
+    cairo_surface_t *measure_surf =
+        cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 1, 1);
+    cairo_t *mcr = cairo_create(measure_surf);
+    cairo_select_font_face(mcr, text_font_family, CAIRO_FONT_SLANT_NORMAL,
+                           CAIRO_FONT_WEIGHT_NORMAL);
+    cairo_set_font_size(mcr, text_font_size);
+    cairo_text_extents_t te;
+    cairo_text_extents(mcr, arg, &te);
+    cairo_font_extents_t fe_m;
+    cairo_font_extents(mcr, &fe_m);
+    cairo_destroy(mcr);
+    cairo_surface_destroy(measure_surf);
+    int sw = (int)(te.x_bearing + te.width + 2);
+    int sh = (int)(fe_m.ascent + fe_m.descent + 2);
+    if (sw < 1) sw = 1;
+    if (sh < 1) sh = 1;
     /* Render black text on white ARGB32 surface.
        Checking a color channel (not alpha) gives clean binary results
        because CAIRO_ANTIALIAS_NONE only works reliably on opaque surfaces. */
