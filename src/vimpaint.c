@@ -437,7 +437,7 @@ static void status_update(void) {
     return;
   if (flash_timer_id)
     return;
-  char buf[128];
+  char buf[160];
   const char *mode = visual_mode ? "VISUAL" : insert_mode ? "INSERT" : "NORMAL";
   guchar r = (fg_color >> 24) & 0xff;
   guchar g = (fg_color >> 16) & 0xff;
@@ -447,13 +447,14 @@ static void status_update(void) {
     snprintf(layer_info, sizeof(layer_info), "  L%d/%d", layer_active + 1, layer_count);
   if (macro_recording)
     snprintf(buf, sizeof(buf),
-             " %s  recording @%c  col: %d  row: %d  #%02x%02x%02x  %dx%d%s", mode,
-             'a' + macro_reg, cursor_x + 1, cursor_y + 1, r, g, b, CANVAS_W,
-             CANVAS_H, layer_info);
+             " %s  recording @%c  col: %d  row: %d  #%02x%02x%02x  %dx%d  z%d%s",
+             mode, 'a' + macro_reg, cursor_x + 1, cursor_y + 1, r, g, b,
+             CANVAS_W, CANVAS_H, CELL_SIZE, layer_info);
   else
-    snprintf(buf, sizeof(buf), " %s  col: %d  row: %d  #%02x%02x%02x  %dx%d%s",
+    snprintf(buf, sizeof(buf),
+             " %s  col: %d  row: %d  #%02x%02x%02x  %dx%d  z%d%s",
              mode, cursor_x + 1, cursor_y + 1, r, g, b, CANVAS_W, CANVAS_H,
-             layer_info);
+             CELL_SIZE, layer_info);
   gtk_label_set_text(GTK_LABEL(cmd_label), buf);
   title_refresh();
 }
@@ -1070,7 +1071,7 @@ static void cmd_execute(void) {
       if (v >= 4 && v <= 64) {
         CELL_SIZE = v;
         zoom_resize();
-        cmd_set("");
+        status_update();
       } else {
         cmd_flash("Zoom must be 4-64.");
       }
