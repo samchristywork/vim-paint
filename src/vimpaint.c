@@ -1748,7 +1748,14 @@ static void cmd_execute(void) {
     commit_canvas_snapshot(before_snap, bw, bh);
     zoom_resize();
     gtk_widget_queue_draw(main_canvas);
-    cmd_set("");
+    if ((size_t)nw * nh > (size_t)4096 * 4096) {
+      char wmsg[64];
+      snprintf(wmsg, sizeof(wmsg), "Large canvas: ~%zu MB/layer",
+               (size_t)nw * nh * 4 / (1024 * 1024));
+      cmd_flash(wmsg);
+    } else {
+      cmd_set("");
+    }
     return;
   }
 
@@ -3747,16 +3754,24 @@ int main(int argc, char *argv[]) {
     switch (opt) {
     case 'W': {
       int v = atoi(optarg);
-      if (v > 0) {
+      if (v > 0 && v <= 16384) {
         CANVAS_W = v;
+        explicit_w = 1;
+      } else if (v > 16384) {
+        fprintf(stderr, "Warning: -W %d clamped to 16384\n", v);
+        CANVAS_W = 16384;
         explicit_w = 1;
       }
       break;
     }
     case 'H': {
       int v = atoi(optarg);
-      if (v > 0) {
+      if (v > 0 && v <= 16384) {
         CANVAS_H = v;
+        explicit_h = 1;
+      } else if (v > 16384) {
+        fprintf(stderr, "Warning: -H %d clamped to 16384\n", v);
+        CANVAS_H = 16384;
         explicit_h = 1;
       }
       break;
