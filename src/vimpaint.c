@@ -96,12 +96,31 @@ static char layer_name[LAYER_MAX][32];
 static int layer_count = 1;
 static int layer_active = 0;
 
+typedef enum {
+  BLEND_NORMAL = 0,
+  BLEND_MULTIPLY,
+} BlendMode;
+
+static BlendMode layer_blend[LAYER_MAX];
+
+static const char *blend_mode_names[] = {
+  "normal", "multiply"
+};
+
+static double blend_apply(BlendMode mode, double cb, double cs) {
+  switch (mode) {
+    case BLEND_MULTIPLY:    return cb * cs;
+    default:                return cs;
+  }
+}
+
 /* Composite all visible layers (bottom to top) into dst buffer */
 static void layers_composite(guint32 *dst, int total) {
   memset(dst, 0, total * sizeof(guint32));
   for (int li = 0; li < layer_count; li++) {
     if (!layer_visible[li] || !layer_bufs[li])
       continue;
+    BlendMode mode = layer_blend[li];
     for (int i = 0; i < total; i++) {
       guint32 src = layer_bufs[li][i];
       double sa = (src & 0xff) / 255.0;
@@ -114,12 +133,28 @@ static void layers_composite(guint32 *dst, int total) {
         dst[i] = 0;
         continue;
       }
-      double inv = 1.0 - sa;
-      int rr = (int)(((src >> 24 & 0xff) / 255.0 * sa + (d >> 24 & 0xff) / 255.0 * da * inv) / ra * 255.0 + 0.5);
-      int rg = (int)(((src >> 16 & 0xff) / 255.0 * sa + (d >> 16 & 0xff) / 255.0 * da * inv) / ra * 255.0 + 0.5);
-      int rb = (int)(((src >>  8 & 0xff) / 255.0 * sa + (d >>  8 & 0xff) / 255.0 * da * inv) / ra * 255.0 + 0.5);
-      dst[i] = PACK_RGBA(CLAMP(rr, 0, 255), CLAMP(rg, 0, 255), CLAMP(rb, 0, 255),
-                         CLAMP((int)(ra * 255.0 + 0.5), 0, 255));
+      double cs_r = (src >> 24 & 0xff) / 255.0;
+      double cs_g = (src >> 16 & 0xff) / 255.0;
+      double cs_b = (src >>  8 & 0xff) / 255.0;
+      double cb_r = (d >> 24 & 0xff) / 255.0;
+      double cb_g = (d >> 16 & 0xff) / 255.0;
+      double cb_b = (d >>  8 & 0xff) / 255.0;
+      double rr, rg, rb;
+      if (mode == BLEND_NORMAL) {
+        double inv = 1.0 - sa;
+        rr = (cs_r * sa + cb_r * da * inv) / ra;
+        rg = (cs_g * sa + cb_g * da * inv) / ra;
+        rb = (cs_b * sa + cb_b * da * inv) / ra;
+      } else {
+        /* W3C compositing: Co = αs((1−αb)Cs + αb·B(Cb,Cs)) + αb(1−αs)Cb */
+        rr = (sa * ((1.0-da)*cs_r + da*blend_apply(mode, cb_r, cs_r)) + da*(1.0-sa)*cb_r) / ra;
+        rg = (sa * ((1.0-da)*cs_g + da*blend_apply(mode, cb_g, cs_g)) + da*(1.0-sa)*cb_g) / ra;
+        rb = (sa * ((1.0-da)*cs_b + da*blend_apply(mode, cb_b, cs_b)) + da*(1.0-sa)*cb_b) / ra;
+      }
+      dst[i] = PACK_RGBA(CLAMP((int)(rr*255.0+0.5), 0, 255),
+                         CLAMP((int)(rg*255.0+0.5), 0, 255),
+                         CLAMP((int)(rb*255.0+0.5), 0, 255),
+                         CLAMP((int)(ra*255.0+0.5), 0, 255));
     }
   }
 }
@@ -442,9 +477,15 @@ static void status_update(void) {
   guchar r = (fg_color >> 24) & 0xff;
   guchar g = (fg_color >> 16) & 0xff;
   guchar b = (fg_color >> 8) & 0xff;
-  char layer_info[24] = "";
-  if (layer_count > 1)
-    snprintf(layer_info, sizeof(layer_info), "  L%d/%d", layer_active + 1, layer_count);
+  char layer_info[48] = "";
+  if (layer_count > 1) {
+    BlendMode bm = layer_blend[layer_active];
+    if (bm != BLEND_NORMAL)
+      snprintf(layer_info, sizeof(layer_info), "  L%d/%d[%s]",
+               layer_active + 1, layer_count, blend_mode_names[bm]);
+    else
+      snprintf(layer_info, sizeof(layer_info), "  L%d/%d", layer_active + 1, layer_count);
+  }
   if (macro_recording)
     snprintf(buf, sizeof(buf),
              " %s  recording @%c  col: %d  row: %d  #%02x%02x%02x  %dx%d  z%d%s",
@@ -1615,10 +1656,12 @@ static void cmd_execute(void) {
     for (int li = layer_count; li > ins; li--) {
       layer_bufs[li] = layer_bufs[li - 1];
       layer_visible[li] = layer_visible[li - 1];
+      layer_blend[li] = layer_blend[li - 1];
       memcpy(layer_name[li], layer_name[li - 1], 32);
     }
     layer_bufs[ins] = buf;
     layer_visible[ins] = TRUE;
+    layer_blend[ins] = BLEND_NORMAL;
     snprintf(layer_name[ins], 32, "Layer %d", layer_count + 1);
     layer_count++;
     layer_active = ins;
@@ -1666,11 +1709,13 @@ static void cmd_execute(void) {
     for (int li = layer_active; li < layer_count - 1; li++) {
       layer_bufs[li] = layer_bufs[li + 1];
       layer_visible[li] = layer_visible[li + 1];
+      layer_blend[li] = layer_blend[li + 1];
       memcpy(layer_name[li], layer_name[li + 1], 32);
     }
     layer_count--;
     layer_bufs[layer_count] = NULL;
     layer_visible[layer_count] = FALSE;
+    layer_blend[layer_count] = BLEND_NORMAL;
     layer_active--;
     pixels = layer_bufs[layer_active];
     commit_canvas_snapshot(before, CANVAS_W, CANVAS_H);
