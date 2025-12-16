@@ -101,12 +101,14 @@ typedef enum {
   BLEND_MULTIPLY,
   BLEND_SCREEN,
   BLEND_OVERLAY,
+  BLEND_DARKEN,
+  BLEND_LIGHTEN,
 } BlendMode;
 
 static BlendMode layer_blend[LAYER_MAX];
 
 static const char *blend_mode_names[] = {
-  "normal", "multiply", "screen", "overlay"
+  "normal", "multiply", "screen", "overlay", "darken", "lighten"
 };
 
 static double blend_apply(BlendMode mode, double cb, double cs) {
@@ -114,6 +116,8 @@ static double blend_apply(BlendMode mode, double cb, double cs) {
     case BLEND_MULTIPLY:    return cb * cs;
     case BLEND_SCREEN:      return cb + cs - cb * cs;
     case BLEND_OVERLAY:     return cb <= 0.5 ? 2.0*cb*cs : 1.0 - 2.0*(1.0-cb)*(1.0-cs);
+    case BLEND_DARKEN:      return cb < cs ? cb : cs;
+    case BLEND_LIGHTEN:     return cb > cs ? cb : cs;
     default:                return cs;
   }
 }
