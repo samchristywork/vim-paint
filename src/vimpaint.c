@@ -105,13 +105,15 @@ typedef enum {
   BLEND_LIGHTEN,
   BLEND_COLOR_DODGE,
   BLEND_COLOR_BURN,
+  BLEND_HARD_LIGHT,
+  BLEND_SOFT_LIGHT,
 } BlendMode;
 
 static BlendMode layer_blend[LAYER_MAX];
 
 static const char *blend_mode_names[] = {
   "normal", "multiply", "screen", "overlay", "darken", "lighten",
-  "color-dodge", "color-burn"
+  "color-dodge", "color-burn", "hard-light", "soft-light"
 };
 
 static double blend_apply(BlendMode mode, double cb, double cs) {
@@ -123,6 +125,11 @@ static double blend_apply(BlendMode mode, double cb, double cs) {
     case BLEND_LIGHTEN:     return cb > cs ? cb : cs;
     case BLEND_COLOR_DODGE: return cb == 0.0 ? 0.0 : cs == 1.0 ? 1.0 : (cb/(1.0-cs) < 1.0 ? cb/(1.0-cs) : 1.0);
     case BLEND_COLOR_BURN:  return cb == 1.0 ? 1.0 : cs == 0.0 ? 0.0 : (1.0 - (1.0-cb)/cs > 0.0 ? 1.0 - (1.0-cb)/cs : 0.0);
+    case BLEND_HARD_LIGHT:  return cs <= 0.5 ? 2.0*cb*cs : 1.0 - 2.0*(1.0-cb)*(1.0-cs);
+    case BLEND_SOFT_LIGHT: {
+      double d = cb <= 0.25 ? ((16.0*cb - 12.0)*cb + 4.0)*cb : sqrt(cb);
+      return cs <= 0.5 ? cb - (1.0-2.0*cs)*cb*(1.0-cb) : cb + (2.0*cs-1.0)*(d-cb);
+    }
     default:                return cs;
   }
 }
