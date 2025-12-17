@@ -1765,6 +1765,34 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strncmp(cmd_buf, ":layerblend ", 12) == 0 && *arg) {
+    BlendMode found = BLEND_MODE_COUNT;
+    for (int m = 0; m < BLEND_MODE_COUNT; m++) {
+      if (strcasecmp(arg, blend_mode_names[m]) == 0) {
+        found = m;
+        break;
+      }
+    }
+    if (found == BLEND_MODE_COUNT) {
+      char modes[256] = "";
+      for (int m = 0; m < BLEND_MODE_COUNT; m++) {
+        if (m) strncat(modes, "|", sizeof(modes) - strlen(modes) - 1);
+        strncat(modes, blend_mode_names[m], sizeof(modes) - strlen(modes) - 1);
+      }
+      char emsg[320];
+      snprintf(emsg, sizeof(emsg), "Unknown mode. Use: %s", modes);
+      cmd_flash(emsg);
+      return;
+    }
+    layer_blend[layer_active] = found;
+    gtk_widget_queue_draw(main_canvas);
+    char msg[64];
+    snprintf(msg, sizeof(msg), "Layer %d blend: %s", layer_active + 1,
+             blend_mode_names[found]);
+    cmd_flash(msg);
+    return;
+  }
+
   if (strncmp(cmd_buf, ":resize ", 8) == 0 && *arg) {
     int nw = 0, nh = 0;
     if (sscanf(arg, "%dx%d", &nw, &nh) != 2)
@@ -2300,6 +2328,7 @@ static void cmd_execute(void) {
         "  :mergedown             composite active layer into layer below\n"
         "  :layer N               switch to layer N (1-based)\n"
         "  :layervis N            toggle visibility of layer N\n"
+        "  :layerblend <mode>     set blend mode (normal|multiply|screen|overlay|...)\n"
         "\n"
         "View\n"
         "  + / -               zoom in / out\n"
