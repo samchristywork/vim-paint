@@ -58,6 +58,12 @@ static gboolean show_grid = TRUE;
 static guint32 grid_color = 0xccccccff; /* RRGGBBAA */
 static gboolean show_ruler = FALSE;
 static gboolean show_checker = FALSE;
+
+#define GUIDE_MAX 64
+typedef struct { int coord; gboolean horizontal; } Guide;
+static Guide guides[GUIDE_MAX];
+static int guide_count = 0;
+static gboolean guide_snap = FALSE;
 static gboolean canvas_dirty = FALSE;
 static gboolean sym_h = FALSE;
 static gboolean sym_v = FALSE;
@@ -1811,6 +1817,61 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strncmp(cmd_buf, ":guide ", 7) == 0 && *arg) {
+    /* :guide h N  — toggle horizontal guide at row N (1-based)
+       :guide v N  — toggle vertical guide at column N (1-based)
+       :guide clear — remove all guides
+       :guide snap  — toggle snap-to-guides */
+    if (strcmp(arg, "clear") == 0) {
+      guide_count = 0;
+      gtk_widget_queue_draw(main_canvas);
+      cmd_flash("Guides cleared.");
+      return;
+    }
+    if (strcmp(arg, "snap") == 0) {
+      guide_snap = !guide_snap;
+      char msg[48];
+      snprintf(msg, sizeof(msg), "Guide snap %s.", guide_snap ? "on" : "off");
+      cmd_flash(msg);
+      return;
+    }
+    char dir = 0;
+    int coord = 0;
+    if (sscanf(arg, "%c %d", &dir, &coord) == 2 &&
+        (dir == 'h' || dir == 'v') && coord >= 1) {
+      gboolean horiz = (dir == 'h');
+      int c = coord - 1; /* convert to 0-based */
+      int limit = horiz ? CANVAS_H : CANVAS_W;
+      if (c < 0 || c >= limit) {
+        cmd_flash("Guide coordinate out of range.");
+        return;
+      }
+      /* Toggle: remove if already present */
+      for (int i = 0; i < guide_count; i++) {
+        if (guides[i].horizontal == horiz && guides[i].coord == c) {
+          guides[i] = guides[--guide_count];
+          gtk_widget_queue_draw(main_canvas);
+          char tmsg[48];
+          snprintf(tmsg, sizeof(tmsg), "Guide %c%d removed.", dir, coord);
+          cmd_flash(tmsg);
+          return;
+        }
+      }
+      if (guide_count >= GUIDE_MAX) {
+        cmd_flash("Guide limit reached.");
+        return;
+      }
+      guides[guide_count++] = (Guide){.coord = c, .horizontal = horiz};
+      gtk_widget_queue_draw(main_canvas);
+      char tmsg[48];
+      snprintf(tmsg, sizeof(tmsg), "Guide %c%d added.", dir, coord);
+      cmd_flash(tmsg);
+      return;
+    }
+    cmd_flash("Usage: :guide h|v N  |  :guide clear  |  :guide snap");
+    return;
+  }
+
   if (strncmp(cmd_buf, ":resize ", 8) == 0 && *arg) {
     int nw = 0, nh = 0;
     if (sscanf(arg, "%dx%d", &nw, &nh) != 2)
@@ -2347,6 +2408,9 @@ static void cmd_execute(void) {
         "  :layer N               switch to layer N (1-based)\n"
         "  :layervis N            toggle visibility of layer N\n"
         "  :layerblend <mode>     set blend mode (normal|multiply|screen|overlay|...)\n"
+        "  :guide h|v N           toggle horizontal/vertical guide at row/col N\n"
+        "  :guide clear           remove all guides\n"
+        "  :guide snap            toggle snap-to-guides in insert mode\n"
         "\n"
         "View\n"
         "  + / -               zoom in / out\n"
@@ -2603,6 +2667,21 @@ static void flood_fill(int sx, int sy, guint32 fill_color) {
   commit_canvas_snapshot(before_snap, CANVAS_W, CANVAS_H);
 }
 
+/* Snap coord to nearest guide on that axis; returns snapped value. */
+static int snap_coord(int coord, gboolean horizontal) {
+  if (!guide_snap || guide_count == 0)
+    return coord;
+  int best = coord, bestd = 3; /* snap radius: 3 cells */
+  for (int i = 0; i < guide_count; i++) {
+    if (guides[i].horizontal != horizontal)
+      continue;
+    int d = guides[i].coord - coord;
+    if (d < 0) d = -d;
+    if (d < bestd) { bestd = d; best = guides[i].coord; }
+  }
+  return best;
+}
+
 static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
   size_t total = (size_t)CANVAS_W * CANVAS_H;
   guint32 *composite = malloc(total * sizeof(guint32));
@@ -2689,6 +2768,34 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
     cairo_stroke(cr);
   }
 
+  /* Draw guide lines */
+  if (guide_count > 0) {
+    double cw = CANVAS_W * CELL_SIZE, ch = CANVAS_H * CELL_SIZE;
+    cairo_set_line_width(cr, 1.0);
+    for (int i = 0; i < guide_count; i++) {
+      double pos = guides[i].coord * CELL_SIZE;
+      /* Cyan with a dark shadow for visibility on any background */
+      cairo_set_source_rgba(cr, 0, 0, 0, 0.35);
+      if (guides[i].horizontal) {
+        cairo_move_to(cr, 0.5, pos + 0.5);
+        cairo_line_to(cr, cw + 0.5, pos + 0.5);
+      } else {
+        cairo_move_to(cr, pos + 0.5, 0.5);
+        cairo_line_to(cr, pos + 0.5, ch + 0.5);
+      }
+      cairo_stroke(cr);
+      cairo_set_source_rgba(cr, 0.0, 0.85, 1.0, 0.75);
+      if (guides[i].horizontal) {
+        cairo_move_to(cr, 0, pos);
+        cairo_line_to(cr, cw, pos);
+      } else {
+        cairo_move_to(cr, pos, 0);
+        cairo_line_to(cr, pos, ch);
+      }
+      cairo_stroke(cr);
+    }
+  }
+
   /* Draw coordinate ruler overlay */
   if (show_ruler) {
     int step = 1;
@@ -2700,29 +2807,51 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
       step = 20;
     double fsize = CLAMP(CELL_SIZE * 0.75, 5.0, 11.0);
     double baseline = CLAMP(fsize, 5.0, (double)CELL_SIZE - 1.0);
+    double tick = CLAMP(CELL_SIZE * 0.25, 2.0, 5.0);
     cairo_select_font_face(cr, "Monospace", CAIRO_FONT_SLANT_NORMAL,
                            CAIRO_FONT_WEIGHT_NORMAL);
     cairo_set_font_size(cr, fsize);
+    cairo_set_line_width(cr, 1.0);
     for (int x = 0; x < CANVAS_W; x += step) {
+      double px = x * CELL_SIZE;
+      /* Tick mark at top edge of column */
+      cairo_set_source_rgba(cr, 0, 0, 0, 0.5);
+      cairo_move_to(cr, px + 0.5, 0.5);
+      cairo_line_to(cr, px + 0.5, tick + 0.5);
+      cairo_stroke(cr);
+      cairo_set_source_rgba(cr, 1, 1, 1, 0.8);
+      cairo_move_to(cr, px, 0);
+      cairo_line_to(cr, px, tick);
+      cairo_stroke(cr);
+      /* Coordinate label */
       char buf[8];
       snprintf(buf, sizeof(buf), "%d", x + 1);
-      double px = x * CELL_SIZE + 1, py = baseline;
       cairo_set_source_rgba(cr, 0, 0, 0, 0.65);
-      cairo_move_to(cr, px + 0.5, py + 0.5);
+      cairo_move_to(cr, px + 1.5, baseline + 0.5);
       cairo_show_text(cr, buf);
       cairo_set_source_rgba(cr, 1, 1, 1, 0.9);
-      cairo_move_to(cr, px, py);
+      cairo_move_to(cr, px + 1, baseline);
       cairo_show_text(cr, buf);
     }
     for (int y = 0; y < CANVAS_H; y += step) {
+      double py = y * CELL_SIZE;
+      /* Tick mark at left edge of row */
+      cairo_set_source_rgba(cr, 0, 0, 0, 0.5);
+      cairo_move_to(cr, 0.5, py + 0.5);
+      cairo_line_to(cr, tick + 0.5, py + 0.5);
+      cairo_stroke(cr);
+      cairo_set_source_rgba(cr, 1, 1, 1, 0.8);
+      cairo_move_to(cr, 0, py);
+      cairo_line_to(cr, tick, py);
+      cairo_stroke(cr);
+      /* Coordinate label */
       char buf[8];
       snprintf(buf, sizeof(buf), "%d", y + 1);
-      double px = 1, py = y * CELL_SIZE + baseline;
       cairo_set_source_rgba(cr, 0, 0, 0, 0.65);
-      cairo_move_to(cr, px + 0.5, py + 0.5);
+      cairo_move_to(cr, 1.5, py + baseline + 0.5);
       cairo_show_text(cr, buf);
       cairo_set_source_rgba(cr, 1, 1, 1, 0.9);
-      cairo_move_to(cr, px, py);
+      cairo_move_to(cr, 1, py + baseline);
       cairo_show_text(cr, buf);
     }
   }
@@ -3374,38 +3503,46 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     break;
   case GDK_KEY_H:
     cursor_x = MAX(cursor_x - 5 * n, 0);
+    cursor_x = snap_coord(cursor_x, FALSE);
     insert_paint();
     break;
   case GDK_KEY_h:
   case GDK_KEY_Left:
     cursor_x = MAX(cursor_x - n, 0);
+    cursor_x = snap_coord(cursor_x, FALSE);
     insert_paint();
     break;
   case GDK_KEY_L:
     cursor_x = MIN(cursor_x + 5 * n, CANVAS_W - 1);
+    cursor_x = snap_coord(cursor_x, FALSE);
     insert_paint();
     break;
   case GDK_KEY_l:
   case GDK_KEY_Right:
     cursor_x = MIN(cursor_x + n, CANVAS_W - 1);
+    cursor_x = snap_coord(cursor_x, FALSE);
     insert_paint();
     break;
   case GDK_KEY_K:
     cursor_y = MAX(cursor_y - 5 * n, 0);
+    cursor_y = snap_coord(cursor_y, TRUE);
     insert_paint();
     break;
   case GDK_KEY_k:
   case GDK_KEY_Up:
     cursor_y = MAX(cursor_y - n, 0);
+    cursor_y = snap_coord(cursor_y, TRUE);
     insert_paint();
     break;
   case GDK_KEY_J:
     cursor_y = MIN(cursor_y + 5 * n, CANVAS_H - 1);
+    cursor_y = snap_coord(cursor_y, TRUE);
     insert_paint();
     break;
   case GDK_KEY_j:
   case GDK_KEY_Down:
     cursor_y = MIN(cursor_y + n, CANVAS_H - 1);
+    cursor_y = snap_coord(cursor_y, TRUE);
     insert_paint();
     break;
   case GDK_KEY_G:
