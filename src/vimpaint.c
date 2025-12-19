@@ -65,8 +65,9 @@ static Guide guides[GUIDE_MAX];
 static int guide_count = 0;
 static gboolean guide_snap = FALSE;
 static gboolean canvas_dirty = FALSE;
-static gboolean sym_h = FALSE;
-static gboolean sym_v = FALSE;
+typedef enum { SYM_NONE = 0, SYM_H, SYM_V, SYM_HV, SYM_RADIAL } SymMode;
+static SymMode sym_mode = SYM_NONE;
+static int sym_radial_n = 4;
 static int brush_size = 1;
 static int brush_shape = 0;    /* 0 = square, 1 = circle */
 static int spray_density = 0;  /* 0 = off, 1-100 = % of pixels painted */
@@ -518,16 +519,24 @@ static void status_update(void) {
     else
       snprintf(layer_info, sizeof(layer_info), "  L%d/%d", layer_active + 1, layer_count);
   }
+  char sym_info[24] = "";
+  switch (sym_mode) {
+    case SYM_H:      snprintf(sym_info, sizeof(sym_info), "  symH"); break;
+    case SYM_V:      snprintf(sym_info, sizeof(sym_info), "  symV"); break;
+    case SYM_HV:     snprintf(sym_info, sizeof(sym_info), "  sym4"); break;
+    case SYM_RADIAL: snprintf(sym_info, sizeof(sym_info), "  sym%d", sym_radial_n); break;
+    default: break;
+  }
   if (macro_recording)
     snprintf(buf, sizeof(buf),
-             " %s  recording @%c  col: %d  row: %d  #%02x%02x%02x  %dx%d  z%d%s",
+             " %s  recording @%c  col: %d  row: %d  #%02x%02x%02x  %dx%d  z%d%s%s",
              mode, 'a' + macro_reg, cursor_x + 1, cursor_y + 1, r, g, b,
-             CANVAS_W, CANVAS_H, CELL_SIZE, layer_info);
+             CANVAS_W, CANVAS_H, CELL_SIZE, layer_info, sym_info);
   else
     snprintf(buf, sizeof(buf),
-             " %s  col: %d  row: %d  #%02x%02x%02x  %dx%d  z%d%s",
+             " %s  col: %d  row: %d  #%02x%02x%02x  %dx%d  z%d%s%s",
              mode, cursor_x + 1, cursor_y + 1, r, g, b, CANVAS_W, CANVAS_H,
-             CELL_SIZE, layer_info);
+             CELL_SIZE, layer_info, sym_info);
   gtk_label_set_text(GTK_LABEL(cmd_label), buf);
   title_refresh();
 }
@@ -1278,20 +1287,25 @@ static void cmd_execute(void) {
         }
       }
     } else if (strcmp(opt, "sym h") == 0) {
-      sym_h = TRUE;
-      sym_v = FALSE;
+      sym_mode = SYM_H;
       cmd_flash("Symmetry: horizontal");
     } else if (strcmp(opt, "sym v") == 0) {
-      sym_h = FALSE;
-      sym_v = TRUE;
+      sym_mode = SYM_V;
       cmd_flash("Symmetry: vertical");
-    } else if (strcmp(opt, "sym hv") == 0 || strcmp(opt, "sym vh") == 0) {
-      sym_h = TRUE;
-      sym_v = TRUE;
-      cmd_flash("Symmetry: both");
+    } else if (strcmp(opt, "sym hv") == 0 || strcmp(opt, "sym vh") == 0 ||
+               strcmp(opt, "sym 4") == 0) {
+      sym_mode = SYM_HV;
+      cmd_flash("Symmetry: 4-way");
+    } else if (strncmp(opt, "sym radial", 10) == 0) {
+      int n = atoi(opt + 10);
+      if (n < 2 || n > 32) n = 4;
+      sym_radial_n = n;
+      sym_mode = SYM_RADIAL;
+      char msg[48];
+      snprintf(msg, sizeof(msg), "Symmetry: %d-point radial", sym_radial_n);
+      cmd_flash(msg);
     } else if (strcmp(opt, "sym none") == 0 || strcmp(opt, "nosym") == 0) {
-      sym_h = FALSE;
-      sym_v = FALSE;
+      sym_mode = SYM_NONE;
       cmd_flash("Symmetry: off");
     } else if (strncmp(opt, "font ", 5) == 0) {
       /* :set font <family> <size>  or  :set font <family> */
@@ -2422,6 +2436,8 @@ static void cmd_execute(void) {
         "  :set brush N        set brush size (1-16)\n"
         "  :set brushshape square|circle  set brush shape\n"
         "  :set spray <1-100>|off  airbrush density (% pixels per stroke)\n"
+        "  :set sym h|v|hv|4|none  mirror symmetry\n"
+        "  :set sym radial N       N-point radial symmetry (N=2..32)\n"
         "  :set undolevels N   set undo history depth (1-256, clears history)\n"
         "  Ctrl-G              show file info\n"
         "  :goto col,row       jump to position (1-based)\n"
@@ -2541,31 +2557,52 @@ static void commit_canvas_snapshot(guint32 *before_snap, int bw, int bh) {
   title_refresh();
 }
 
-static void paint_pixel(int x, int y, guint32 color) {
+static void paint_pixel_raw(int x, int y, guint32 color) {
   if (x < 0 || x >= CANVAS_W || y < 0 || y >= CANVAS_H)
     return;
   push_undo(x, y);
   PX(y, x) = color;
-  if (sym_h) {
-    int mx = CANVAS_W - 1 - x;
-    if (mx != x) {
-      push_undo(mx, y);
-      PX(y, mx) = color;
-    }
-  }
-  if (sym_v) {
-    int my = CANVAS_H - 1 - y;
-    if (my != y) {
-      push_undo(x, my);
-      PX(my, x) = color;
-    }
-    if (sym_h) {
+}
+
+static void paint_pixel(int x, int y, guint32 color) {
+  if (x < 0 || x >= CANVAS_W || y < 0 || y >= CANVAS_H)
+    return;
+  paint_pixel_raw(x, y, color);
+  switch (sym_mode) {
+    case SYM_H: {
       int mx = CANVAS_W - 1 - x;
-      if (mx != x && my != y) {
-        push_undo(mx, my);
-        PX(my, mx) = color;
-      }
+      if (mx != x) paint_pixel_raw(mx, y, color);
+      break;
     }
+    case SYM_V: {
+      int my = CANVAS_H - 1 - y;
+      if (my != y) paint_pixel_raw(x, my, color);
+      break;
+    }
+    case SYM_HV: {
+      int mx = CANVAS_W - 1 - x, my = CANVAS_H - 1 - y;
+      if (mx != x) paint_pixel_raw(mx, y, color);
+      if (my != y) paint_pixel_raw(x, my, color);
+      if (mx != x && my != y) paint_pixel_raw(mx, my, color);
+      break;
+    }
+    case SYM_RADIAL: {
+      double cx = (CANVAS_W - 1) / 2.0, cy = (CANVAS_H - 1) / 2.0;
+      double rx = x - cx, ry = y - cy;
+      double r = sqrt(rx * rx + ry * ry);
+      double theta = atan2(ry, rx);
+      double step = 2.0 * M_PI / sym_radial_n;
+      for (int k = 1; k < sym_radial_n; k++) {
+        double a = theta + k * step;
+        int px = (int)(cx + r * cos(a) + 0.5);
+        int py = (int)(cy + r * sin(a) + 0.5);
+        if (px != x || py != y)
+          paint_pixel_raw(px, py, color);
+      }
+      break;
+    }
+    default:
+      break;
   }
 }
 
