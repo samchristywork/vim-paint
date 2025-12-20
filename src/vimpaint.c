@@ -58,6 +58,10 @@ static gboolean show_grid = TRUE;
 static guint32 grid_color = 0xccccccff; /* RRGGBBAA */
 static gboolean show_ruler = FALSE;
 static gboolean show_checker = FALSE;
+static gboolean gradient_tool = FALSE;
+static gboolean grad_dragging = FALSE;
+static int grad_x0 = 0, grad_y0 = 0;
+static guint32 grad_c1 = 0, grad_c2 = 0;
 
 #define GUIDE_MAX 64
 typedef struct { int coord; gboolean horizontal; } Guide;
@@ -506,7 +510,7 @@ static void status_update(void) {
   if (flash_timer_id)
     return;
   char buf[160];
-  const char *mode = visual_mode ? "VISUAL" : insert_mode ? "INSERT" : "NORMAL";
+  const char *mode = gradient_tool ? "GRADIENT" : visual_mode ? "VISUAL" : insert_mode ? "INSERT" : "NORMAL";
   guchar r = (fg_color >> 24) & 0xff;
   guchar g = (fg_color >> 16) & 0xff;
   guchar b = (fg_color >> 8) & 0xff;
@@ -1421,6 +1425,30 @@ static void cmd_execute(void) {
     visual_mode = FALSE;
     gtk_widget_queue_draw(main_canvas);
     cmd_set("");
+    return;
+  }
+
+  if (strncmp(cmd_buf, ":gradtool", 9) == 0) {
+    /* :gradtool [c1 c2]  — enter interactive gradient drag mode.
+       Colors default to current fg/bg if not given. */
+    unsigned int rgb1 = 0, rgb2 = 0;
+    if (*arg) {
+      char c1s[64] = "", c2s[64] = "";
+      if (sscanf(arg, "%63s %63s", c1s, c2s) != 2 ||
+          !parse_color(c1s, &rgb1) || !parse_color(c2s, &rgb2)) {
+        cmd_flash("Usage: :gradtool [color1 color2]");
+        return;
+      }
+    } else {
+      /* Extract 24-bit RGB from packed fg/bg */
+      rgb1 = ((fg_color >> 8) & 0xffffff);
+      rgb2 = ((bg_color >> 8) & 0xffffff);
+    }
+    grad_c1 = rgb1;
+    grad_c2 = rgb2;
+    gradient_tool = TRUE;
+    grad_dragging = FALSE;
+    cmd_flash("Click and drag to apply gradient (Esc to cancel)");
     return;
   }
 
@@ -2444,6 +2472,7 @@ static void cmd_execute(void) {
         "  :find color <hex|name>  jump to nearest pixel of color\n"
         "  :replace <from> <to>    replace all pixels of one color with "
         "another\n"
+        "  :gradtool [c1 c2]        interactive gradient (click-drag to apply)\n"
         "  :gradient <c1> <c2> h|v  fill canvas with gradient between two "
         "colors\n");
     gtk_dialog_run(GTK_DIALOG(dlg));
@@ -2719,6 +2748,35 @@ static int snap_coord(int coord, gboolean horizontal) {
   return best;
 }
 
+static void apply_gradient_linear(int x0, int y0, int x1, int y1,
+                                   guint32 c1, guint32 c2) {
+  int r1 = (c1 >> 16) & 0xff, g1 = (c1 >> 8) & 0xff, b1 = c1 & 0xff;
+  int r2 = (c2 >> 16) & 0xff, g2 = (c2 >> 8) & 0xff, b2 = c2 & 0xff;
+  double dx = x1 - x0, dy = y1 - y0;
+  double len2 = dx * dx + dy * dy;
+  int rx0 = 0, ry0 = 0, rx1 = CANVAS_W - 1, ry1 = CANVAS_H - 1;
+  if (visual_mode) {
+    rx0 = MIN(cursor_x, visual_anchor_x); rx1 = MAX(cursor_x, visual_anchor_x);
+    ry0 = MIN(cursor_y, visual_anchor_y); ry1 = MAX(cursor_y, visual_anchor_y);
+  }
+  begin_undo_action();
+  for (int y = ry0; y <= ry1; y++) {
+    for (int x = rx0; x <= rx1; x++) {
+      double t = 0.0;
+      if (len2 > 0.5)
+        t = ((x - x0) * dx + (y - y0) * dy) / len2;
+      t = t < 0.0 ? 0.0 : t > 1.0 ? 1.0 : t;
+      int ri = (int)(r1 + t * (r2 - r1) + 0.5);
+      int gi = (int)(g1 + t * (g2 - g1) + 0.5);
+      int bi = (int)(b1 + t * (b2 - b1) + 0.5);
+      push_undo(x, y);
+      PX(y, x) = PACK_RGBA(CLAMP(ri, 0, 255), CLAMP(gi, 0, 255),
+                            CLAMP(bi, 0, 255), 255);
+    }
+  }
+  commit_undo_action();
+}
+
 static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
   size_t total = (size_t)CANVAS_W * CANVAS_H;
   guint32 *composite = malloc(total * sizeof(guint32));
@@ -2802,6 +2860,42 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
     cairo_rectangle(cr, cursor_x * CELL_SIZE + inset,
                     cursor_y * CELL_SIZE + inset, CELL_SIZE - 2 * inset,
                     CELL_SIZE - 2 * inset);
+    cairo_stroke(cr);
+  }
+
+  /* Draw gradient tool preview: line + endpoint markers */
+  if (gradient_tool && grad_dragging) {
+    double sx = grad_x0 * CELL_SIZE + CELL_SIZE / 2.0;
+    double sy = grad_y0 * CELL_SIZE + CELL_SIZE / 2.0;
+    double ex = cursor_x * CELL_SIZE + CELL_SIZE / 2.0;
+    double ey = cursor_y * CELL_SIZE + CELL_SIZE / 2.0;
+    cairo_set_line_width(cr, 2.0);
+    cairo_set_source_rgba(cr, 0, 0, 0, 0.5);
+    cairo_move_to(cr, sx + 1, sy + 1);
+    cairo_line_to(cr, ex + 1, ey + 1);
+    cairo_stroke(cr);
+    cairo_set_source_rgba(cr, 1, 1, 1, 0.9);
+    cairo_move_to(cr, sx, sy);
+    cairo_line_to(cr, ex, ey);
+    cairo_stroke(cr);
+    /* Color circles at endpoints */
+    double r1 = (grad_c1 >> 16 & 0xff) / 255.0;
+    double g1 = (grad_c1 >> 8  & 0xff) / 255.0;
+    double b1 = (grad_c1       & 0xff) / 255.0;
+    double r2 = (grad_c2 >> 16 & 0xff) / 255.0;
+    double g2 = (grad_c2 >> 8  & 0xff) / 255.0;
+    double b2 = (grad_c2       & 0xff) / 255.0;
+    double rad = CLAMP(CELL_SIZE * 0.4, 3.0, 8.0);
+    cairo_arc(cr, sx, sy, rad, 0, 2 * M_PI);
+    cairo_set_source_rgb(cr, r1, g1, b1);
+    cairo_fill_preserve(cr);
+    cairo_set_source_rgba(cr, 1, 1, 1, 0.8);
+    cairo_set_line_width(cr, 1.0);
+    cairo_stroke(cr);
+    cairo_arc(cr, ex, ey, rad, 0, 2 * M_PI);
+    cairo_set_source_rgb(cr, r2, g2, b2);
+    cairo_fill_preserve(cr);
+    cairo_set_source_rgba(cr, 1, 1, 1, 0.8);
     cairo_stroke(cr);
   }
 
@@ -3298,6 +3392,8 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
   if (event->keyval == GDK_KEY_Escape) {
     visual_mode = FALSE;
     insert_mode = FALSE;
+    gradient_tool = FALSE;
+    grad_dragging = FALSE;
     pending_g = FALSE;
     pending_d = FALSE;
     pending_f = FALSE;
@@ -3923,7 +4019,11 @@ static gboolean on_button_press(GtkWidget *widget, GdkEventButton *event,
   int cy = (int)(event->y / CELL_SIZE);
   cursor_x = CLAMP(cx, 0, CANVAS_W - 1);
   cursor_y = CLAMP(cy, 0, CANVAS_H - 1);
-  if (insert_mode) {
+  if (gradient_tool && event->button == 1) {
+    grad_x0 = cursor_x;
+    grad_y0 = cursor_y;
+    grad_dragging = TRUE;
+  } else if (insert_mode) {
     drag_color = (event->button == 3) ? bg_color : fg_color;
     begin_undo_action();
     drag_painting = TRUE;
@@ -3941,6 +4041,16 @@ static gboolean on_button_press(GtkWidget *widget, GdkEventButton *event,
 
 static gboolean on_button_release(GtkWidget *widget, GdkEventButton *event,
                                   gpointer data) {
+  if (grad_dragging) {
+    grad_dragging = FALSE;
+    apply_gradient_linear(grad_x0, grad_y0, cursor_x, cursor_y,
+                          grad_c1, grad_c2);
+    gradient_tool = FALSE;
+    visual_mode = FALSE;
+    status_update();
+    gtk_widget_queue_draw(widget);
+    return TRUE;
+  }
   if (drag_painting) {
     commit_undo_action();
     drag_painting = FALSE;
@@ -3972,7 +4082,7 @@ static gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event,
   if (insert_mode && drag_painting)
     paint_brush(cursor_x, cursor_y, drag_color);
   status_update();
-  gtk_widget_queue_draw(widget);
+  gtk_widget_queue_draw(widget); /* also redraws gradient preview */
   return TRUE;
 }
 
