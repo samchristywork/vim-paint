@@ -78,6 +78,11 @@ static int brush_shape = 0;    /* 0 = square, 1 = circle, 2 = custom */
 static int custom_brush_w = 0, custom_brush_h = 0;
 static gboolean custom_brush_pixels[CUSTOM_BRUSH_MAX][CUSTOM_BRUSH_MAX];
 static int spray_density = 0;  /* 0 = off, 1-100 = % of pixels painted */
+
+typedef enum {
+  FILL_SOLID = 0,
+} FillPattern;
+static FillPattern fill_pattern = FILL_SOLID;
 static char text_font_family[256] = "Monospace";
 static double text_font_size = 10.0;
 
@@ -1214,6 +1219,13 @@ static void cmd_execute(void) {
         } else {
           cmd_flash("Usage: :set spray <1-100>|off");
         }
+      }
+    } else if (strncmp(opt, "fill ", 5) == 0) {
+      const char *val = opt + 5;
+      if (strcmp(val, "solid") == 0) {
+        fill_pattern = FILL_SOLID; cmd_flash("Fill: solid");
+      } else {
+        cmd_flash("Usage: :set fill solid|checker|hstripes|vstripes|halftone");
       }
     } else if (strncmp(opt, "bg ", 3) == 0) {
       const char *val = opt + 3;
@@ -2529,6 +2541,7 @@ static void cmd_execute(void) {
         "  :brushdefine <pat>  define custom brush (rows sep by /, # = on)\n"
         "  :brushdefine        capture visual selection as custom brush\n"
         "  :set spray <1-100>|off  airbrush density (% pixels per stroke)\n"
+        "  :set fill solid\n"
         "  :set sym h|v|hv|4|none  mirror symmetry\n"
         "  :set sym radial N       N-point radial symmetry (N=2..32)\n"
         "  :set undolevels N   set undo history depth (1-256, clears history)\n"
@@ -2776,22 +2789,52 @@ static void find_up(void) {
     }
 }
 
+/* Return the fill color for pixel (x,y) given current fill_pattern.
+   fg is the primary color, bg_color is the secondary (transparent pixels
+   in pattern positions use bg_color with alpha=0 if bg is transparent). */
+static guint32 fill_color_at(int x, int y, guint32 fg) {
+  switch (fill_pattern) {
+    case FILL_CHECKER:
+      return ((x + y) & 1) ? bg_color : fg;
+    case FILL_HSTRIPES:
+      return (y & 1) ? bg_color : fg;
+    case FILL_VSTRIPES:
+      return (x & 1) ? bg_color : fg;
+    case FILL_HALFTONE: {
+      /* 4x4 ordered-dither Bayer matrix at ~50% density */
+      static const int bayer[4][4] = {
+        { 0,  8,  2, 10},
+        {12,  4, 14,  6},
+        { 3, 11,  1,  9},
+        {15,  7, 13,  5}
+      };
+      return bayer[y & 3][x & 3] < 4 ? fg : bg_color;
+    }
+    default:
+      return fg;
+  }
+}
+
 static void flood_fill(int sx, int sy, guint32 fill_color) {
   guint32 target = PX(sy, sx);
-  if (target == fill_color)
+  if (fill_pattern == FILL_SOLID && target == fill_color)
     return;
   size_t total = (size_t)CANVAS_W * CANVAS_H;
   guint32 *before_snap = malloc(total * sizeof(guint32));
   int *queue = malloc(total * sizeof(int));
-  if (!before_snap || !queue) {
+  /* visited prevents re-queuing when bg_color == target under pattern fills */
+  gboolean *visited = calloc(total, sizeof(gboolean));
+  if (!before_snap || !queue || !visited) {
     free(before_snap);
     free(queue);
+    free(visited);
     return;
   }
   memcpy(before_snap, pixels, total * sizeof(guint32));
   int head = 0, tail = 0;
+  visited[sy * CANVAS_W + sx] = TRUE;
   queue[tail++] = sy * CANVAS_W + sx;
-  PX(sy, sx) = fill_color;
+  PX(sy, sx) = fill_color_at(sx, sy, fill_color);
   while (head < tail) {
     int pos = queue[head++];
     int x = pos % CANVAS_W, y = pos / CANVAS_W;
@@ -2800,12 +2843,15 @@ static void flood_fill(int sx, int sy, guint32 fill_color) {
       int nx = neighbors[i][0], ny = neighbors[i][1];
       if (nx < 0 || nx >= CANVAS_W || ny < 0 || ny >= CANVAS_H)
         continue;
-      if (PX(ny, nx) != target)
+      int npos = ny * CANVAS_W + nx;
+      if (visited[npos] || PX(ny, nx) != target)
         continue;
-      PX(ny, nx) = fill_color;
-      queue[tail++] = ny * CANVAS_W + nx;
+      visited[npos] = TRUE;
+      PX(ny, nx) = fill_color_at(nx, ny, fill_color);
+      queue[tail++] = npos;
     }
   }
+  free(visited);
   free(queue);
   commit_canvas_snapshot(before_snap, CANVAS_W, CANVAS_H);
 }
