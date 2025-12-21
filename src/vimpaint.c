@@ -1462,6 +1462,59 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strcmp(cmd_buf, ":brushdefine") == 0 ||
+      strncmp(cmd_buf, ":brushdefine ", 13) == 0) {
+    if (*arg) {
+      /* Pattern string: rows separated by '/', '#'/'*'/'1' = set, rest = clear */
+      memset(custom_brush_pixels, 0, sizeof(custom_brush_pixels));
+      int row = 0, maxcol = 0;
+      const char *p = arg;
+      while (*p && row < CUSTOM_BRUSH_MAX) {
+        int col = 0;
+        while (*p && *p != '/' && col < CUSTOM_BRUSH_MAX) {
+          custom_brush_pixels[row][col] =
+              (*p == '#' || *p == '*' || *p == '1') ? TRUE : FALSE;
+          col++;
+          p++;
+        }
+        if (col > maxcol) maxcol = col;
+        row++;
+        if (*p == '/') p++;
+      }
+      if (row == 0 || maxcol == 0) {
+        cmd_flash("Empty pattern.");
+        return;
+      }
+      custom_brush_w = maxcol;
+      custom_brush_h = row;
+    } else if (visual_mode) {
+      /* Capture shape from visual selection: non-transparent pixels = set */
+      int x0 = MIN(cursor_x, visual_anchor_x);
+      int x1 = MAX(cursor_x, visual_anchor_x);
+      int y0 = MIN(cursor_y, visual_anchor_y);
+      int y1 = MAX(cursor_y, visual_anchor_y);
+      int w = x1 - x0 + 1, h = y1 - y0 + 1;
+      if (w > CUSTOM_BRUSH_MAX) w = CUSTOM_BRUSH_MAX;
+      if (h > CUSTOM_BRUSH_MAX) h = CUSTOM_BRUSH_MAX;
+      memset(custom_brush_pixels, 0, sizeof(custom_brush_pixels));
+      for (int dy = 0; dy < h; dy++)
+        for (int dx = 0; dx < w; dx++)
+          custom_brush_pixels[dy][dx] = (PX(y0 + dy, x0 + dx) & 0xff) != 0;
+      custom_brush_w = w;
+      custom_brush_h = h;
+      visual_mode = FALSE;
+    } else {
+      cmd_flash("Usage: :brushdefine <pattern>  or select region first");
+      return;
+    }
+    brush_shape = 2;
+    char msg[64];
+    snprintf(msg, sizeof(msg), "Custom brush defined (%dx%d).",
+             custom_brush_w, custom_brush_h);
+    cmd_flash(msg);
+    return;
+  }
+
   if (strncmp(cmd_buf, ":hue ", 5) == 0 || strncmp(cmd_buf, ":sat ", 5) == 0 ||
       strncmp(cmd_buf, ":bright ", 8) == 0) {
     double delta = atof(arg);
@@ -2473,6 +2526,8 @@ static void cmd_execute(void) {
         "  :set zoom N         set cell size\n"
         "  :set brush N        set brush size (1-16)\n"
         "  :set brushshape square|circle|custom  set brush shape\n"
+        "  :brushdefine <pat>  define custom brush (rows sep by /, # = on)\n"
+        "  :brushdefine        capture visual selection as custom brush\n"
         "  :set spray <1-100>|off  airbrush density (% pixels per stroke)\n"
         "  :set sym h|v|hv|4|none  mirror symmetry\n"
         "  :set sym radial N       N-point radial symmetry (N=2..32)\n"
