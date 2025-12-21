@@ -73,7 +73,10 @@ typedef enum { SYM_NONE = 0, SYM_H, SYM_V, SYM_HV, SYM_RADIAL } SymMode;
 static SymMode sym_mode = SYM_NONE;
 static int sym_radial_n = 4;
 static int brush_size = 1;
-static int brush_shape = 0;    /* 0 = square, 1 = circle */
+static int brush_shape = 0;    /* 0 = square, 1 = circle, 2 = custom */
+#define CUSTOM_BRUSH_MAX 16
+static int custom_brush_w = 0, custom_brush_h = 0;
+static gboolean custom_brush_pixels[CUSTOM_BRUSH_MAX][CUSTOM_BRUSH_MAX];
 static int spray_density = 0;  /* 0 = off, 1-100 = % of pixels painted */
 static char text_font_family[256] = "Monospace";
 static double text_font_size = 10.0;
@@ -1188,8 +1191,15 @@ static void cmd_execute(void) {
       } else if (strcmp(shape, "square") == 0) {
         brush_shape = 0;
         cmd_set("");
+      } else if (strcmp(shape, "custom") == 0) {
+        if (custom_brush_w == 0) {
+          cmd_flash("No custom brush defined. Use :brushdefine first.");
+        } else {
+          brush_shape = 2;
+          cmd_set("");
+        }
       } else {
-        cmd_flash("Usage: :set brushshape square|circle");
+        cmd_flash("Usage: :set brushshape square|circle|custom");
       }
     } else if (strncmp(opt, "spray ", 6) == 0) {
       const char *val = opt + 6;
@@ -2462,7 +2472,7 @@ static void cmd_execute(void) {
         "  :set gridcolor <hex|name>  set grid line colour\n"
         "  :set zoom N         set cell size\n"
         "  :set brush N        set brush size (1-16)\n"
-        "  :set brushshape square|circle  set brush shape\n"
+        "  :set brushshape square|circle|custom  set brush shape\n"
         "  :set spray <1-100>|off  airbrush density (% pixels per stroke)\n"
         "  :set sym h|v|hv|4|none  mirror symmetry\n"
         "  :set sym radial N       N-point radial symmetry (N=2..32)\n"
@@ -2636,6 +2646,18 @@ static void paint_pixel(int x, int y, guint32 color) {
 }
 
 static void paint_brush(int x, int y, guint32 color) {
+  if (brush_shape == 2 && custom_brush_w > 0 && custom_brush_h > 0) {
+    int ox = custom_brush_w / 2, oy = custom_brush_h / 2;
+    for (int dy = 0; dy < custom_brush_h; dy++)
+      for (int dx = 0; dx < custom_brush_w; dx++) {
+        if (!custom_brush_pixels[dy][dx])
+          continue;
+        if (spray_density > 0 && (rand() % 100) >= spray_density)
+          continue;
+        paint_pixel(x - ox + dx, y - oy + dy, color);
+      }
+    return;
+  }
   int half = brush_size / 2;
   for (int dy = 0; dy < brush_size; dy++)
     for (int dx = 0; dx < brush_size; dx++) {
