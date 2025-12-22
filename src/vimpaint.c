@@ -81,6 +81,7 @@ static int spray_density = 0;  /* 0 = off, 1-100 = % of pixels painted */
 
 typedef enum {
   FILL_SOLID = 0,
+  FILL_CHECKER,
 } FillPattern;
 static FillPattern fill_pattern = FILL_SOLID;
 static char text_font_family[256] = "Monospace";
@@ -1224,6 +1225,8 @@ static void cmd_execute(void) {
       const char *val = opt + 5;
       if (strcmp(val, "solid") == 0) {
         fill_pattern = FILL_SOLID; cmd_flash("Fill: solid");
+      } else if (strcmp(val, "checker") == 0) {
+        fill_pattern = FILL_CHECKER; cmd_flash("Fill: checkerboard");
       } else {
         cmd_flash("Usage: :set fill solid|checker|hstripes|vstripes|halftone");
       }
@@ -2541,7 +2544,7 @@ static void cmd_execute(void) {
         "  :brushdefine <pat>  define custom brush (rows sep by /, # = on)\n"
         "  :brushdefine        capture visual selection as custom brush\n"
         "  :set spray <1-100>|off  airbrush density (% pixels per stroke)\n"
-        "  :set fill solid\n"
+        "  :set fill solid|checker\n"
         "  :set sym h|v|hv|4|none  mirror symmetry\n"
         "  :set sym radial N       N-point radial symmetry (N=2..32)\n"
         "  :set undolevels N   set undo history depth (1-256, clears history)\n"
