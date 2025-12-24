@@ -2178,7 +2178,9 @@ static void cmd_execute(void) {
   }
 
   if (strcmp(cmd_buf, ":colorpicker") == 0 ||
-      strcmp(cmd_buf, ":colorpicker bg") == 0) {
+      strcmp(cmd_buf, ":cp") == 0 ||
+      strcmp(cmd_buf, ":colorpicker bg") == 0 ||
+      strcmp(cmd_buf, ":cp bg") == 0) {
     gboolean set_bg = (strstr(cmd_buf, "bg") != NULL);
     guint32 current = set_bg ? bg_color : fg_color;
     GdkRGBA rgba = {
@@ -2571,8 +2573,8 @@ static void cmd_execute(void) {
         "  :set color <hex|name>          add/select color\n"
         "  :set color <idx> <hex|name>    edit palette slot\n"
         "  :set bg <hex|name>             set background color\n"
-        "  :colorpicker                   open HSL/RGB color picker dialog\n"
-        "  :colorpicker bg                open color picker for background\n"
+        "  :colorpicker  (:cp)            open HSL/RGB color picker dialog\n"
+        "  :colorpicker bg  (:cp bg)      open color picker for background\n"
         "  :savep / :loadp <file>         save / load palette\n"
         "  :importp <file>               sample unique colors from PNG\n"
         "  :delp <idx>                    delete palette entry\n"
