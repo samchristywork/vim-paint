@@ -2177,6 +2177,55 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strcmp(cmd_buf, ":colorpicker") == 0) == 0) {
+    gboolean set_bg = (strstr(cmd_buf, "bg") != NULL);
+    guint32 current = set_bg ? bg_color : fg_color;
+    GdkRGBA rgba = {
+      ((current >> 24) & 0xff) / 255.0,
+      ((current >> 16) & 0xff) / 255.0,
+      ((current >>  8) & 0xff) / 255.0,
+      1.0
+    };
+    GtkWidget *dlg = gtk_color_chooser_dialog_new(
+        set_bg ? "Background Color" : "Foreground Color",
+        GTK_WINDOW(main_window));
+    gtk_color_chooser_set_rgba(GTK_COLOR_CHOOSER(dlg), &rgba);
+    gtk_color_chooser_set_use_alpha(GTK_COLOR_CHOOSER(dlg), FALSE);
+    if (gtk_dialog_run(GTK_DIALOG(dlg)) == GTK_RESPONSE_OK) {
+      gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(dlg), &rgba);
+      int r = CLAMP((int)(rgba.red   * 255.0 + 0.5), 0, 255);
+      int g = CLAMP((int)(rgba.green * 255.0 + 0.5), 0, 255);
+      int b = CLAMP((int)(rgba.blue  * 255.0 + 0.5), 0, 255);
+      guint32 packed = PACK_RGBA(r, g, b, 255);
+      if (set_bg) {
+        bg_color = packed;
+        set_palette_rgb(0, (r << 16) | (g << 8) | b);
+      } else {
+        unsigned int rgb = (r << 16) | (g << 8) | b;
+        double pr = r / 255.0, pg = g / 255.0, pb = b / 255.0;
+        int found = -1;
+        for (int i = 0; i < PALETTE_SIZE; i++) {
+          if (palette[i][0] == pr && palette[i][1] == pg && palette[i][2] == pb) {
+            found = i;
+            break;
+          }
+        }
+        if (found < 0 && PALETTE_SIZE < 256 && palette_reserve(palette_size + 1)) {
+          found = palette_size;
+          set_palette_rgb(found, rgb);
+          palette_size++;
+        }
+        fg_color = packed;
+      }
+      gtk_widget_queue_draw(palette_bar);
+      gtk_widget_queue_draw(main_canvas);
+      status_update();
+    }
+    gtk_widget_destroy(dlg);
+    cmd_set("");
+    return;
+  }
+
   if (strcmp(cmd_buf, ":fliph") == 0) {
     begin_undo_action();
     for (int y = 0; y < CANVAS_H; y++)
@@ -2521,6 +2570,7 @@ static void cmd_execute(void) {
         "  :set color <hex|name>          add/select color\n"
         "  :set color <idx> <hex|name>    edit palette slot\n"
         "  :set bg <hex|name>             set background color\n"
+        "  :colorpicker                   open HSL/RGB color picker dialog\n"
         "  :savep / :loadp <file>         save / load palette\n"
         "  :importp <file>               sample unique colors from PNG\n"
         "  :delp <idx>                    delete palette entry\n"
