@@ -58,6 +58,8 @@ static gboolean show_grid = TRUE;
 static guint32 grid_color = 0xccccccff; /* RRGGBBAA */
 static gboolean show_ruler = FALSE;
 static gboolean show_checker = FALSE;
+static gboolean show_onionskin = FALSE;
+static int onionskin_opacity = 50; /* percent */
 static gboolean gradient_tool = FALSE;
 static gboolean grad_dragging = FALSE;
 static int grad_x0 = 0, grad_y0 = 0;
@@ -1184,6 +1186,23 @@ static void cmd_execute(void) {
       show_checker = FALSE;
       gtk_widget_queue_draw(main_canvas);
       cmd_set("");
+    } else if (strcmp(opt, "onionskin") == 0) {
+      show_onionskin = TRUE;
+      gtk_widget_queue_draw(main_canvas);
+      cmd_flash("Onion skin on.");
+    } else if (strcmp(opt, "noonionskin") == 0) {
+      show_onionskin = FALSE;
+      gtk_widget_queue_draw(main_canvas);
+      cmd_flash("Onion skin off.");
+    } else if (strncmp(opt, "onionskinopacity ", 17) == 0) {
+      int v = atoi(opt + 17);
+      if (v < 1 || v > 100) {
+        cmd_flash("Onion skin opacity must be 1-100.");
+      } else {
+        onionskin_opacity = v;
+        gtk_widget_queue_draw(main_canvas);
+        cmd_set("");
+      }
     } else if (strncmp(opt, "zoom ", 5) == 0) {
       int v = atoi(opt + 5);
       if (v >= 4 && v <= 64) {
@@ -2694,6 +2713,8 @@ static void cmd_execute(void) {
         "  | (pipe)            toggle grid\n"
         "  %                   toggle coordinate ruler\n"
         "  #                   toggle checkerboard background\n"
+        "  :set onionskin / :set noonionskin  toggle onion skin overlay\n"
+        "  :set onionskinopacity N    onion skin strength 1-100 (default 50)\n"
         "  :set gridcolor <hex|name>  set grid line colour\n"
         "  :set zoom N         set cell size\n"
         "  :set brush N        set brush size (1-16)\n"
@@ -3086,6 +3107,37 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
     }
   }
   free(composite);
+
+  /* Onion skin: overlay adjacent layers semi-transparently as drawing reference.
+     Previous layer is tinted red, next layer is tinted blue. */
+  if (show_onionskin && layer_count > 1) {
+    double op = onionskin_opacity / 100.0;
+    int offsets[2] = {-1, 1};
+    for (int oi = 0; oi < 2; oi++) {
+      int li = layer_active + offsets[oi];
+      if (li < 0 || li >= layer_count || !layer_bufs[li])
+        continue;
+      for (int y = 0; y < CANVAS_H; y++) {
+        for (int x = 0; x < CANVAS_W; x++) {
+          guint32 px = layer_bufs[li][y * CANVAS_W + x];
+          double pa = (px & 0xff) / 255.0;
+          if (pa < 0.01)
+            continue;
+          double pr = (px >> 24 & 0xff) / 255.0;
+          double pg = (px >> 16 & 0xff) / 255.0;
+          double pb = (px >>  8 & 0xff) / 255.0;
+          double alpha = pa * op;
+          /* Tint: previous=red, next=blue */
+          if (offsets[oi] < 0)
+            cairo_set_source_rgba(cr, pr * 0.5 + 0.5, pg * 0.5, pb * 0.5, alpha);
+          else
+            cairo_set_source_rgba(cr, pr * 0.5, pg * 0.5, pb * 0.5 + 0.5, alpha);
+          cairo_rectangle(cr, x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+          cairo_fill(cr);
+        }
+      }
+    }
+  }
 
   /* Draw grid lines */
   if (show_grid) {
