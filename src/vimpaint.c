@@ -1858,6 +1858,57 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strcmp(cmd_buf, ":seltolay") == 0) {
+    if (!visual_mode) {
+      cmd_flash("No selection. Enter visual mode first.");
+      return;
+    }
+    if (layer_count >= LAYER_MAX) {
+      cmd_flash("Layer limit reached.");
+      return;
+    }
+    int x0 = MIN(cursor_x, visual_anchor_x);
+    int x1 = MAX(cursor_x, visual_anchor_x);
+    int y0 = MIN(cursor_y, visual_anchor_y);
+    int y1 = MAX(cursor_y, visual_anchor_y);
+    size_t total = (size_t)CANVAS_W * CANVAS_H;
+    guint32 *buf = calloc(total, sizeof(guint32));
+    if (!buf) {
+      cmd_flash("Out of memory.");
+      return;
+    }
+    /* Copy selection pixels at their original coordinates */
+    for (int y = y0; y <= y1; y++)
+      for (int x = x0; x <= x1; x++)
+        buf[y * CANVAS_W + x] = PX(y, x);
+    /* Insert above active layer */
+    int ins = layer_active + 1;
+    for (int li = layer_count; li > ins; li--) {
+      layer_bufs[li]    = layer_bufs[li - 1];
+      layer_visible[li] = layer_visible[li - 1];
+      layer_blend[li]   = layer_blend[li - 1];
+      layer_opacity[li] = layer_opacity[li - 1];
+      memcpy(layer_name[li], layer_name[li - 1], 32);
+    }
+    layer_bufs[ins]    = buf;
+    layer_visible[ins] = TRUE;
+    layer_blend[ins]   = BLEND_NORMAL;
+    layer_opacity[ins] = 100;
+    snprintf(layer_name[ins], 32, "Layer %d", layer_count + 1);
+    layer_count++;
+    layer_active = ins;
+    pixels = layer_bufs[layer_active];
+    visual_mode = FALSE;
+    clear_history();
+    status_update();
+    gtk_widget_queue_draw(main_canvas);
+    char msg[64];
+    snprintf(msg, sizeof(msg), "Selection copied to layer %d/%d",
+             layer_active + 1, layer_count);
+    cmd_flash(msg);
+    return;
+  }
+
   if (strcmp(cmd_buf, ":mergedown") == 0) {
     if (layer_active == 0) {
       cmd_flash("Already at bottom layer.");
@@ -2605,6 +2656,8 @@ static void cmd_execute(void) {
         "  R                   rotate selection 90° clockwise\n"
         "  :scale N            scale selection N× in place (N = 2..8)\n"
         "  + / -               grow / shrink selection by N pixels (n=count)\n"
+        "  T                   copy selection to a new layer above active\n"
+        "  :seltolay           same as T\n"
         "\n"
         "Palette\n"
         "  c / C               cycle color forward / backward\n"
@@ -3656,6 +3709,13 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
         yank_buf[ey * yank_w + ex] = PX(y0 + ey, x0 + ex);
     visual_mode = FALSE;
     status_update();
+    gtk_widget_queue_draw(GTK_WIDGET(data));
+    return TRUE;
+  }
+
+  if (visual_mode && event->keyval == GDK_KEY_T) {
+    snprintf(cmd_buf, sizeof(cmd_buf), ":seltolay");
+    cmd_execute();
     gtk_widget_queue_draw(GTK_WIDGET(data));
     return TRUE;
   }
