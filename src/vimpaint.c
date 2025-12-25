@@ -116,6 +116,7 @@ static int redo_top = 0, redo_count = 0;
 static guint32 *layer_bufs[LAYER_MAX];
 static gboolean layer_visible[LAYER_MAX];
 static char layer_name[LAYER_MAX][32];
+static int layer_opacity[LAYER_MAX]; /* 0–100, default 100 */
 static int layer_count = 1;
 static int layer_active = 0;
 
@@ -170,9 +171,10 @@ static void layers_composite(guint32 *dst, int total) {
     if (!layer_visible[li] || !layer_bufs[li])
       continue;
     BlendMode mode = layer_blend[li];
+    double op = layer_opacity[li] / 100.0;
     for (int i = 0; i < total; i++) {
       guint32 src = layer_bufs[li][i];
-      double sa = (src & 0xff) / 255.0;
+      double sa = (src & 0xff) / 255.0 * op;
       if (sa == 0.0)
         continue;
       guint32 d = dst[i];
@@ -227,6 +229,8 @@ static void layers_flatten(void) {
   layer_count = 1;
   layer_active = 0;
   layer_visible[0] = TRUE;
+  layer_opacity[0] = 100;
+  layer_blend[0] = BLEND_NORMAL;
   snprintf(layer_name[0], 32, "Layer 1");
 }
 
@@ -403,6 +407,8 @@ static void tab_switch(int newidx) {
   layer_count = 1;
   layer_active = 0;
   layer_visible[0] = TRUE;
+  layer_opacity[0] = 100;
+  layer_blend[0] = BLEND_NORMAL;
   snprintf(layer_name[0], 32, "Layer 1");
   CANVAS_W = t->w;
   CANVAS_H = t->h;
@@ -458,6 +464,8 @@ static void tab_close_current(void) {
   layer_count = 1;
   layer_active = 0;
   layer_visible[0] = TRUE;
+  layer_opacity[0] = 100;
+  layer_blend[0] = BLEND_NORMAL;
   snprintf(layer_name[0], 32, "Layer 1");
   CANVAS_W = t->w;
   CANVAS_H = t->h;
@@ -526,12 +534,24 @@ static void status_update(void) {
   guchar r = (fg_color >> 24) & 0xff;
   guchar g = (fg_color >> 16) & 0xff;
   guchar b = (fg_color >> 8) & 0xff;
-  char layer_info[48] = "";
+  char layer_info[64] = "";
   if (layer_count > 1) {
     BlendMode bm = layer_blend[layer_active];
+    int op = layer_opacity[layer_active];
+    char bm_part[24] = "", op_part[12] = "";
     if (bm != BLEND_NORMAL)
+      snprintf(bm_part, sizeof(bm_part), "%s", blend_mode_names[bm]);
+    if (op != 100)
+      snprintf(op_part, sizeof(op_part), "%d%%", op);
+    if (bm_part[0] && op_part[0])
+      snprintf(layer_info, sizeof(layer_info), "  L%d/%d[%s@%s]",
+               layer_active + 1, layer_count, bm_part, op_part);
+    else if (bm_part[0])
       snprintf(layer_info, sizeof(layer_info), "  L%d/%d[%s]",
-               layer_active + 1, layer_count, blend_mode_names[bm]);
+               layer_active + 1, layer_count, bm_part);
+    else if (op_part[0])
+      snprintf(layer_info, sizeof(layer_info), "  L%d/%d[%s]",
+               layer_active + 1, layer_count, op_part);
     else
       snprintf(layer_info, sizeof(layer_info), "  L%d/%d", layer_active + 1, layer_count);
   }
@@ -1818,11 +1838,13 @@ static void cmd_execute(void) {
       layer_bufs[li] = layer_bufs[li - 1];
       layer_visible[li] = layer_visible[li - 1];
       layer_blend[li] = layer_blend[li - 1];
+      layer_opacity[li] = layer_opacity[li - 1];
       memcpy(layer_name[li], layer_name[li - 1], 32);
     }
     layer_bufs[ins] = buf;
     layer_visible[ins] = TRUE;
     layer_blend[ins] = BLEND_NORMAL;
+    layer_opacity[ins] = 100;
     snprintf(layer_name[ins], 32, "Layer %d", layer_count + 1);
     layer_count++;
     layer_active = ins;
@@ -1871,12 +1893,14 @@ static void cmd_execute(void) {
       layer_bufs[li] = layer_bufs[li + 1];
       layer_visible[li] = layer_visible[li + 1];
       layer_blend[li] = layer_blend[li + 1];
+      layer_opacity[li] = layer_opacity[li + 1];
       memcpy(layer_name[li], layer_name[li + 1], 32);
     }
     layer_count--;
     layer_bufs[layer_count] = NULL;
     layer_visible[layer_count] = FALSE;
     layer_blend[layer_count] = BLEND_NORMAL;
+    layer_opacity[layer_count] = 100;
     layer_active--;
     pixels = layer_bufs[layer_active];
     commit_canvas_snapshot(before, CANVAS_W, CANVAS_H);
@@ -1942,6 +1966,21 @@ static void cmd_execute(void) {
     char msg[64];
     snprintf(msg, sizeof(msg), "Layer %d blend: %s", layer_active + 1,
              blend_mode_names[found]);
+    cmd_flash(msg);
+    return;
+  }
+
+  if (strncmp(cmd_buf, ":layeropacity ", 14) == 0 && *arg) {
+    int v = atoi(arg);
+    if (v < 0 || v > 100) {
+      cmd_flash("Opacity must be 0-100.");
+      return;
+    }
+    layer_opacity[layer_active] = v;
+    gtk_widget_queue_draw(main_canvas);
+    status_update();
+    char msg[64];
+    snprintf(msg, sizeof(msg), "Layer %d opacity: %d%%", layer_active + 1, v);
     cmd_flash(msg);
     return;
   }
@@ -2592,6 +2631,7 @@ static void cmd_execute(void) {
         "  :layer N               switch to layer N (1-based)\n"
         "  :layervis N            toggle visibility of layer N\n"
         "  :layerblend <mode>     set blend mode (normal|multiply|screen|overlay|...)\n"
+        "  :layeropacity N        set active layer opacity 0-100\n"
         "  :guide h|v N           toggle horizontal/vertical guide at row/col N\n"
         "  :guide clear           remove all guides\n"
         "  :guide snap            toggle snap-to-guides in insert mode\n"
@@ -4422,6 +4462,8 @@ int main(int argc, char *argv[]) {
   pixels = calloc((size_t)CANVAS_W * CANVAS_H, sizeof(guint32));
   layer_bufs[0] = pixels;
   layer_visible[0] = TRUE;
+  layer_opacity[0] = 100;
+  layer_blend[0] = BLEND_NORMAL;
   snprintf(layer_name[0], 32, "Layer 1");
   layer_count = 1;
   layer_active = 0;
