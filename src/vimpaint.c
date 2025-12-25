@@ -2565,6 +2565,7 @@ static void cmd_execute(void) {
         "  H / V               flip selection horizontally / vertically\n"
         "  R                   rotate selection 90° clockwise\n"
         "  :scale N            scale selection N× in place (N = 2..8)\n"
+        "  + / -               grow / shrink selection by N pixels (n=count)\n"
         "\n"
         "Palette\n"
         "  c / C               cycle color forward / backward\n"
@@ -3723,6 +3724,37 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     free(tmp);
     commit_undo_action();
     visual_mode = FALSE;
+    status_update();
+    gtk_widget_queue_draw(GTK_WIDGET(data));
+    return TRUE;
+  }
+
+  if (visual_mode && (event->keyval == GDK_KEY_plus ||
+                      event->keyval == GDK_KEY_equal)) {
+    int amount = MAX(1, n);
+    int x0 = CLAMP(MIN(cursor_x, visual_anchor_x) - amount, 0, CANVAS_W - 1);
+    int x1 = CLAMP(MAX(cursor_x, visual_anchor_x) + amount, 0, CANVAS_W - 1);
+    int y0 = CLAMP(MIN(cursor_y, visual_anchor_y) - amount, 0, CANVAS_H - 1);
+    int y1 = CLAMP(MAX(cursor_y, visual_anchor_y) + amount, 0, CANVAS_H - 1);
+    visual_anchor_x = x0; visual_anchor_y = y0;
+    cursor_x = x1;        cursor_y = y1;
+    status_update();
+    gtk_widget_queue_draw(GTK_WIDGET(data));
+    return TRUE;
+  }
+
+  if (visual_mode && event->keyval == GDK_KEY_minus) {
+    int amount = MAX(1, n);
+    int x0 = MIN(cursor_x, visual_anchor_x);
+    int x1 = MAX(cursor_x, visual_anchor_x);
+    int y0 = MIN(cursor_y, visual_anchor_y);
+    int y1 = MAX(cursor_y, visual_anchor_y);
+    x0 = MIN(x0 + amount, (x0 + x1) / 2);
+    x1 = MAX(x1 - amount, (x0 + x1) / 2);
+    y0 = MIN(y0 + amount, (y0 + y1) / 2);
+    y1 = MAX(y1 - amount, (y0 + y1) / 2);
+    visual_anchor_x = x0; visual_anchor_y = y0;
+    cursor_x = x1;        cursor_y = y1;
     status_update();
     gtk_widget_queue_draw(GTK_WIDGET(data));
     return TRUE;
