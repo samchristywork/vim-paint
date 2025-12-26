@@ -80,6 +80,7 @@ static int brush_shape = 0;    /* 0 = square, 1 = circle, 2 = custom */
 static int custom_brush_w = 0, custom_brush_h = 0;
 static gboolean custom_brush_pixels[CUSTOM_BRUSH_MAX][CUSTOM_BRUSH_MAX];
 static int spray_density = 0;  /* 0 = off, 1-100 = % of pixels painted */
+static int ellipse_ry = 0;     /* 0 = use rx (circle), >0 = fixed y-radius */
 
 typedef enum {
   FILL_SOLID = 0,
@@ -1261,6 +1262,20 @@ static void cmd_execute(void) {
           cmd_set("");
         } else {
           cmd_flash("Usage: :set spray <1-100>|off");
+        }
+      }
+    } else if (strncmp(opt, "ellipsery ", 10) == 0) {
+      const char *val = opt + 10;
+      if (strcmp(val, "0") == 0 || strcmp(val, "off") == 0) {
+        ellipse_ry = 0;
+        cmd_flash("Ellipse ry: auto (= rx)");
+      } else {
+        int v = atoi(val);
+        if (v >= 1 && v <= 8192) {
+          ellipse_ry = v;
+          cmd_flash("Ellipse ry set");
+        } else {
+          cmd_flash("Usage: :set ellipsery <1-8192>|0");
         }
       }
     } else if (strncmp(opt, "fill ", 5) == 0) {
@@ -2662,6 +2677,9 @@ static void cmd_execute(void) {
         "  x                   erase rect  (n=radius)\n"
         "  o                   circle outline  (n=radius)\n"
         "  O                   filled circle   (n=radius)\n"
+        "  E                   filled ellipse  (n=rx, :set ellipsery for ry)\n"
+        "  e  (in visual mode) ellipse outline fitting selection\n"
+        "  E  (in visual mode) filled ellipse fitting selection\n"
         "  S                   flood fill\n"
         "  i                   insert mode (move to paint)\n"
         "  .                   repeat last paint / erase\n"
@@ -2722,6 +2740,7 @@ static void cmd_execute(void) {
         "  :brushdefine <pat>  define custom brush (rows sep by /, # = on)\n"
         "  :brushdefine        capture visual selection as custom brush\n"
         "  :set spray <1-100>|off  airbrush density (% pixels per stroke)\n"
+        "  :set ellipsery <N>|0    y-radius for e/E (0 = same as rx)\n"
         "  :set fill solid|checker|hstripes|vstripes|halftone\n"
         "  :set sym h|v|hv|4|none  mirror symmetry\n"
         "  :set sym radial N       N-point radial symmetry (N=2..32)\n"
@@ -4140,14 +4159,56 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     break;
   }
   case GDK_KEY_e: {
-    fg_color = PX(cursor_y, cursor_x); /* pick RGBA directly */
-    gtk_widget_queue_draw(palette_bar);
-    guchar er = (fg_color >> 24) & 0xff;
-    guchar eg = (fg_color >> 16) & 0xff;
-    guchar eb = (fg_color >> 8) & 0xff;
-    char ebuf[32];
-    snprintf(ebuf, sizeof(ebuf), "color #%02x%02x%02x", er, eg, eb);
-    cmd_flash(ebuf);
+    if (visual_mode) {
+      /* ellipse outline fitting selection */
+      int vx0 = MIN(cursor_x, visual_anchor_x);
+      int vx1 = MAX(cursor_x, visual_anchor_x);
+      int vy0 = MIN(cursor_y, visual_anchor_y);
+      int vy1 = MAX(cursor_y, visual_anchor_y);
+      int ecx = (vx0 + vx1) / 2, ecy = (vy0 + vy1) / 2;
+      int erx = MAX(1, (vx1 - vx0 + 1) / 2);
+      int ery = MAX(1, (vy1 - vy0 + 1) / 2);
+      begin_undo_action();
+      long long rx2 = (long long)erx * erx;
+      long long ry2 = (long long)ery * ery;
+      long long oex = erx, oey = 0;
+      long long oerr = rx2 - ry2 * erx + ry2 / 4;
+#define OESET(px, py) do { \
+  int _ex = ecx + (int)(px), _ey = ecy + (int)(py); \
+  if (_ex >= 0 && _ex < CANVAS_W && _ey >= 0 && _ey < CANVAS_H) \
+    paint_pixel(_ex, _ey, fg_color); \
+  _ex = ecx - (int)(px); \
+  if (_ex >= 0 && _ex < CANVAS_W && _ey >= 0 && _ey < CANVAS_H) \
+    paint_pixel(_ex, _ey, fg_color); \
+} while (0)
+      while (2 * ry2 * oex > 2 * rx2 * oey) {
+        OESET(oex,  oey);
+        OESET(oex, -oey);
+        if (oerr < 0) { oey++; oerr += 2 * ry2 * oey + ry2; }
+        else { oex--; oey++; oerr += 2 * ry2 * oey - 2 * rx2 * oex + ry2; }
+      }
+      oerr = ry2 * (oex * oex + oex) + rx2 * ((oey - 1) * (oey - 1) - ry2) + rx2 - ry2 * oex * 2;
+      while (oex >= 0) {
+        OESET(oex,  oey);
+        OESET(oex, -oey);
+        if (oerr > 0) { oey++; oerr += 2 * rx2 * oey + rx2; }
+        else { oex--; oey++; oerr += 2 * ry2 * oex + 2 * rx2 * oey + rx2; }
+      }
+#undef OESET
+      commit_undo_action();
+      visual_mode = FALSE;
+      gtk_widget_queue_draw(main_canvas);
+      status_update();
+    } else {
+      fg_color = PX(cursor_y, cursor_x); /* eyedropper */
+      gtk_widget_queue_draw(palette_bar);
+      guchar er = (fg_color >> 24) & 0xff;
+      guchar eg = (fg_color >> 16) & 0xff;
+      guchar eb = (fg_color >> 8) & 0xff;
+      char ebuf[32];
+      snprintf(ebuf, sizeof(ebuf), "color #%02x%02x%02x", er, eg, eb);
+      cmd_flash(ebuf);
+    }
     break;
   }
   case GDK_KEY_o: {
@@ -4193,6 +4254,44 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
             ex < CANVAS_W && ey >= 0 && ey < CANVAS_H)
           paint_pixel(ex, ey, fg_color);
     commit_undo_action();
+    break;
+  }
+  case GDK_KEY_E: {
+    int cx, cy, rx, ry;
+    if (visual_mode) {
+      int vx0 = MIN(cursor_x, visual_anchor_x);
+      int vx1 = MAX(cursor_x, visual_anchor_x);
+      int vy0 = MIN(cursor_y, visual_anchor_y);
+      int vy1 = MAX(cursor_y, visual_anchor_y);
+      cx = (vx0 + vx1) / 2;
+      cy = (vy0 + vy1) / 2;
+      rx = (vx1 - vx0 + 1) / 2;
+      ry = (vy1 - vy0 + 1) / 2;
+    } else {
+      cx = cursor_x;
+      cy = cursor_y;
+      rx = MAX(1, radius);
+      ry = ellipse_ry > 0 ? ellipse_ry : rx;
+    }
+    if (rx < 1) rx = 1;
+    if (ry < 1) ry = 1;
+    begin_undo_action();
+    /* filled ellipse: scan lines */
+    for (int ey = cy - ry; ey <= cy + ry; ey++) {
+      if (ey < 0 || ey >= CANVAS_H) continue;
+      double dy = (double)(ey - cy) / ry;
+      double dx_f = rx * sqrt(MAX(0.0, 1.0 - dy * dy));
+      int ex0 = CLAMP((int)(cx - dx_f), 0, CANVAS_W - 1);
+      int ex1 = CLAMP((int)(cx + dx_f), 0, CANVAS_W - 1);
+      for (int ex = ex0; ex <= ex1; ex++)
+        paint_pixel(ex, ey, fg_color);
+    }
+    commit_undo_action();
+    if (visual_mode) {
+      visual_mode = FALSE;
+      gtk_widget_queue_draw(main_canvas);
+      status_update();
+    }
     break;
   }
   case GDK_KEY_space:
