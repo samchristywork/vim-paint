@@ -4169,32 +4169,26 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
       int erx = MAX(1, (vx1 - vx0 + 1) / 2);
       int ery = MAX(1, (vy1 - vy0 + 1) / 2);
       begin_undo_action();
-      long long rx2 = (long long)erx * erx;
-      long long ry2 = (long long)ery * ery;
-      long long oex = erx, oey = 0;
-      long long oerr = rx2 - ry2 * erx + ry2 / 4;
-#define OESET(px, py) do { \
-  int _ex = ecx + (int)(px), _ey = ecy + (int)(py); \
-  if (_ex >= 0 && _ex < CANVAS_W && _ey >= 0 && _ey < CANVAS_H) \
-    paint_pixel(_ex, _ey, fg_color); \
-  _ex = ecx - (int)(px); \
+#define EPSET(px, py) do { \
+  int _ex = (px), _ey = (py); \
   if (_ex >= 0 && _ex < CANVAS_W && _ey >= 0 && _ey < CANVAS_H) \
     paint_pixel(_ex, _ey, fg_color); \
 } while (0)
-      while (2 * ry2 * oex > 2 * rx2 * oey) {
-        OESET(oex,  oey);
-        OESET(oex, -oey);
-        if (oerr < 0) { oey++; oerr += 2 * ry2 * oey + ry2; }
-        else { oex--; oey++; oerr += 2 * ry2 * oey - 2 * rx2 * oex + ry2; }
+      /* scan x: fills left/right arcs */
+      for (int oex = -erx; oex <= erx; oex++) {
+        double t = 1.0 - (double)oex * oex / ((double)erx * erx);
+        int dy = (int)round(ery * sqrt(MAX(0.0, t)));
+        EPSET(ecx + oex, ecy + dy);
+        EPSET(ecx + oex, ecy - dy);
       }
-      oerr = ry2 * (oex * oex + oex) + rx2 * ((oey - 1) * (oey - 1) - ry2) + rx2 - ry2 * oex * 2;
-      while (oex >= 0) {
-        OESET(oex,  oey);
-        OESET(oex, -oey);
-        if (oerr > 0) { oey++; oerr += 2 * rx2 * oey + rx2; }
-        else { oex--; oey++; oerr += 2 * ry2 * oex + 2 * rx2 * oey + rx2; }
+      /* scan y: fills top/bottom arcs */
+      for (int oey = -ery; oey <= ery; oey++) {
+        double t = 1.0 - (double)oey * oey / ((double)ery * ery);
+        int dx = (int)round(erx * sqrt(MAX(0.0, t)));
+        EPSET(ecx + dx, ecy + oey);
+        EPSET(ecx - dx, ecy + oey);
       }
-#undef OESET
+#undef EPSET
       commit_undo_action();
       visual_mode = FALSE;
       gtk_widget_queue_draw(main_canvas);
