@@ -2391,6 +2391,33 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strcmp(cmd_buf, ":invert") == 0) {
+    int x0 = 0, y0 = 0, x1 = CANVAS_W - 1, y1 = CANVAS_H - 1;
+    if (visual_mode) {
+      x0 = MIN(cursor_x, visual_anchor_x);
+      x1 = MAX(cursor_x, visual_anchor_x);
+      y0 = MIN(cursor_y, visual_anchor_y);
+      y1 = MAX(cursor_y, visual_anchor_y);
+    }
+    begin_undo_action();
+    for (int y = y0; y <= y1; y++)
+      for (int x = x0; x <= x1; x++) {
+        guint32 px = PX(y, x);
+        guchar a = px & 0xff;
+        if (a == 0) continue;
+        guchar r = ~((px >> 24) & 0xff);
+        guchar g = ~((px >> 16) & 0xff);
+        guchar b = ~((px >> 8) & 0xff);
+        push_undo(x, y);
+        PX(y, x) = PACK_RGBA(r, g, b, a);
+      }
+    commit_undo_action();
+    visual_mode = FALSE;
+    gtk_widget_queue_draw(main_canvas);
+    cmd_set("");
+    return;
+  }
+
   if (strcmp(cmd_buf, ":rotate") == 0) {
     if (layer_count > 1)
       layers_flatten();
@@ -2716,6 +2743,7 @@ static void cmd_execute(void) {
         "\n"
         "Transform\n"
         "  :resize WxH   :fliph   :flipv   :rotate   :center   :crop\n"
+        "  :invert             invert RGB of canvas (or visual selection)\n"
         "  :newlayer              add transparent layer above active\n"
         "  :mergedown             composite active layer into layer below\n"
         "  :layer N               switch to layer N (1-based)\n"
