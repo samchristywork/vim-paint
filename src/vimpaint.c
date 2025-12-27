@@ -2479,6 +2479,31 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strcmp(cmd_buf, ":stroke") == 0) {
+    if (!visual_mode) {
+      cmd_flash(":stroke requires a visual selection.");
+      return;
+    }
+    int x0 = MIN(cursor_x, visual_anchor_x);
+    int x1 = MAX(cursor_x, visual_anchor_x);
+    int y0 = MIN(cursor_y, visual_anchor_y);
+    int y1 = MAX(cursor_y, visual_anchor_y);
+    begin_undo_action();
+    for (int x = x0; x <= x1; x++) {
+      paint_brush(x, y0, fg_color);
+      paint_brush(x, y1, fg_color);
+    }
+    for (int y = y0 + 1; y < y1; y++) {
+      paint_brush(x0, y, fg_color);
+      paint_brush(x1, y, fg_color);
+    }
+    commit_undo_action();
+    visual_mode = FALSE;
+    gtk_widget_queue_draw(main_canvas);
+    cmd_set("");
+    return;
+  }
+
   if (strcmp(cmd_buf, ":rotate") == 0) {
     if (layer_count > 1)
       layers_flatten();
@@ -2783,6 +2808,7 @@ static void cmd_execute(void) {
         "  + / -               grow / shrink selection by N pixels (n=count)\n"
         "  T                   copy selection to a new layer above active\n"
         "  :seltolay           same as T\n"
+        "  :stroke             paint brush along border of selection\n"
         "\n"
         "Palette\n"
         "  c / C               cycle color forward / backward\n"
