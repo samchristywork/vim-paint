@@ -2418,6 +2418,67 @@ static void cmd_execute(void) {
     return;
   }
 
+  if (strcmp(cmd_buf, ":blur") == 0 || strncmp(cmd_buf, ":blur ", 6) == 0) {
+    int radius = 1;
+    if (*arg) {
+      radius = atoi(arg);
+      if (radius < 1 || radius > 64) {
+        cmd_flash("Usage: :blur [N]  (N = 1..64)");
+        return;
+      }
+    }
+    int x0 = 0, y0 = 0, x1 = CANVAS_W - 1, y1 = CANVAS_H - 1;
+    if (visual_mode) {
+      x0 = MIN(cursor_x, visual_anchor_x);
+      x1 = MAX(cursor_x, visual_anchor_x);
+      y0 = MIN(cursor_y, visual_anchor_y);
+      y1 = MAX(cursor_y, visual_anchor_y);
+    }
+    int w = x1 - x0 + 1, h = y1 - y0 + 1;
+    guint32 *tmp = malloc((size_t)w * h * sizeof(guint32));
+    if (!tmp) { cmd_flash("Out of memory."); return; }
+    /* horizontal pass: source = canvas, dest = tmp */
+    for (int y = 0; y < h; y++) {
+      for (int x = 0; x < w; x++) {
+        long sr = 0, sg = 0, sb = 0, sa = 0, cnt = 0;
+        for (int dx = -radius; dx <= radius; dx++) {
+          int sx = CLAMP(x0 + x + dx, x0, x1);
+          guint32 px = PX(y0 + y, sx);
+          sr += (px >> 24) & 0xff;
+          sg += (px >> 16) & 0xff;
+          sb += (px >> 8) & 0xff;
+          sa += px & 0xff;
+          cnt++;
+        }
+        tmp[y * w + x] = PACK_RGBA(sr/cnt, sg/cnt, sb/cnt, sa/cnt);
+      }
+    }
+    /* vertical pass: source = tmp, write into canvas with undo */
+    begin_undo_action();
+    for (int x = 0; x < w; x++) {
+      for (int y = 0; y < h; y++) {
+        long sr = 0, sg = 0, sb = 0, sa = 0, cnt = 0;
+        for (int dy = -radius; dy <= radius; dy++) {
+          int sy = CLAMP(y + dy, 0, h - 1);
+          guint32 px = tmp[sy * w + x];
+          sr += (px >> 24) & 0xff;
+          sg += (px >> 16) & 0xff;
+          sb += (px >> 8) & 0xff;
+          sa += px & 0xff;
+          cnt++;
+        }
+        push_undo(x0 + x, y0 + y);
+        PX(y0 + y, x0 + x) = PACK_RGBA(sr/cnt, sg/cnt, sb/cnt, sa/cnt);
+      }
+    }
+    free(tmp);
+    commit_undo_action();
+    visual_mode = FALSE;
+    gtk_widget_queue_draw(main_canvas);
+    cmd_set("");
+    return;
+  }
+
   if (strcmp(cmd_buf, ":rotate") == 0) {
     if (layer_count > 1)
       layers_flatten();
@@ -2744,6 +2805,7 @@ static void cmd_execute(void) {
         "Transform\n"
         "  :resize WxH   :fliph   :flipv   :rotate   :center   :crop\n"
         "  :invert             invert RGB of canvas (or visual selection)\n"
+        "  :blur [N]           box blur radius N (default 1) on canvas or selection\n"
         "  :newlayer              add transparent layer above active\n"
         "  :mergedown             composite active layer into layer below\n"
         "  :layer N               switch to layer N (1-based)\n"
