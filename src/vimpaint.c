@@ -66,7 +66,10 @@ static int grad_x0 = 0, grad_y0 = 0;
 static guint32 grad_c1 = 0, grad_c2 = 0;
 
 #define GUIDE_MAX 64
-typedef struct { int coord; gboolean horizontal; } Guide;
+typedef struct {
+  int coord;
+  gboolean horizontal;
+} Guide;
 static Guide guides[GUIDE_MAX];
 static int guide_count = 0;
 static gboolean guide_snap = FALSE;
@@ -75,12 +78,12 @@ typedef enum { SYM_NONE = 0, SYM_H, SYM_V, SYM_HV, SYM_RADIAL } SymMode;
 static SymMode sym_mode = SYM_NONE;
 static int sym_radial_n = 4;
 static int brush_size = 1;
-static int brush_shape = 0;    /* 0 = square, 1 = circle, 2 = custom */
+static int brush_shape = 0; /* 0 = square, 1 = circle, 2 = custom */
 #define CUSTOM_BRUSH_MAX 16
 static int custom_brush_w = 0, custom_brush_h = 0;
 static gboolean custom_brush_pixels[CUSTOM_BRUSH_MAX][CUSTOM_BRUSH_MAX];
-static int spray_density = 0;  /* 0 = off, 1-100 = % of pixels painted */
-static int ellipse_ry = 0;     /* 0 = use rx (circle), >0 = fixed y-radius */
+static int spray_density = 0; /* 0 = off, 1-100 = % of pixels painted */
+static int ellipse_ry = 0;    /* 0 = use rx (circle), >0 = fixed y-radius */
 
 typedef enum {
   FILL_SOLID = 0,
@@ -142,28 +145,44 @@ typedef enum {
 static BlendMode layer_blend[LAYER_MAX];
 
 static const char *blend_mode_names[] = {
-  "normal", "multiply", "screen", "overlay", "darken", "lighten",
-  "color-dodge", "color-burn", "hard-light", "soft-light",
-  "difference", "exclusion"
-};
+    "normal",     "multiply",   "screen",      "overlay",
+    "darken",     "lighten",    "color-dodge", "color-burn",
+    "hard-light", "soft-light", "difference",  "exclusion"};
 
 static double blend_apply(BlendMode mode, double cb, double cs) {
   switch (mode) {
-    case BLEND_MULTIPLY:    return cb * cs;
-    case BLEND_SCREEN:      return cb + cs - cb * cs;
-    case BLEND_OVERLAY:     return cb <= 0.5 ? 2.0*cb*cs : 1.0 - 2.0*(1.0-cb)*(1.0-cs);
-    case BLEND_DARKEN:      return cb < cs ? cb : cs;
-    case BLEND_LIGHTEN:     return cb > cs ? cb : cs;
-    case BLEND_COLOR_DODGE: return cb == 0.0 ? 0.0 : cs == 1.0 ? 1.0 : (cb/(1.0-cs) < 1.0 ? cb/(1.0-cs) : 1.0);
-    case BLEND_COLOR_BURN:  return cb == 1.0 ? 1.0 : cs == 0.0 ? 0.0 : (1.0 - (1.0-cb)/cs > 0.0 ? 1.0 - (1.0-cb)/cs : 0.0);
-    case BLEND_HARD_LIGHT:  return cs <= 0.5 ? 2.0*cb*cs : 1.0 - 2.0*(1.0-cb)*(1.0-cs);
-    case BLEND_SOFT_LIGHT: {
-      double d = cb <= 0.25 ? ((16.0*cb - 12.0)*cb + 4.0)*cb : sqrt(cb);
-      return cs <= 0.5 ? cb - (1.0-2.0*cs)*cb*(1.0-cb) : cb + (2.0*cs-1.0)*(d-cb);
-    }
-    case BLEND_DIFFERENCE:  return cb > cs ? cb - cs : cs - cb;
-    case BLEND_EXCLUSION:   return cb + cs - 2.0*cb*cs;
-    default:                return cs;
+  case BLEND_MULTIPLY:
+    return cb * cs;
+  case BLEND_SCREEN:
+    return cb + cs - cb * cs;
+  case BLEND_OVERLAY:
+    return cb <= 0.5 ? 2.0 * cb * cs : 1.0 - 2.0 * (1.0 - cb) * (1.0 - cs);
+  case BLEND_DARKEN:
+    return cb < cs ? cb : cs;
+  case BLEND_LIGHTEN:
+    return cb > cs ? cb : cs;
+  case BLEND_COLOR_DODGE:
+    return cb == 0.0   ? 0.0
+           : cs == 1.0 ? 1.0
+                       : (cb / (1.0 - cs) < 1.0 ? cb / (1.0 - cs) : 1.0);
+  case BLEND_COLOR_BURN:
+    return cb == 1.0 ? 1.0
+           : cs == 0.0
+               ? 0.0
+               : (1.0 - (1.0 - cb) / cs > 0.0 ? 1.0 - (1.0 - cb) / cs : 0.0);
+  case BLEND_HARD_LIGHT:
+    return cs <= 0.5 ? 2.0 * cb * cs : 1.0 - 2.0 * (1.0 - cb) * (1.0 - cs);
+  case BLEND_SOFT_LIGHT: {
+    double d = cb <= 0.25 ? ((16.0 * cb - 12.0) * cb + 4.0) * cb : sqrt(cb);
+    return cs <= 0.5 ? cb - (1.0 - 2.0 * cs) * cb * (1.0 - cb)
+                     : cb + (2.0 * cs - 1.0) * (d - cb);
+  }
+  case BLEND_DIFFERENCE:
+    return cb > cs ? cb - cs : cs - cb;
+  case BLEND_EXCLUSION:
+    return cb + cs - 2.0 * cb * cs;
+  default:
+    return cs;
   }
 }
 
@@ -189,10 +208,10 @@ static void layers_composite(guint32 *dst, int total) {
       }
       double cs_r = (src >> 24 & 0xff) / 255.0;
       double cs_g = (src >> 16 & 0xff) / 255.0;
-      double cs_b = (src >>  8 & 0xff) / 255.0;
+      double cs_b = (src >> 8 & 0xff) / 255.0;
       double cb_r = (d >> 24 & 0xff) / 255.0;
       double cb_g = (d >> 16 & 0xff) / 255.0;
-      double cb_b = (d >>  8 & 0xff) / 255.0;
+      double cb_b = (d >> 8 & 0xff) / 255.0;
       double rr, rg, rb;
       if (mode == BLEND_NORMAL) {
         double inv = 1.0 - sa;
@@ -201,14 +220,20 @@ static void layers_composite(guint32 *dst, int total) {
         rb = (cs_b * sa + cb_b * da * inv) / ra;
       } else {
         /* W3C compositing: Co = αs((1−αb)Cs + αb·B(Cb,Cs)) + αb(1−αs)Cb */
-        rr = (sa * ((1.0-da)*cs_r + da*blend_apply(mode, cb_r, cs_r)) + da*(1.0-sa)*cb_r) / ra;
-        rg = (sa * ((1.0-da)*cs_g + da*blend_apply(mode, cb_g, cs_g)) + da*(1.0-sa)*cb_g) / ra;
-        rb = (sa * ((1.0-da)*cs_b + da*blend_apply(mode, cb_b, cs_b)) + da*(1.0-sa)*cb_b) / ra;
+        rr = (sa * ((1.0 - da) * cs_r + da * blend_apply(mode, cb_r, cs_r)) +
+              da * (1.0 - sa) * cb_r) /
+             ra;
+        rg = (sa * ((1.0 - da) * cs_g + da * blend_apply(mode, cb_g, cs_g)) +
+              da * (1.0 - sa) * cb_g) /
+             ra;
+        rb = (sa * ((1.0 - da) * cs_b + da * blend_apply(mode, cb_b, cs_b)) +
+              da * (1.0 - sa) * cb_b) /
+             ra;
       }
-      dst[i] = PACK_RGBA(CLAMP((int)(rr*255.0+0.5), 0, 255),
-                         CLAMP((int)(rg*255.0+0.5), 0, 255),
-                         CLAMP((int)(rb*255.0+0.5), 0, 255),
-                         CLAMP((int)(ra*255.0+0.5), 0, 255));
+      dst[i] = PACK_RGBA(CLAMP((int)(rr * 255.0 + 0.5), 0, 255),
+                         CLAMP((int)(rg * 255.0 + 0.5), 0, 255),
+                         CLAMP((int)(rb * 255.0 + 0.5), 0, 255),
+                         CLAMP((int)(ra * 255.0 + 0.5), 0, 255));
     }
   }
 }
@@ -533,7 +558,10 @@ static void status_update(void) {
   if (flash_timer_id)
     return;
   char buf[160];
-  const char *mode = gradient_tool ? "GRADIENT" : visual_mode ? "VISUAL" : insert_mode ? "INSERT" : "NORMAL";
+  const char *mode = gradient_tool ? "GRADIENT"
+                     : visual_mode ? "VISUAL"
+                     : insert_mode ? "INSERT"
+                                   : "NORMAL";
   guchar r = (fg_color >> 24) & 0xff;
   guchar g = (fg_color >> 16) & 0xff;
   guchar b = (fg_color >> 8) & 0xff;
@@ -550,32 +578,43 @@ static void status_update(void) {
       snprintf(layer_info, sizeof(layer_info), "  L%d/%d[%s@%s]",
                layer_active + 1, layer_count, bm_part, op_part);
     else if (bm_part[0])
-      snprintf(layer_info, sizeof(layer_info), "  L%d/%d[%s]",
-               layer_active + 1, layer_count, bm_part);
+      snprintf(layer_info, sizeof(layer_info), "  L%d/%d[%s]", layer_active + 1,
+               layer_count, bm_part);
     else if (op_part[0])
-      snprintf(layer_info, sizeof(layer_info), "  L%d/%d[%s]",
-               layer_active + 1, layer_count, op_part);
+      snprintf(layer_info, sizeof(layer_info), "  L%d/%d[%s]", layer_active + 1,
+               layer_count, op_part);
     else
-      snprintf(layer_info, sizeof(layer_info), "  L%d/%d", layer_active + 1, layer_count);
+      snprintf(layer_info, sizeof(layer_info), "  L%d/%d", layer_active + 1,
+               layer_count);
   }
   char sym_info[24] = "";
   switch (sym_mode) {
-    case SYM_H:      snprintf(sym_info, sizeof(sym_info), "  symH"); break;
-    case SYM_V:      snprintf(sym_info, sizeof(sym_info), "  symV"); break;
-    case SYM_HV:     snprintf(sym_info, sizeof(sym_info), "  sym4"); break;
-    case SYM_RADIAL: snprintf(sym_info, sizeof(sym_info), "  sym%d", sym_radial_n); break;
-    default: break;
+  case SYM_H:
+    snprintf(sym_info, sizeof(sym_info), "  symH");
+    break;
+  case SYM_V:
+    snprintf(sym_info, sizeof(sym_info), "  symV");
+    break;
+  case SYM_HV:
+    snprintf(sym_info, sizeof(sym_info), "  sym4");
+    break;
+  case SYM_RADIAL:
+    snprintf(sym_info, sizeof(sym_info), "  sym%d", sym_radial_n);
+    break;
+  default:
+    break;
   }
   if (macro_recording)
-    snprintf(buf, sizeof(buf),
-             " %s  recording @%c  col: %d  row: %d  #%02x%02x%02x  %dx%d  z%d%s%s",
-             mode, 'a' + macro_reg, cursor_x + 1, cursor_y + 1, r, g, b,
-             CANVAS_W, CANVAS_H, CELL_SIZE, layer_info, sym_info);
+    snprintf(
+        buf, sizeof(buf),
+        " %s  recording @%c  col: %d  row: %d  #%02x%02x%02x  %dx%d  z%d%s%s",
+        mode, 'a' + macro_reg, cursor_x + 1, cursor_y + 1, r, g, b, CANVAS_W,
+        CANVAS_H, CELL_SIZE, layer_info, sym_info);
   else
     snprintf(buf, sizeof(buf),
-             " %s  col: %d  row: %d  #%02x%02x%02x  %dx%d  z%d%s%s",
-             mode, cursor_x + 1, cursor_y + 1, r, g, b, CANVAS_W, CANVAS_H,
-             CELL_SIZE, layer_info, sym_info);
+             " %s  col: %d  row: %d  #%02x%02x%02x  %dx%d  z%d%s%s", mode,
+             cursor_x + 1, cursor_y + 1, r, g, b, CANVAS_W, CANVAS_H, CELL_SIZE,
+             layer_info, sym_info);
   gtk_label_set_text(GTK_LABEL(cmd_label), buf);
   title_refresh();
 }
@@ -807,7 +846,10 @@ static const struct { const char *name; unsigned int rgb; } named_colors[] = {
    malformed. Returns FALSE without flashing if val is neither a valid hex nor a
    known name. */
 static void palette_to_rgb(int idx, int *r, int *g, int *b) {
-  if (idx < 0 || idx >= PALETTE_SIZE) { *r = *g = *b = 0; return; }
+  if (idx < 0 || idx >= PALETTE_SIZE) {
+    *r = *g = *b = 0;
+    return;
+  }
   *r = (int)(palette[idx][0] * 255 + 0.5);
   *g = (int)(palette[idx][1] * 255 + 0.5);
   *b = (int)(palette[idx][2] * 255 + 0.5);
@@ -1167,7 +1209,8 @@ static void cmd_execute(void) {
     } else if (strncmp(opt, "gridcolor ", 10) == 0) {
       unsigned int rgb = 0;
       if (parse_color(opt + 10, &rgb)) {
-        grid_color = PACK_RGBA((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff, 255);
+        grid_color =
+            PACK_RGBA((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff, 255);
         gtk_widget_queue_draw(main_canvas);
         cmd_set("");
       }
@@ -1281,15 +1324,20 @@ static void cmd_execute(void) {
     } else if (strncmp(opt, "fill ", 5) == 0) {
       const char *val = opt + 5;
       if (strcmp(val, "solid") == 0) {
-        fill_pattern = FILL_SOLID; cmd_flash("Fill: solid");
+        fill_pattern = FILL_SOLID;
+        cmd_flash("Fill: solid");
       } else if (strcmp(val, "checker") == 0) {
-        fill_pattern = FILL_CHECKER; cmd_flash("Fill: checkerboard");
+        fill_pattern = FILL_CHECKER;
+        cmd_flash("Fill: checkerboard");
       } else if (strcmp(val, "hstripes") == 0) {
-        fill_pattern = FILL_HSTRIPES; cmd_flash("Fill: horizontal stripes");
+        fill_pattern = FILL_HSTRIPES;
+        cmd_flash("Fill: horizontal stripes");
       } else if (strcmp(val, "vstripes") == 0) {
-        fill_pattern = FILL_VSTRIPES; cmd_flash("Fill: vertical stripes");
+        fill_pattern = FILL_VSTRIPES;
+        cmd_flash("Fill: vertical stripes");
       } else if (strcmp(val, "halftone") == 0) {
-        fill_pattern = FILL_HALFTONE; cmd_flash("Fill: halftone dither");
+        fill_pattern = FILL_HALFTONE;
+        cmd_flash("Fill: halftone dither");
       } else {
         cmd_flash("Usage: :set fill solid|checker|hstripes|vstripes|halftone");
       }
@@ -1390,7 +1438,8 @@ static void cmd_execute(void) {
       cmd_flash("Symmetry: 4-way");
     } else if (strncmp(opt, "sym radial", 10) == 0) {
       int n = atoi(opt + 10);
-      if (n < 2 || n > 32) n = 4;
+      if (n < 2 || n > 32)
+        n = 4;
       sym_radial_n = n;
       sym_mode = SYM_RADIAL;
       char msg[48];
@@ -1522,8 +1571,8 @@ static void cmd_execute(void) {
     unsigned int rgb1 = 0, rgb2 = 0;
     if (*arg) {
       char c1s[64] = "", c2s[64] = "";
-      if (sscanf(arg, "%63s %63s", c1s, c2s) != 2 ||
-          !parse_color(c1s, &rgb1) || !parse_color(c2s, &rgb2)) {
+      if (sscanf(arg, "%63s %63s", c1s, c2s) != 2 || !parse_color(c1s, &rgb1) ||
+          !parse_color(c2s, &rgb2)) {
         cmd_flash("Usage: :gradtool [color1 color2]");
         return;
       }
@@ -1543,7 +1592,8 @@ static void cmd_execute(void) {
   if (strcmp(cmd_buf, ":brushdefine") == 0 ||
       strncmp(cmd_buf, ":brushdefine ", 13) == 0) {
     if (*arg) {
-      /* Pattern string: rows separated by '/', '#'/'*'/'1' = set, rest = clear */
+      /* Pattern string: rows separated by '/', '#'/'*'/'1' = set, rest = clear
+       */
       memset(custom_brush_pixels, 0, sizeof(custom_brush_pixels));
       int row = 0, maxcol = 0;
       const char *p = arg;
@@ -1555,9 +1605,11 @@ static void cmd_execute(void) {
           col++;
           p++;
         }
-        if (col > maxcol) maxcol = col;
+        if (col > maxcol)
+          maxcol = col;
         row++;
-        if (*p == '/') p++;
+        if (*p == '/')
+          p++;
       }
       if (row == 0 || maxcol == 0) {
         cmd_flash("Empty pattern.");
@@ -1572,8 +1624,10 @@ static void cmd_execute(void) {
       int y0 = MIN(cursor_y, visual_anchor_y);
       int y1 = MAX(cursor_y, visual_anchor_y);
       int w = x1 - x0 + 1, h = y1 - y0 + 1;
-      if (w > CUSTOM_BRUSH_MAX) w = CUSTOM_BRUSH_MAX;
-      if (h > CUSTOM_BRUSH_MAX) h = CUSTOM_BRUSH_MAX;
+      if (w > CUSTOM_BRUSH_MAX)
+        w = CUSTOM_BRUSH_MAX;
+      if (h > CUSTOM_BRUSH_MAX)
+        h = CUSTOM_BRUSH_MAX;
       memset(custom_brush_pixels, 0, sizeof(custom_brush_pixels));
       for (int dy = 0; dy < h; dy++)
         for (int dx = 0; dx < w; dx++)
@@ -1587,8 +1641,8 @@ static void cmd_execute(void) {
     }
     brush_shape = 2;
     char msg[64];
-    snprintf(msg, sizeof(msg), "Custom brush defined (%dx%d).",
-             custom_brush_w, custom_brush_h);
+    snprintf(msg, sizeof(msg), "Custom brush defined (%dx%d).", custom_brush_w,
+             custom_brush_h);
     cmd_flash(msg);
     return;
   }
@@ -1658,7 +1712,8 @@ static void cmd_execute(void) {
       y0 = MIN(cursor_y, visual_anchor_y);
       y1 = MAX(cursor_y, visual_anchor_y);
     }
-    guint32 *before_snap = malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
+    guint32 *before_snap =
+        malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
     if (!before_snap) {
       cmd_flash("Out of memory.");
       return;
@@ -1887,7 +1942,8 @@ static void cmd_execute(void) {
     status_update();
     gtk_widget_queue_draw(main_canvas);
     char msg[64];
-    snprintf(msg, sizeof(msg), "New layer %d/%d", layer_active + 1, layer_count);
+    snprintf(msg, sizeof(msg), "New layer %d/%d", layer_active + 1,
+             layer_count);
     cmd_flash(msg);
     return;
   }
@@ -1918,15 +1974,15 @@ static void cmd_execute(void) {
     /* Insert above active layer */
     int ins = layer_active + 1;
     for (int li = layer_count; li > ins; li--) {
-      layer_bufs[li]    = layer_bufs[li - 1];
+      layer_bufs[li] = layer_bufs[li - 1];
       layer_visible[li] = layer_visible[li - 1];
-      layer_blend[li]   = layer_blend[li - 1];
+      layer_blend[li] = layer_blend[li - 1];
       layer_opacity[li] = layer_opacity[li - 1];
       memcpy(layer_name[li], layer_name[li - 1], 32);
     }
-    layer_bufs[ins]    = buf;
+    layer_bufs[ins] = buf;
     layer_visible[ins] = TRUE;
-    layer_blend[ins]   = BLEND_NORMAL;
+    layer_blend[ins] = BLEND_NORMAL;
     layer_opacity[ins] = 100;
     snprintf(layer_name[ins], 32, "Layer %d", layer_count + 1);
     layer_count++;
@@ -1966,12 +2022,26 @@ static void cmd_execute(void) {
       guint32 d = dst[i];
       double da = (d & 0xff) / 255.0;
       double ra = sa + da * (1.0 - sa);
-      if (ra < 1e-6) { dst[i] = 0; continue; }
+      if (ra < 1e-6) {
+        dst[i] = 0;
+        continue;
+      }
       double inv = 1.0 - sa;
-      int rr = (int)(((s>>24&0xff)/255.0*sa + (d>>24&0xff)/255.0*da*inv)/ra*255+0.5);
-      int rg = (int)(((s>>16&0xff)/255.0*sa + (d>>16&0xff)/255.0*da*inv)/ra*255+0.5);
-      int rb = (int)(((s>> 8&0xff)/255.0*sa + (d>> 8&0xff)/255.0*da*inv)/ra*255+0.5);
-      dst[i] = PACK_RGBA(CLAMP(rr,0,255),CLAMP(rg,0,255),CLAMP(rb,0,255),CLAMP((int)(ra*255+0.5),0,255));
+      int rr = (int)(((s >> 24 & 0xff) / 255.0 * sa +
+                      (d >> 24 & 0xff) / 255.0 * da * inv) /
+                         ra * 255 +
+                     0.5);
+      int rg = (int)(((s >> 16 & 0xff) / 255.0 * sa +
+                      (d >> 16 & 0xff) / 255.0 * da * inv) /
+                         ra * 255 +
+                     0.5);
+      int rb = (int)(((s >> 8 & 0xff) / 255.0 * sa +
+                      (d >> 8 & 0xff) / 255.0 * da * inv) /
+                         ra * 255 +
+                     0.5);
+      dst[i] =
+          PACK_RGBA(CLAMP(rr, 0, 255), CLAMP(rg, 0, 255), CLAMP(rb, 0, 255),
+                    CLAMP((int)(ra * 255 + 0.5), 0, 255));
     }
     free(layer_bufs[layer_active]);
     for (int li = layer_active; li < layer_count - 1; li++) {
@@ -2038,7 +2108,8 @@ static void cmd_execute(void) {
     if (found == BLEND_MODE_COUNT) {
       char modes[256] = "";
       for (int m = 0; m < BLEND_MODE_COUNT; m++) {
-        if (m) strncat(modes, "|", sizeof(modes) - strlen(modes) - 1);
+        if (m)
+          strncat(modes, "|", sizeof(modes) - strlen(modes) - 1);
         strncat(modes, blend_mode_names[m], sizeof(modes) - strlen(modes) - 1);
       }
       char emsg[320];
@@ -2090,8 +2161,8 @@ static void cmd_execute(void) {
     }
     char dir = 0;
     int coord = 0;
-    if (sscanf(arg, "%c %d", &dir, &coord) == 2 &&
-        (dir == 'h' || dir == 'v') && coord >= 1) {
+    if (sscanf(arg, "%c %d", &dir, &coord) == 2 && (dir == 'h' || dir == 'v') &&
+        coord >= 1) {
       gboolean horiz = (dir == 'h');
       int c = coord - 1; /* convert to 0-based */
       int limit = horiz ? CANVAS_H : CANVAS_W;
@@ -2135,7 +2206,8 @@ static void cmd_execute(void) {
     }
     if (layer_count > 1)
       layers_flatten();
-    guint32 *before_snap = malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
+    guint32 *before_snap =
+        malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
     guint32 *np = calloc((size_t)nw * nh, sizeof(guint32));
     if (!before_snap || !np) {
       free(before_snap);
@@ -2301,28 +2373,24 @@ static void cmd_execute(void) {
     return;
   }
 
-  if (strcmp(cmd_buf, ":colorpicker") == 0 ||
-      strcmp(cmd_buf, ":cp") == 0 ||
+  if (strcmp(cmd_buf, ":colorpicker") == 0 || strcmp(cmd_buf, ":cp") == 0 ||
       strcmp(cmd_buf, ":colorpicker bg") == 0 ||
       strcmp(cmd_buf, ":cp bg") == 0) {
     gboolean set_bg = (strstr(cmd_buf, "bg") != NULL);
     guint32 current = set_bg ? bg_color : fg_color;
-    GdkRGBA rgba = {
-      ((current >> 24) & 0xff) / 255.0,
-      ((current >> 16) & 0xff) / 255.0,
-      ((current >>  8) & 0xff) / 255.0,
-      1.0
-    };
-    GtkWidget *dlg = gtk_color_chooser_dialog_new(
-        set_bg ? "Background Color" : "Foreground Color",
-        GTK_WINDOW(main_window));
+    GdkRGBA rgba = {((current >> 24) & 0xff) / 255.0,
+                    ((current >> 16) & 0xff) / 255.0,
+                    ((current >> 8) & 0xff) / 255.0, 1.0};
+    GtkWidget *dlg = gtk_color_chooser_dialog_new(set_bg ? "Background Color"
+                                                         : "Foreground Color",
+                                                  GTK_WINDOW(main_window));
     gtk_color_chooser_set_rgba(GTK_COLOR_CHOOSER(dlg), &rgba);
     gtk_color_chooser_set_use_alpha(GTK_COLOR_CHOOSER(dlg), FALSE);
     if (gtk_dialog_run(GTK_DIALOG(dlg)) == GTK_RESPONSE_OK) {
       gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(dlg), &rgba);
-      int r = CLAMP((int)(rgba.red   * 255.0 + 0.5), 0, 255);
+      int r = CLAMP((int)(rgba.red * 255.0 + 0.5), 0, 255);
       int g = CLAMP((int)(rgba.green * 255.0 + 0.5), 0, 255);
-      int b = CLAMP((int)(rgba.blue  * 255.0 + 0.5), 0, 255);
+      int b = CLAMP((int)(rgba.blue * 255.0 + 0.5), 0, 255);
       guint32 packed = PACK_RGBA(r, g, b, 255);
       if (set_bg) {
         bg_color = packed;
@@ -2332,12 +2400,14 @@ static void cmd_execute(void) {
         double pr = r / 255.0, pg = g / 255.0, pb = b / 255.0;
         int found = -1;
         for (int i = 0; i < PALETTE_SIZE; i++) {
-          if (palette[i][0] == pr && palette[i][1] == pg && palette[i][2] == pb) {
+          if (palette[i][0] == pr && palette[i][1] == pg &&
+              palette[i][2] == pb) {
             found = i;
             break;
           }
         }
-        if (found < 0 && PALETTE_SIZE < 256 && palette_reserve(palette_size + 1)) {
+        if (found < 0 && PALETTE_SIZE < 256 &&
+            palette_reserve(palette_size + 1)) {
           found = palette_size;
           set_palette_rgb(found, rgb);
           palette_size++;
@@ -2404,7 +2474,8 @@ static void cmd_execute(void) {
       for (int x = x0; x <= x1; x++) {
         guint32 px = PX(y, x);
         guchar a = px & 0xff;
-        if (a == 0) continue;
+        if (a == 0)
+          continue;
         guchar r = ~((px >> 24) & 0xff);
         guchar g = ~((px >> 16) & 0xff);
         guchar b = ~((px >> 8) & 0xff);
@@ -2436,7 +2507,10 @@ static void cmd_execute(void) {
     }
     int w = x1 - x0 + 1, h = y1 - y0 + 1;
     guint32 *tmp = malloc((size_t)w * h * sizeof(guint32));
-    if (!tmp) { cmd_flash("Out of memory."); return; }
+    if (!tmp) {
+      cmd_flash("Out of memory.");
+      return;
+    }
     /* horizontal pass: source = canvas, dest = tmp */
     for (int y = 0; y < h; y++) {
       for (int x = 0; x < w; x++) {
@@ -2450,7 +2524,7 @@ static void cmd_execute(void) {
           sa += px & 0xff;
           cnt++;
         }
-        tmp[y * w + x] = PACK_RGBA(sr/cnt, sg/cnt, sb/cnt, sa/cnt);
+        tmp[y * w + x] = PACK_RGBA(sr / cnt, sg / cnt, sb / cnt, sa / cnt);
       }
     }
     /* vertical pass: source = tmp, write into canvas with undo */
@@ -2468,7 +2542,7 @@ static void cmd_execute(void) {
           cnt++;
         }
         push_undo(x0 + x, y0 + y);
-        PX(y0 + y, x0 + x) = PACK_RGBA(sr/cnt, sg/cnt, sb/cnt, sa/cnt);
+        PX(y0 + y, x0 + x) = PACK_RGBA(sr / cnt, sg / cnt, sb / cnt, sa / cnt);
       }
     }
     free(tmp);
@@ -2624,7 +2698,8 @@ static void cmd_execute(void) {
       cmd_flash("Already centered.");
       return;
     }
-    guint32 *before_snap = malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
+    guint32 *before_snap =
+        malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
     guint32 *np = calloc((size_t)CANVAS_W * CANVAS_H, sizeof(guint32));
     if (!before_snap || !np) {
       free(before_snap);
@@ -2676,7 +2751,8 @@ static void cmd_execute(void) {
       return;
     }
     int nW = max_x - min_x + 1, nH = max_y - min_y + 1;
-    guint32 *before_snap = malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
+    guint32 *before_snap =
+        malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
     guint32 *np = calloc((size_t)nW * nH, sizeof(guint32));
     if (!before_snap || !np) {
       free(before_snap);
@@ -2720,8 +2796,10 @@ static void cmd_execute(void) {
     cairo_surface_destroy(measure_surf);
     int sw = (int)(te.x_bearing + te.width + 2);
     int sh = (int)(fe_m.ascent + fe_m.descent + 2);
-    if (sw < 1) sw = 1;
-    if (sh < 1) sh = 1;
+    if (sw < 1)
+      sw = 1;
+    if (sh < 1)
+      sh = 1;
     /* Render black text on white ARGB32 surface.
        Checking a color channel (not alpha) gives clean binary results
        because CAIRO_ANTIALIAS_NONE only works reliably on opaque surfaces. */
@@ -2831,14 +2909,17 @@ static void cmd_execute(void) {
         "Transform\n"
         "  :resize WxH   :fliph   :flipv   :rotate   :center   :crop\n"
         "  :invert             invert RGB of canvas (or visual selection)\n"
-        "  :blur [N]           box blur radius N (default 1) on canvas or selection\n"
+        "  :blur [N]           box blur radius N (default 1) on canvas or "
+        "selection\n"
         "  :newlayer              add transparent layer above active\n"
         "  :mergedown             composite active layer into layer below\n"
         "  :layer N               switch to layer N (1-based)\n"
         "  :layervis N            toggle visibility of layer N\n"
-        "  :layerblend <mode>     set blend mode (normal|multiply|screen|overlay|...)\n"
+        "  :layerblend <mode>     set blend mode "
+        "(normal|multiply|screen|overlay|...)\n"
         "  :layeropacity N        set active layer opacity 0-100\n"
-        "  :guide h|v N           toggle horizontal/vertical guide at row/col N\n"
+        "  :guide h|v N           toggle horizontal/vertical guide at row/col "
+        "N\n"
         "  :guide clear           remove all guides\n"
         "  :guide snap            toggle snap-to-guides in insert mode\n"
         "\n"
@@ -2866,7 +2947,8 @@ static void cmd_execute(void) {
         "  :find color <hex|name>  jump to nearest pixel of color\n"
         "  :replace <from> <to>    replace all pixels of one color with "
         "another\n"
-        "  :gradtool [c1 c2]        interactive gradient (click-drag to apply)\n"
+        "  :gradtool [c1 c2]        interactive gradient (click-drag to "
+        "apply)\n"
         "  :gradient <c1> <c2> h|v  fill canvas with gradient between two "
         "colors\n");
     gtk_dialog_run(GTK_DIALOG(dlg));
@@ -2894,21 +2976,19 @@ static void free_action(UndoAction *a) {
 
 static void clear_history(void) {
   for (int i = 0; i < undo_count; i++)
-    free_action(
-        &undo_stack[(undo_top - undo_count + i + undo_levels * 2) % undo_levels]);
+    free_action(&undo_stack[(undo_top - undo_count + i + undo_levels * 2) %
+                            undo_levels]);
   undo_top = 0;
   undo_count = 0;
   for (int i = 0; i < redo_count; i++)
-    free_action(
-        &redo_stack[(redo_top - redo_count + i + undo_levels * 2) % undo_levels]);
+    free_action(&redo_stack[(redo_top - redo_count + i + undo_levels * 2) %
+                            undo_levels]);
   redo_top = 0;
   redo_count = 0;
   staged_count = 0;
 }
 
-static void begin_undo_action(void) {
-  staged_count = 0;
-}
+static void begin_undo_action(void) { staged_count = 0; }
 
 static void push_undo(int x, int y) {
   for (int i = 0; i < staged_count; i++)
@@ -2929,8 +3009,8 @@ static void commit_undo_action(void) {
   if (staged_count == 0)
     return;
   for (int i = 0; i < redo_count; i++)
-    free_action(
-        &redo_stack[(redo_top - redo_count + i + undo_levels * 2) % undo_levels]);
+    free_action(&redo_stack[(redo_top - redo_count + i + undo_levels * 2) %
+                            undo_levels]);
   redo_top = 0;
   redo_count = 0;
   for (int i = 0; i < staged_count; i++)
@@ -2960,8 +3040,8 @@ static void commit_canvas_snapshot(guint32 *before_snap, int bw, int bh) {
   }
   memcpy(after_snap, pixels, (size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
   for (int i = 0; i < redo_count; i++)
-    free_action(
-        &redo_stack[(redo_top - redo_count + i + undo_levels * 2) % undo_levels]);
+    free_action(&redo_stack[(redo_top - redo_count + i + undo_levels * 2) %
+                            undo_levels]);
   redo_top = 0;
   redo_count = 0;
   int idx = undo_top % undo_levels;
@@ -2992,40 +3072,45 @@ static void paint_pixel(int x, int y, guint32 color) {
     return;
   paint_pixel_raw(x, y, color);
   switch (sym_mode) {
-    case SYM_H: {
-      int mx = CANVAS_W - 1 - x;
-      if (mx != x) paint_pixel_raw(mx, y, color);
-      break;
+  case SYM_H: {
+    int mx = CANVAS_W - 1 - x;
+    if (mx != x)
+      paint_pixel_raw(mx, y, color);
+    break;
+  }
+  case SYM_V: {
+    int my = CANVAS_H - 1 - y;
+    if (my != y)
+      paint_pixel_raw(x, my, color);
+    break;
+  }
+  case SYM_HV: {
+    int mx = CANVAS_W - 1 - x, my = CANVAS_H - 1 - y;
+    if (mx != x)
+      paint_pixel_raw(mx, y, color);
+    if (my != y)
+      paint_pixel_raw(x, my, color);
+    if (mx != x && my != y)
+      paint_pixel_raw(mx, my, color);
+    break;
+  }
+  case SYM_RADIAL: {
+    double cx = (CANVAS_W - 1) / 2.0, cy = (CANVAS_H - 1) / 2.0;
+    double rx = x - cx, ry = y - cy;
+    double r = sqrt(rx * rx + ry * ry);
+    double theta = atan2(ry, rx);
+    double step = 2.0 * M_PI / sym_radial_n;
+    for (int k = 1; k < sym_radial_n; k++) {
+      double a = theta + k * step;
+      int px = (int)(cx + r * cos(a) + 0.5);
+      int py = (int)(cy + r * sin(a) + 0.5);
+      if (px != x || py != y)
+        paint_pixel_raw(px, py, color);
     }
-    case SYM_V: {
-      int my = CANVAS_H - 1 - y;
-      if (my != y) paint_pixel_raw(x, my, color);
-      break;
-    }
-    case SYM_HV: {
-      int mx = CANVAS_W - 1 - x, my = CANVAS_H - 1 - y;
-      if (mx != x) paint_pixel_raw(mx, y, color);
-      if (my != y) paint_pixel_raw(x, my, color);
-      if (mx != x && my != y) paint_pixel_raw(mx, my, color);
-      break;
-    }
-    case SYM_RADIAL: {
-      double cx = (CANVAS_W - 1) / 2.0, cy = (CANVAS_H - 1) / 2.0;
-      double rx = x - cx, ry = y - cy;
-      double r = sqrt(rx * rx + ry * ry);
-      double theta = atan2(ry, rx);
-      double step = 2.0 * M_PI / sym_radial_n;
-      for (int k = 1; k < sym_radial_n; k++) {
-        double a = theta + k * step;
-        int px = (int)(cx + r * cos(a) + 0.5);
-        int py = (int)(cy + r * sin(a) + 0.5);
-        if (px != x || py != y)
-          paint_pixel_raw(px, py, color);
-      }
-      break;
-    }
-    default:
-      break;
+    break;
+  }
+  default:
+    break;
   }
 }
 
@@ -3110,24 +3195,20 @@ static void find_up(void) {
    in pattern positions use bg_color with alpha=0 if bg is transparent). */
 static guint32 fill_color_at(int x, int y, guint32 fg) {
   switch (fill_pattern) {
-    case FILL_CHECKER:
-      return ((x + y) & 1) ? bg_color : fg;
-    case FILL_HSTRIPES:
-      return (y & 1) ? bg_color : fg;
-    case FILL_VSTRIPES:
-      return (x & 1) ? bg_color : fg;
-    case FILL_HALFTONE: {
-      /* 4x4 ordered-dither Bayer matrix at ~50% density */
-      static const int bayer[4][4] = {
-        { 0,  8,  2, 10},
-        {12,  4, 14,  6},
-        { 3, 11,  1,  9},
-        {15,  7, 13,  5}
-      };
-      return bayer[y & 3][x & 3] < 4 ? fg : bg_color;
-    }
-    default:
-      return fg;
+  case FILL_CHECKER:
+    return ((x + y) & 1) ? bg_color : fg;
+  case FILL_HSTRIPES:
+    return (y & 1) ? bg_color : fg;
+  case FILL_VSTRIPES:
+    return (x & 1) ? bg_color : fg;
+  case FILL_HALFTONE: {
+    /* 4x4 ordered-dither Bayer matrix at ~50% density */
+    static const int bayer[4][4] = {
+        {0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
+    return bayer[y & 3][x & 3] < 4 ? fg : bg_color;
+  }
+  default:
+    return fg;
   }
 }
 
@@ -3181,22 +3262,28 @@ static int snap_coord(int coord, gboolean horizontal) {
     if (guides[i].horizontal != horizontal)
       continue;
     int d = guides[i].coord - coord;
-    if (d < 0) d = -d;
-    if (d < bestd) { bestd = d; best = guides[i].coord; }
+    if (d < 0)
+      d = -d;
+    if (d < bestd) {
+      bestd = d;
+      best = guides[i].coord;
+    }
   }
   return best;
 }
 
-static void apply_gradient_linear(int x0, int y0, int x1, int y1,
-                                   guint32 c1, guint32 c2) {
+static void apply_gradient_linear(int x0, int y0, int x1, int y1, guint32 c1,
+                                  guint32 c2) {
   int r1 = (c1 >> 16) & 0xff, g1 = (c1 >> 8) & 0xff, b1 = c1 & 0xff;
   int r2 = (c2 >> 16) & 0xff, g2 = (c2 >> 8) & 0xff, b2 = c2 & 0xff;
   double dx = x1 - x0, dy = y1 - y0;
   double len2 = dx * dx + dy * dy;
   int rx0 = 0, ry0 = 0, rx1 = CANVAS_W - 1, ry1 = CANVAS_H - 1;
   if (visual_mode) {
-    rx0 = MIN(cursor_x, visual_anchor_x); rx1 = MAX(cursor_x, visual_anchor_x);
-    ry0 = MIN(cursor_y, visual_anchor_y); ry1 = MAX(cursor_y, visual_anchor_y);
+    rx0 = MIN(cursor_x, visual_anchor_x);
+    rx1 = MAX(cursor_x, visual_anchor_x);
+    ry0 = MIN(cursor_y, visual_anchor_y);
+    ry1 = MAX(cursor_y, visual_anchor_y);
   }
   begin_undo_action();
   for (int y = ry0; y <= ry1; y++) {
@@ -3210,7 +3297,7 @@ static void apply_gradient_linear(int x0, int y0, int x1, int y1,
       int bi = (int)(b1 + t * (b2 - b1) + 0.5);
       push_undo(x, y);
       PX(y, x) = PACK_RGBA(CLAMP(ri, 0, 255), CLAMP(gi, 0, 255),
-                            CLAMP(bi, 0, 255), 255);
+                           CLAMP(bi, 0, 255), 255);
     }
   }
   commit_undo_action();
@@ -3243,8 +3330,8 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
   }
   free(composite);
 
-  /* Onion skin: overlay adjacent layers semi-transparently as drawing reference.
-     Previous layer is tinted red, next layer is tinted blue. */
+  /* Onion skin: overlay adjacent layers semi-transparently as drawing
+     reference. Previous layer is tinted red, next layer is tinted blue. */
   if (show_onionskin && layer_count > 1) {
     double op = onionskin_opacity / 100.0;
     int offsets[2] = {-1, 1};
@@ -3260,14 +3347,17 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
             continue;
           double pr = (px >> 24 & 0xff) / 255.0;
           double pg = (px >> 16 & 0xff) / 255.0;
-          double pb = (px >>  8 & 0xff) / 255.0;
+          double pb = (px >> 8 & 0xff) / 255.0;
           double alpha = pa * op;
           /* Tint: previous=red, next=blue */
           if (offsets[oi] < 0)
-            cairo_set_source_rgba(cr, pr * 0.5 + 0.5, pg * 0.5, pb * 0.5, alpha);
+            cairo_set_source_rgba(cr, pr * 0.5 + 0.5, pg * 0.5, pb * 0.5,
+                                  alpha);
           else
-            cairo_set_source_rgba(cr, pr * 0.5, pg * 0.5, pb * 0.5 + 0.5, alpha);
-          cairo_rectangle(cr, x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            cairo_set_source_rgba(cr, pr * 0.5, pg * 0.5, pb * 0.5 + 0.5,
+                                  alpha);
+          cairo_rectangle(cr, x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE,
+                          CELL_SIZE);
           cairo_fill(cr);
         }
       }
@@ -3276,11 +3366,10 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
 
   /* Draw grid lines */
   if (show_grid) {
-    cairo_set_source_rgba(cr,
-                          ((grid_color >> 24) & 0xff) / 255.0,
+    cairo_set_source_rgba(cr, ((grid_color >> 24) & 0xff) / 255.0,
                           ((grid_color >> 16) & 0xff) / 255.0,
-                          ((grid_color >>  8) & 0xff) / 255.0,
-                          ( grid_color        & 0xff) / 255.0);
+                          ((grid_color >> 8) & 0xff) / 255.0,
+                          (grid_color & 0xff) / 255.0);
     cairo_set_line_width(cr, 0.5);
     for (int x = 0; x <= CANVAS_W; x++) {
       cairo_move_to(cr, x * CELL_SIZE, 0);
@@ -3350,11 +3439,11 @@ static gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
     cairo_stroke(cr);
     /* Color circles at endpoints */
     double r1 = (grad_c1 >> 16 & 0xff) / 255.0;
-    double g1 = (grad_c1 >> 8  & 0xff) / 255.0;
-    double b1 = (grad_c1       & 0xff) / 255.0;
+    double g1 = (grad_c1 >> 8 & 0xff) / 255.0;
+    double b1 = (grad_c1 & 0xff) / 255.0;
     double r2 = (grad_c2 >> 16 & 0xff) / 255.0;
-    double g2 = (grad_c2 >> 8  & 0xff) / 255.0;
-    double b2 = (grad_c2       & 0xff) / 255.0;
+    double g2 = (grad_c2 >> 8 & 0xff) / 255.0;
+    double b2 = (grad_c2 & 0xff) / 255.0;
     double rad = CLAMP(CELL_SIZE * 0.4, 3.0, 8.0);
     cairo_arc(cr, sx, sy, rad, 0, 2 * M_PI);
     cairo_set_source_rgb(cr, r1, g1, b1);
@@ -4016,15 +4105,17 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     return TRUE;
   }
 
-  if (visual_mode && (event->keyval == GDK_KEY_plus ||
-                      event->keyval == GDK_KEY_equal)) {
+  if (visual_mode &&
+      (event->keyval == GDK_KEY_plus || event->keyval == GDK_KEY_equal)) {
     int amount = MAX(1, n);
     int x0 = CLAMP(MIN(cursor_x, visual_anchor_x) - amount, 0, CANVAS_W - 1);
     int x1 = CLAMP(MAX(cursor_x, visual_anchor_x) + amount, 0, CANVAS_W - 1);
     int y0 = CLAMP(MIN(cursor_y, visual_anchor_y) - amount, 0, CANVAS_H - 1);
     int y1 = CLAMP(MAX(cursor_y, visual_anchor_y) + amount, 0, CANVAS_H - 1);
-    visual_anchor_x = x0; visual_anchor_y = y0;
-    cursor_x = x1;        cursor_y = y1;
+    visual_anchor_x = x0;
+    visual_anchor_y = y0;
+    cursor_x = x1;
+    cursor_y = y1;
     status_update();
     gtk_widget_queue_draw(GTK_WIDGET(data));
     return TRUE;
@@ -4040,8 +4131,10 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     x1 = MAX(x1 - amount, (x0 + x1) / 2);
     y0 = MIN(y0 + amount, (y0 + y1) / 2);
     y1 = MAX(y1 - amount, (y0 + y1) / 2);
-    visual_anchor_x = x0; visual_anchor_y = y0;
-    cursor_x = x1;        cursor_y = y1;
+    visual_anchor_x = x0;
+    visual_anchor_y = y0;
+    cursor_x = x1;
+    cursor_y = y1;
     status_update();
     gtk_widget_queue_draw(GTK_WIDGET(data));
     return TRUE;
@@ -4232,7 +4325,8 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     return TRUE;
   case GDK_KEY_c: {
     /* Find the palette slot that matches fg_color, then cycle forward */
-    if (PALETTE_SIZE <= 1) break;
+    if (PALETTE_SIZE <= 1)
+      break;
     int cur_slot = -1;
     for (int i = 0; i < PALETTE_SIZE; i++) {
       int pr, pg, pb;
@@ -4253,7 +4347,8 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
     break;
   }
   case GDK_KEY_C: {
-    if (PALETTE_SIZE <= 1) break;
+    if (PALETTE_SIZE <= 1)
+      break;
     int cur_slot = -1;
     for (int i = 0; i < PALETTE_SIZE; i++) {
       int pr, pg, pb;
@@ -4285,11 +4380,12 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
       int erx = MAX(1, (vx1 - vx0 + 1) / 2);
       int ery = MAX(1, (vy1 - vy0 + 1) / 2);
       begin_undo_action();
-#define EPSET(px, py) do { \
-  int _ex = (px), _ey = (py); \
-  if (_ex >= 0 && _ex < CANVAS_W && _ey >= 0 && _ey < CANVAS_H) \
-    paint_pixel(_ex, _ey, fg_color); \
-} while (0)
+#define EPSET(px, py)                                                          \
+  do {                                                                         \
+    int _ex = (px), _ey = (py);                                                \
+    if (_ex >= 0 && _ex < CANVAS_W && _ey >= 0 && _ey < CANVAS_H)              \
+      paint_pixel(_ex, _ey, fg_color);                                         \
+  } while (0)
       /* scan x: fills left/right arcs */
       for (int oex = -erx; oex <= erx; oex++) {
         double t = 1.0 - (double)oex * oex / ((double)erx * erx);
@@ -4383,12 +4479,15 @@ static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
       rx = MAX(1, radius);
       ry = ellipse_ry > 0 ? ellipse_ry : rx;
     }
-    if (rx < 1) rx = 1;
-    if (ry < 1) ry = 1;
+    if (rx < 1)
+      rx = 1;
+    if (ry < 1)
+      ry = 1;
     begin_undo_action();
     /* filled ellipse: scan lines */
     for (int ey = cy - ry; ey <= cy + ry; ey++) {
-      if (ey < 0 || ey >= CANVAS_H) continue;
+      if (ey < 0 || ey >= CANVAS_H)
+        continue;
       double dy = (double)(ey - cy) / ry;
       double dx_f = rx * sqrt(MAX(0.0, 1.0 - dy * dy));
       int ex0 = CLAMP((int)(cx - dx_f), 0, CANVAS_W - 1);
@@ -4625,8 +4724,8 @@ static gboolean on_button_release(GtkWidget *widget, GdkEventButton *event,
                                   gpointer data) {
   if (grad_dragging) {
     grad_dragging = FALSE;
-    apply_gradient_linear(grad_x0, grad_y0, cursor_x, cursor_y,
-                          grad_c1, grad_c2);
+    apply_gradient_linear(grad_x0, grad_y0, cursor_x, cursor_y, grad_c1,
+                          grad_c2);
     gradient_tool = FALSE;
     visual_mode = FALSE;
     status_update();
