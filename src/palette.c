@@ -165,3 +165,174 @@ gboolean parse_color(const char *val, unsigned int *out_rgb) {
   }
   return FALSE;
 }
+
+void exec_delp(const char *arg) {
+  int idx = atoi(arg);
+  if (idx == 0) {
+    cmd_flash("Cannot delete background color (index 0).");
+    return;
+  }
+  if (idx < 0 || idx >= PALETTE_SIZE) {
+    cmd_flash("Invalid palette index.");
+    return;
+  }
+  for (int i = idx; i < PALETTE_SIZE - 1; i++) {
+    palette[i][0] = palette[i + 1][0];
+    palette[i][1] = palette[i + 1][1];
+    palette[i][2] = palette[i + 1][2];
+  }
+  palette_size--;
+  gtk_widget_queue_draw(palette_bar);
+  gtk_widget_queue_draw(main_canvas);
+  cmd_flash("Entry deleted.");
+}
+
+void exec_colorpicker(const char *arg) {
+  (void)arg;
+  gboolean set_bg = (strstr(cmd_buf, "bg") != NULL);
+  guint32 current = set_bg ? bg_color : fg_color;
+  GdkRGBA rgba = {((current >> 24) & 0xff) / 255.0,
+                  ((current >> 16) & 0xff) / 255.0,
+                  ((current >> 8) & 0xff) / 255.0, 1.0};
+  GtkWidget *dlg = gtk_color_chooser_dialog_new(set_bg ? "Background Color"
+                                                       : "Foreground Color",
+                                                GTK_WINDOW(main_window));
+  gtk_color_chooser_set_rgba(GTK_COLOR_CHOOSER(dlg), &rgba);
+  gtk_color_chooser_set_use_alpha(GTK_COLOR_CHOOSER(dlg), FALSE);
+  if (gtk_dialog_run(GTK_DIALOG(dlg)) == GTK_RESPONSE_OK) {
+    gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(dlg), &rgba);
+    int r = CLAMP((int)(rgba.red * 255.0 + 0.5), 0, 255);
+    int g = CLAMP((int)(rgba.green * 255.0 + 0.5), 0, 255);
+    int b = CLAMP((int)(rgba.blue * 255.0 + 0.5), 0, 255);
+    guint32 packed = PACK_RGBA(r, g, b, 255);
+    if (set_bg) {
+      bg_color = packed;
+      set_palette_rgb(0, (r << 16) | (g << 8) | b);
+    } else {
+      unsigned int rgb = (r << 16) | (g << 8) | b;
+      double pr = r / 255.0, pg = g / 255.0, pb = b / 255.0;
+      int found = -1;
+      for (int i = 0; i < PALETTE_SIZE; i++) {
+        if (palette[i][0] == pr && palette[i][1] == pg &&
+            palette[i][2] == pb) {
+          found = i;
+          break;
+        }
+      }
+      if (found < 0 && PALETTE_SIZE < 256 &&
+          palette_reserve(palette_size + 1)) {
+        found = palette_size;
+        set_palette_rgb(found, rgb);
+        palette_size++;
+      }
+      fg_color = packed;
+    }
+    gtk_widget_queue_draw(palette_bar);
+    gtk_widget_queue_draw(main_canvas);
+    status_update();
+  }
+  gtk_widget_destroy(dlg);
+  cmd_set("");
+}
+
+void exec_savep(const char *arg) {
+  FILE *f = fopen(arg, "w");
+  if (!f) {
+    cmd_flash("Cannot open file.");
+    return;
+  }
+  for (int i = 0; i < PALETTE_SIZE; i++) {
+    int r, g, b;
+    palette_to_rgb(i, &r, &g, &b);
+    fprintf(f, "#%02x%02x%02x\n", r, g, b);
+  }
+  fclose(f);
+  cmd_flash("Palette saved.");
+}
+
+void exec_loadp(const char *arg) {
+  FILE *f = fopen(arg, "r");
+  if (!f) {
+    cmd_flash("Cannot open file.");
+    return;
+  }
+  int count = 0;
+  char line[16];
+  while (fgets(line, sizeof(line), f) && count < 256) {
+    unsigned int rgb;
+    if (line[0] == '#' && sscanf(line + 1, "%06x", &rgb) == 1) {
+      if (palette_reserve(count + 1))
+        set_palette_rgb(count++, rgb);
+    }
+  }
+  fclose(f);
+  if (count == 0) {
+    cmd_flash("No colors found.");
+    return;
+  }
+  palette_size = count;
+  gtk_widget_queue_draw(palette_bar);
+  gtk_widget_queue_draw(main_canvas);
+  cmd_flash("Palette loaded.");
+}
+
+void exec_importp(const char *arg) {
+  cairo_surface_t *surf = cairo_image_surface_create_from_png(arg);
+  if (cairo_surface_status(surf) != CAIRO_STATUS_SUCCESS) {
+    cmd_flash("Cannot open file.");
+    cairo_surface_destroy(surf);
+    return;
+  }
+  guchar *d = cairo_image_surface_get_data(surf);
+  int stride = cairo_image_surface_get_stride(surf);
+  int iw = cairo_image_surface_get_width(surf);
+  int ih = cairo_image_surface_get_height(surf);
+  unsigned int seen[256];
+  int seen_count = 0;
+  for (int y = 0; y < ih && seen_count < 256; y++) {
+    for (int x = 0; x < iw && seen_count < 256; x++) {
+      unsigned int r = d[y * stride + x * 4 + 2];
+      unsigned int g = d[y * stride + x * 4 + 1];
+      unsigned int b = d[y * stride + x * 4 + 0];
+      unsigned int rgb = (r << 16) | (g << 8) | b;
+      int dup = 0;
+      for (int i = 0; i < seen_count; i++)
+        if (seen[i] == rgb) {
+          dup = 1;
+          break;
+        }
+      if (!dup)
+        seen[seen_count++] = rgb;
+    }
+  }
+  cairo_surface_destroy(surf);
+  int added = 0;
+  for (int s = 0; s < seen_count && PALETTE_SIZE < 256; s++) {
+    unsigned int sr = (seen[s] >> 16) & 0xff;
+    unsigned int sg = (seen[s] >> 8) & 0xff;
+    unsigned int sb = seen[s] & 0xff;
+    int dup = 0;
+    for (int i = 0; i < PALETTE_SIZE; i++) {
+      int pr, pg, pb;
+      palette_to_rgb(i, &pr, &pg, &pb);
+      if ((unsigned int)pr == sr && (unsigned int)pg == sg &&
+          (unsigned int)pb == sb) {
+        dup = 1;
+        break;
+      }
+    }
+    if (!dup && palette_reserve(palette_size + 1)) {
+      set_palette_rgb(palette_size++, seen[s]);
+      added++;
+    }
+  }
+  if (added == 0) {
+    cmd_flash("No new colors found.");
+  } else {
+    char msg[64];
+    snprintf(msg, sizeof(msg), "Added %d color(s) to palette.", added);
+    gtk_widget_queue_draw(palette_bar);
+    gtk_widget_queue_draw(main_canvas);
+    cmd_flash(msg);
+  }
+}

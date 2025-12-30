@@ -202,3 +202,106 @@ void cmd_open(const char *filename) {
   gtk_widget_queue_draw(main_canvas);
   cmd_set("");
 }
+
+void exec_write(const char *arg) {
+  if (*arg) {
+    if (cmd_write(arg)) {
+      snprintf(last_filename, sizeof(last_filename), "%s", arg);
+      update_title(last_filename);
+    }
+  } else {
+    if (*last_filename)
+      cmd_write(last_filename);
+    else
+      cmd_flash("No filename. Use :w filename");
+  }
+}
+
+void exec_write_quit(const char *arg) {
+  if (*arg) {
+    if (cmd_write(arg)) {
+      snprintf(last_filename, sizeof(last_filename), "%s", arg);
+      update_title(last_filename);
+      gtk_main_quit();
+    }
+  } else {
+    if (*last_filename) {
+      if (cmd_write(last_filename))
+        gtk_main_quit();
+    } else {
+      cmd_flash("No filename. Use :wq filename");
+    }
+  }
+}
+
+void exec_edit(const char *arg) {
+  gboolean force = (cmd_buf[2] == '!');
+  if (!force && canvas_dirty) {
+    cmd_flash("Unsaved changes. Use :e! to discard or :w to save first.");
+    return;
+  }
+  const char *fn = *arg ? arg : last_filename;
+  if (*fn)
+    cmd_open(fn);
+  else
+    cmd_flash("No filename.");
+}
+
+void exec_export(const char *arg) {
+  char fname[4096];
+  int scale = 1;
+  const char *sp = strrchr(arg, ' ');
+  if (sp && sp != arg) {
+    char *end;
+    long sv = strtol(sp + 1, &end, 10);
+    if (*end == '\0' && sv >= 1 && sv <= 32) {
+      scale = (int)sv;
+      size_t flen = (size_t)(sp - arg);
+      memcpy(fname, arg, flen);
+      fname[flen] = '\0';
+      arg = fname;
+    }
+  }
+  size_t alen = strlen(arg);
+  if (alen >= 4 && strcmp(arg + alen - 4, ".bmp") == 0) {
+    cmd_export_bmp(arg, scale);
+  } else if (alen >= 4 && strcmp(arg + alen - 4, ".png") == 0) {
+    int sw = CANVAS_W * scale, sh = CANVAS_H * scale;
+    cairo_surface_t *surf =
+        cairo_image_surface_create(CAIRO_FORMAT_ARGB32, sw, sh);
+    guchar *d = cairo_image_surface_get_data(surf);
+    int st = cairo_image_surface_get_stride(surf);
+    for (int y = 0; y < CANVAS_H; y++)
+      for (int x = 0; x < CANVAS_W; x++) {
+        guint32 px = PX(y, x);
+        guchar r = (px >> 24) & 0xff;
+        guchar g = (px >> 16) & 0xff;
+        guchar b = (px >> 8) & 0xff;
+        guchar a = px & 0xff;
+        guchar wb, wg, wr, wa;
+        if (show_checker && a == 0) {
+          wb = wg = wr = wa = 0;
+        } else {
+          wb = b;
+          wg = g;
+          wr = r;
+          wa = show_checker ? a : 255;
+        }
+        for (int dy = 0; dy < scale; dy++)
+          for (int dx = 0; dx < scale; dx++) {
+            int oy = y * scale + dy, ox = x * scale + dx;
+            d[oy * st + ox * 4 + 0] = wb;
+            d[oy * st + ox * 4 + 1] = wg;
+            d[oy * st + ox * 4 + 2] = wr;
+            d[oy * st + ox * 4 + 3] = wa;
+          }
+      }
+    cairo_surface_mark_dirty(surf);
+    gboolean ok =
+        cairo_surface_write_to_png(surf, arg) == CAIRO_STATUS_SUCCESS;
+    cairo_surface_destroy(surf);
+    cmd_flash(ok ? "Exported." : "Export failed.");
+  } else {
+    cmd_flash("Unsupported format. Use .png or .bmp.");
+  }
+}

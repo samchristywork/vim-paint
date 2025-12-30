@@ -112,3 +112,225 @@ void layers_flatten(void) {
   layer_blend[0] = BLEND_NORMAL;
   snprintf(layer_name[0], 32, "Layer 1");
 }
+
+void exec_newlayer(const char *arg) {
+  (void)arg;
+  if (layer_count >= LAYER_MAX) {
+    cmd_flash("Layer limit reached.");
+    return;
+  }
+  size_t total = (size_t)CANVAS_W * CANVAS_H;
+  guint32 *buf = calloc(total, sizeof(guint32));
+  if (!buf) {
+    cmd_flash("Out of memory.");
+    return;
+  }
+  int ins = layer_active + 1;
+  for (int li = layer_count; li > ins; li--) {
+    layer_bufs[li] = layer_bufs[li - 1];
+    layer_visible[li] = layer_visible[li - 1];
+    layer_blend[li] = layer_blend[li - 1];
+    layer_opacity[li] = layer_opacity[li - 1];
+    memcpy(layer_name[li], layer_name[li - 1], 32);
+  }
+  layer_bufs[ins] = buf;
+  layer_visible[ins] = TRUE;
+  layer_blend[ins] = BLEND_NORMAL;
+  layer_opacity[ins] = 100;
+  snprintf(layer_name[ins], 32, "Layer %d", layer_count + 1);
+  layer_count++;
+  layer_active = ins;
+  pixels = layer_bufs[layer_active];
+  clear_history();
+  status_update();
+  gtk_widget_queue_draw(main_canvas);
+  char msg[64];
+  snprintf(msg, sizeof(msg), "New layer %d/%d", layer_active + 1, layer_count);
+  cmd_flash(msg);
+}
+
+void exec_seltolay(const char *arg) {
+  (void)arg;
+  if (!visual_mode) {
+    cmd_flash("No selection. Enter visual mode first.");
+    return;
+  }
+  if (layer_count >= LAYER_MAX) {
+    cmd_flash("Layer limit reached.");
+    return;
+  }
+  int x0 = MIN(cursor_x, visual_anchor_x);
+  int x1 = MAX(cursor_x, visual_anchor_x);
+  int y0 = MIN(cursor_y, visual_anchor_y);
+  int y1 = MAX(cursor_y, visual_anchor_y);
+  size_t total = (size_t)CANVAS_W * CANVAS_H;
+  guint32 *buf = calloc(total, sizeof(guint32));
+  if (!buf) {
+    cmd_flash("Out of memory.");
+    return;
+  }
+  for (int y = y0; y <= y1; y++)
+    for (int x = x0; x <= x1; x++)
+      buf[y * CANVAS_W + x] = PX(y, x);
+  int ins = layer_active + 1;
+  for (int li = layer_count; li > ins; li--) {
+    layer_bufs[li] = layer_bufs[li - 1];
+    layer_visible[li] = layer_visible[li - 1];
+    layer_blend[li] = layer_blend[li - 1];
+    layer_opacity[li] = layer_opacity[li - 1];
+    memcpy(layer_name[li], layer_name[li - 1], 32);
+  }
+  layer_bufs[ins] = buf;
+  layer_visible[ins] = TRUE;
+  layer_blend[ins] = BLEND_NORMAL;
+  layer_opacity[ins] = 100;
+  snprintf(layer_name[ins], 32, "Layer %d", layer_count + 1);
+  layer_count++;
+  layer_active = ins;
+  pixels = layer_bufs[layer_active];
+  visual_mode = FALSE;
+  clear_history();
+  status_update();
+  gtk_widget_queue_draw(main_canvas);
+  char msg[64];
+  snprintf(msg, sizeof(msg), "Selection copied to layer %d/%d",
+           layer_active + 1, layer_count);
+  cmd_flash(msg);
+}
+
+void exec_mergedown(const char *arg) {
+  (void)arg;
+  if (layer_active == 0) {
+    cmd_flash("Already at bottom layer.");
+    return;
+  }
+  size_t total = (size_t)CANVAS_W * CANVAS_H;
+  guint32 *dst = layer_bufs[layer_active - 1];
+  guint32 *src = layer_bufs[layer_active];
+  guint32 *before = malloc(total * sizeof(guint32));
+  if (!before) {
+    cmd_flash("Out of memory.");
+    return;
+  }
+  memcpy(before, dst, total * sizeof(guint32));
+  for (int i = 0; i < (int)total; i++) {
+    guint32 s = src[i];
+    double sa = (s & 0xff) / 255.0;
+    if (sa == 0.0)
+      continue;
+    guint32 d = dst[i];
+    double da = (d & 0xff) / 255.0;
+    double ra = sa + da * (1.0 - sa);
+    if (ra < 1e-6) {
+      dst[i] = 0;
+      continue;
+    }
+    double inv = 1.0 - sa;
+    int rr = (int)(((s >> 24 & 0xff) / 255.0 * sa +
+                    (d >> 24 & 0xff) / 255.0 * da * inv) /
+                       ra * 255 +
+                   0.5);
+    int rg = (int)(((s >> 16 & 0xff) / 255.0 * sa +
+                    (d >> 16 & 0xff) / 255.0 * da * inv) /
+                       ra * 255 +
+                   0.5);
+    int rb = (int)(((s >> 8 & 0xff) / 255.0 * sa +
+                    (d >> 8 & 0xff) / 255.0 * da * inv) /
+                       ra * 255 +
+                   0.5);
+    dst[i] =
+        PACK_RGBA(CLAMP(rr, 0, 255), CLAMP(rg, 0, 255), CLAMP(rb, 0, 255),
+                  CLAMP((int)(ra * 255 + 0.5), 0, 255));
+  }
+  free(layer_bufs[layer_active]);
+  for (int li = layer_active; li < layer_count - 1; li++) {
+    layer_bufs[li] = layer_bufs[li + 1];
+    layer_visible[li] = layer_visible[li + 1];
+    layer_blend[li] = layer_blend[li + 1];
+    layer_opacity[li] = layer_opacity[li + 1];
+    memcpy(layer_name[li], layer_name[li + 1], 32);
+  }
+  layer_count--;
+  layer_bufs[layer_count] = NULL;
+  layer_visible[layer_count] = FALSE;
+  layer_blend[layer_count] = BLEND_NORMAL;
+  layer_opacity[layer_count] = 100;
+  layer_active--;
+  pixels = layer_bufs[layer_active];
+  commit_canvas_snapshot(before, CANVAS_W, CANVAS_H);
+  status_update();
+  gtk_widget_queue_draw(main_canvas);
+  cmd_flash("Merged down.");
+}
+
+void exec_layer(const char *arg) {
+  int n = atoi(arg) - 1;
+  if (n < 0 || n >= layer_count) {
+    cmd_flash("Invalid layer number.");
+    return;
+  }
+  layer_active = n;
+  pixels = layer_bufs[layer_active];
+  clear_history();
+  status_update();
+  gtk_widget_queue_draw(main_canvas);
+  char msg[64];
+  snprintf(msg, sizeof(msg), "Layer %d/%d", layer_active + 1, layer_count);
+  cmd_flash(msg);
+}
+
+void exec_layervis(const char *arg) {
+  int n = atoi(arg) - 1;
+  if (n < 0 || n >= layer_count) {
+    cmd_flash("Invalid layer number.");
+    return;
+  }
+  layer_visible[n] = !layer_visible[n];
+  gtk_widget_queue_draw(main_canvas);
+  char msg[64];
+  snprintf(msg, sizeof(msg), "Layer %d %s", n + 1,
+           layer_visible[n] ? "visible" : "hidden");
+  cmd_flash(msg);
+}
+
+void exec_layerblend(const char *arg) {
+  BlendMode found = BLEND_MODE_COUNT;
+  for (int m = 0; m < BLEND_MODE_COUNT; m++) {
+    if (strcasecmp(arg, blend_mode_names[m]) == 0) {
+      found = m;
+      break;
+    }
+  }
+  if (found == BLEND_MODE_COUNT) {
+    char modes[256] = "";
+    for (int m = 0; m < BLEND_MODE_COUNT; m++) {
+      if (m)
+        strncat(modes, "|", sizeof(modes) - strlen(modes) - 1);
+      strncat(modes, blend_mode_names[m], sizeof(modes) - strlen(modes) - 1);
+    }
+    char emsg[320];
+    snprintf(emsg, sizeof(emsg), "Unknown mode. Use: %s", modes);
+    cmd_flash(emsg);
+    return;
+  }
+  layer_blend[layer_active] = found;
+  gtk_widget_queue_draw(main_canvas);
+  char msg[64];
+  snprintf(msg, sizeof(msg), "Layer %d blend: %s", layer_active + 1,
+           blend_mode_names[found]);
+  cmd_flash(msg);
+}
+
+void exec_layeropacity(const char *arg) {
+  int v = atoi(arg);
+  if (v < 0 || v > 100) {
+    cmd_flash("Opacity must be 0-100.");
+    return;
+  }
+  layer_opacity[layer_active] = v;
+  gtk_widget_queue_draw(main_canvas);
+  status_update();
+  char msg[64];
+  snprintf(msg, sizeof(msg), "Layer %d opacity: %d%%", layer_active + 1, v);
+  cmd_flash(msg);
+}

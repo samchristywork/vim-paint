@@ -210,11 +210,23 @@ void rgb_to_hsl(double r, double g, double b, double *h, double *s, double *l);
 double hue_to_rgb(double p, double q, double t);
 void hsl_to_rgb(double h, double s, double l, double *r, double *g, double *b);
 gboolean parse_color(const char *val, unsigned int *out_rgb);
+void exec_delp(const char *arg);
+void exec_colorpicker(const char *arg);
+void exec_savep(const char *arg);
+void exec_loadp(const char *arg);
+void exec_importp(const char *arg);
 
 /* layers.c */
 double blend_apply(BlendMode mode, double cb, double cs);
 void layers_composite(guint32 *dst, int total);
 void layers_flatten(void);
+void exec_newlayer(const char *arg);
+void exec_seltolay(const char *arg);
+void exec_mergedown(const char *arg);
+void exec_layer(const char *arg);
+void exec_layervis(const char *arg);
+void exec_layerblend(const char *arg);
+void exec_layeropacity(const char *arg);
 
 /* undo.c */
 void free_action(UndoAction *a);
@@ -238,11 +250,34 @@ guint32 fill_color_at(int x, int y, guint32 fg);
 void flood_fill(int sx, int sy, guint32 fill_color);
 int snap_coord(int coord, gboolean horizontal);
 void apply_gradient_linear(int x0, int y0, int x1, int y1, guint32 c1, guint32 c2);
+void exec_replace(const char *arg);
+void exec_gradient(const char *arg);
+void exec_gradtool(const char *arg);
+void exec_brushdefine(const char *arg);
+void exec_hsl(const char *arg);
+void exec_dither(const char *arg);
+void exec_find_color(const char *arg);
+void exec_goto(const char *arg);
+void exec_scale(const char *arg);
+void exec_fliph(const char *arg);
+void exec_flipv(const char *arg);
+void exec_invert(const char *arg);
+void exec_blur(const char *arg);
+void exec_stroke(const char *arg);
+void exec_rotate(const char *arg);
+void exec_resize(const char *arg);
+void exec_center(const char *arg);
+void exec_crop(const char *arg);
+void exec_text(const char *arg);
 
 /* fileio.c */
 gboolean cmd_write(const char *filename);
 void cmd_export_bmp(const char *filename, int scale);
 void cmd_open(const char *filename);
+void exec_write(const char *arg);
+void exec_write_quit(const char *arg);
+void exec_edit(const char *arg);
+void exec_export(const char *arg);
 
 /* commands.c */
 void cmd_execute(void);
@@ -274,3 +309,7 @@ gboolean on_flash_expire(gpointer data);
 void cmd_flash(const char *text);
 void usage(const char *prog, int exitcode);
 int main(int argc, char *argv[]);
+void exec_quit(const char *arg);
+void exec_force_quit(const char *arg);
+void exec_tabnew(const char *arg);
+void exec_new(const char *arg);
