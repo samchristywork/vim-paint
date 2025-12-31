@@ -4,12 +4,16 @@ LIBS := $(shell pkg-config --libs gtk+-3.0)
 
 SRCS := src/state.c src/layers.c src/undo.c src/palette.c src/canvas.c \
         src/fileio.c src/commands.c src/render.c src/input.c src/main.c
+OBJS := $(SRCS:src/%.c=build/%.o)
 
 all: build/vimpaint
 
-build/vimpaint: $(SRCS) src/vimpaint.h
+build/vimpaint: $(OBJS)
+	${CC} $(OBJS) -o $@ ${LIBS} -lm
+
+build/%.o: src/%.c src/vimpaint.h
 	mkdir -p build/
-	${CC} ${CFLAGS} $(SRCS) -o $@ ${LIBS} -lm
+	${CC} ${CFLAGS} -c $< -o $@
 
 clean:
 	rm -rf build/
