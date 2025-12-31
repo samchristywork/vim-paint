@@ -1,4 +1,8 @@
-#include "vimpaint.h"
+#include "canvas.h"
+#include "layers.h"
+#include "main.h"
+#include "palette.h"
+#include "undo.h"
 
 void insert_paint(void) {
   if (insert_mode) {

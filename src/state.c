@@ -1,4 +1,4 @@
-#include "vimpaint.h"
+#include "state.h"
 
 int CANVAS_W = DEFAULT_CANVAS_W;
 int CANVAS_H = DEFAULT_CANVAS_H;

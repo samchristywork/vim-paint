@@ -1,4 +1,5 @@
-#pragma once
+#ifndef VIMPAINT_STATE_H
+#define VIMPAINT_STATE_H
 
 #include <glob.h>
 #include <gtk/gtk.h>
@@ -56,7 +57,6 @@ typedef struct {
 typedef struct {
   PixelChange *changes;
   int count;
-  /* Non-NULL for canvas-resizing ops */
   guint32 *before_snap;
   int before_w, before_h;
   guint32 *after_snap;
@@ -94,6 +94,8 @@ typedef enum {
   BLEND_EXCLUSION,
   BLEND_MODE_COUNT
 } BlendMode;
+
+typedef struct { const char *name; unsigned int rgb; } NamedColor;
 
 extern int CANVAS_W;
 extern int CANVAS_H;
@@ -199,117 +201,6 @@ extern guint32 *yank_buf;
 extern int yank_w;
 extern int yank_h;
 
-typedef struct { const char *name; unsigned int rgb; } NamedColor;
 extern const NamedColor named_colors[];
 
-/* palette.c */
-int palette_reserve(int needed);
-void palette_to_rgb(int idx, int *r, int *g, int *b);
-void set_palette_rgb(int slot, unsigned int rgb);
-void rgb_to_hsl(double r, double g, double b, double *h, double *s, double *l);
-double hue_to_rgb(double p, double q, double t);
-void hsl_to_rgb(double h, double s, double l, double *r, double *g, double *b);
-gboolean parse_color(const char *val, unsigned int *out_rgb);
-void exec_delp(const char *arg);
-void exec_colorpicker(const char *arg);
-void exec_savep(const char *arg);
-void exec_loadp(const char *arg);
-void exec_importp(const char *arg);
-
-/* layers.c */
-double blend_apply(BlendMode mode, double cb, double cs);
-void layers_composite(guint32 *dst, int total);
-void layers_flatten(void);
-void exec_newlayer(const char *arg);
-void exec_seltolay(const char *arg);
-void exec_mergedown(const char *arg);
-void exec_layer(const char *arg);
-void exec_layervis(const char *arg);
-void exec_layerblend(const char *arg);
-void exec_layeropacity(const char *arg);
-
-/* undo.c */
-void free_action(UndoAction *a);
-void clear_history(void);
-void begin_undo_action(void);
-void push_undo(int x, int y);
-void commit_undo_action(void);
-void commit_canvas_snapshot(guint32 *before_snap, int bw, int bh);
-
-/* canvas.c */
-void insert_paint(void);
-void draw_line(int x0, int y0, int x1, int y1, guint32 color);
-void paint_pixel_raw(int x, int y, guint32 color);
-void paint_pixel(int x, int y, guint32 color);
-void paint_brush(int x, int y, guint32 color);
-void find_right(void);
-void find_left(void);
-void find_down(void);
-void find_up(void);
-guint32 fill_color_at(int x, int y, guint32 fg);
-void flood_fill(int sx, int sy, guint32 fill_color);
-int snap_coord(int coord, gboolean horizontal);
-void apply_gradient_linear(int x0, int y0, int x1, int y1, guint32 c1, guint32 c2);
-void exec_replace(const char *arg);
-void exec_gradient(const char *arg);
-void exec_gradtool(const char *arg);
-void exec_brushdefine(const char *arg);
-void exec_hsl(const char *arg);
-void exec_dither(const char *arg);
-void exec_find_color(const char *arg);
-void exec_goto(const char *arg);
-void exec_scale(const char *arg);
-void exec_fliph(const char *arg);
-void exec_flipv(const char *arg);
-void exec_invert(const char *arg);
-void exec_blur(const char *arg);
-void exec_stroke(const char *arg);
-void exec_rotate(const char *arg);
-void exec_resize(const char *arg);
-void exec_center(const char *arg);
-void exec_crop(const char *arg);
-void exec_text(const char *arg);
-
-/* fileio.c */
-gboolean cmd_write(const char *filename);
-void cmd_export_bmp(const char *filename, int scale);
-void cmd_open(const char *filename);
-void exec_write(const char *arg);
-void exec_write_quit(const char *arg);
-void exec_edit(const char *arg);
-void exec_export(const char *arg);
-
-/* commands.c */
-void cmd_execute(void);
-
-/* render.c */
-gboolean on_draw(GtkWidget *widget, cairo_t *cr, gpointer data);
-gboolean on_palette_draw(GtkWidget *widget, cairo_t *cr, gpointer data);
-gboolean on_palette_click(GtkWidget *widget, GdkEventButton *event, gpointer data);
-
-/* input.c */
-gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data);
-gboolean on_button_press(GtkWidget *widget, GdkEventButton *event, gpointer data);
-gboolean on_button_release(GtkWidget *widget, GdkEventButton *event, gpointer data);
-gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event, gpointer data);
-gboolean on_scroll(GtkWidget *widget, GdkEventScroll *event, gpointer data);
-
-/* main.c */
-void zoom_resize(void);
-void tab_reset(void);
-void flash_color(int idx);
-void update_title(const char *filename);
-void title_refresh(void);
-void tab_save(int idx);
-void tab_switch(int newidx);
-void tab_close_current(void);
-void cmd_set(const char *text);
-void status_update(void);
-gboolean on_flash_expire(gpointer data);
-void cmd_flash(const char *text);
-void usage(const char *prog, int exitcode);
-int main(int argc, char *argv[]);
-void exec_quit(const char *arg);
-void exec_force_quit(const char *arg);
-void exec_tabnew(const char *arg);
-void exec_new(const char *arg);
+#endif

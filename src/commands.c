@@ -1,4 +1,10 @@
-#include "vimpaint.h"
+#include "commands.h"
+#include "canvas.h"
+#include "fileio.h"
+#include "layers.h"
+#include "main.h"
+#include "palette.h"
+#include "undo.h"
 
 static void exec_set(const char *arg) {
   const char *opt = cmd_buf + 5;

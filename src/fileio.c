@@ -1,4 +1,7 @@
-#include "vimpaint.h"
+#include "fileio.h"
+#include "layers.h"
+#include "main.h"
+#include "undo.h"
 
 gboolean cmd_write(const char *filename) {
   size_t total = (size_t)CANVAS_W * CANVAS_H;

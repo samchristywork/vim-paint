@@ -1,4 +1,11 @@
-#include "vimpaint.h"
+#include "input.h"
+#include "canvas.h"
+#include "commands.h"
+#include "fileio.h"
+#include "layers.h"
+#include "main.h"
+#include "palette.h"
+#include "undo.h"
 
 static gboolean drag_painting = FALSE;
 static gboolean drag_selecting = FALSE;

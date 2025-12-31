@@ -1,4 +1,5 @@
-#include "vimpaint.h"
+#include "palette.h"
+#include "main.h"
 
 int palette_reserve(int needed) {
   if (needed <= palette_cap)

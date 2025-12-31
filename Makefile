@@ -11,7 +11,9 @@ all: build/vimpaint
 build/vimpaint: $(OBJS)
 	${CC} $(OBJS) -o $@ ${LIBS} -lm
 
-build/%.o: src/%.c src/vimpaint.h
+HDRS := $(wildcard src/*.h)
+
+build/%.o: src/%.c $(HDRS)
 	mkdir -p build/
 	${CC} ${CFLAGS} -c $< -o $@
 

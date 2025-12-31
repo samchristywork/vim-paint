@@ -1,4 +1,6 @@
-#include "vimpaint.h"
+#include "layers.h"
+#include "main.h"
+#include "undo.h"
 
 double blend_apply(BlendMode mode, double cb, double cs) {
   switch (mode) {

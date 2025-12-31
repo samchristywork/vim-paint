@@ -1,4 +1,7 @@
-#include "vimpaint.h"
+#include "render.h"
+#include "layers.h"
+#include "main.h"
+#include "palette.h"
 
 gboolean on_palette_draw(GtkWidget *widget, cairo_t *cr, gpointer data) {
   for (int i = 0; i < PALETTE_SIZE; i++) {

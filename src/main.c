@@ -1,4 +1,10 @@
-#include "vimpaint.h"
+#include "main.h"
+#include "fileio.h"
+#include "input.h"
+#include "layers.h"
+#include "palette.h"
+#include "render.h"
+#include "undo.h"
 
 void zoom_resize(void) {
   gtk_widget_set_size_request(main_canvas, CANVAS_W * CELL_SIZE,

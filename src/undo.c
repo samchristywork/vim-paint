@@ -1,4 +1,5 @@
-#include "vimpaint.h"
+#include "undo.h"
+#include "main.h"
 
 void free_action(UndoAction *a) {
   free(a->changes);
