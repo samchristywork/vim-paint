@@ -1,6 +1,7 @@
 #include "main.h"
 #include "fileio.h"
-#include "input.h"
+#include "keys.h"
+#include "mouse.h"
 #include "layers.h"
 #include "palette.h"
 #include "render.h"
