@@ -1,5 +1,5 @@
 #include "keys.h"
-#include "canvas.h"
+#include "draw.h"
 #include "cmdline.h"
 #include "commands.h"
 #include "fileio.h"

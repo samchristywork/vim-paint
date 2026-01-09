@@ -1,5 +1,6 @@
 #include "commands.h"
-#include "canvas.h"
+#include "effects.h"
+#include "transform.h"
 #include "fileio.h"
 #include "layers.h"
 #include "main.h"

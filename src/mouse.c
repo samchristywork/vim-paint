@@ -1,5 +1,5 @@
 #include "mouse.h"
-#include "canvas.h"
+#include "draw.h"
 #include "main.h"
 #include "undo.h"
 
