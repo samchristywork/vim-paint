@@ -5,7 +5,7 @@
 #include "palette.h"
 #include "undo.h"
 
-static void find_color(const char *arg) {
+void find_color(const char *arg) {
   (void)arg;
   const char *val = cmd_buf + 12;
   unsigned int rgb;
@@ -48,7 +48,7 @@ static void find_color(const char *arg) {
   cmd_set("");
 }
 
-static void go_to(const char *arg) {
+void go_to(const char *arg) {
   int gx = 0, gy = 0;
   if (sscanf(arg, "%d,%d", &gx, &gy) != 2)
     sscanf(arg, "%d %d", &gx, &gy);
@@ -63,7 +63,7 @@ static void go_to(const char *arg) {
   cmd_set("");
 }
 
-static void scale(const char *arg) {
+void scale(const char *arg) {
   int n = atoi(arg);
   if (n < 2 || n > 8) {
     cmd_flash("Usage: :scale N  (N = 2..8, requires visual selection)");
@@ -106,7 +106,7 @@ static void scale(const char *arg) {
   cmd_set("");
 }
 
-static void fliph(const char *arg) {
+void fliph(const char *arg) {
   (void)arg;
   begin_undo_action();
   for (int y = 0; y < CANVAS_H; y++)
@@ -125,7 +125,7 @@ static void fliph(const char *arg) {
   cmd_set("");
 }
 
-static void flipv(const char *arg) {
+void flipv(const char *arg) {
   (void)arg;
   begin_undo_action();
   for (int y = 0; y < CANVAS_H / 2; y++)
@@ -144,7 +144,7 @@ static void flipv(const char *arg) {
   cmd_set("");
 }
 
-static void rotate(const char *arg) {
+void rotate(const char *arg) {
   (void)arg;
   if (layer_count > 1)
     layers_flatten();
@@ -178,7 +178,7 @@ static void rotate(const char *arg) {
   cmd_set("");
 }
 
-static void resize(const char *arg) {
+void resize(const char *arg) {
   int nw = 0, nh = 0;
   if (sscanf(arg, "%dx%d", &nw, &nh) != 2)
     sscanf(arg, "%d %d", &nw, &nh);
@@ -225,7 +225,7 @@ static void resize(const char *arg) {
   }
 }
 
-static void center(const char *arg) {
+void center(const char *arg) {
   (void)arg;
   int min_x = CANVAS_W, max_x = -1, min_y = CANVAS_H, max_y = -1;
   for (int y = 0; y < CANVAS_H; y++)
@@ -276,7 +276,7 @@ static void center(const char *arg) {
   cmd_set("");
 }
 
-static void crop(const char *arg) {
+void crop(const char *arg) {
   (void)arg;
   if (layer_count > 1)
     layers_flatten();
@@ -330,7 +330,7 @@ static void crop(const char *arg) {
   cmd_set("");
 }
 
-static void stroke(const char *arg) {
+void stroke(const char *arg) {
   (void)arg;
   if (!visual_mode) {
     cmd_flash(":stroke requires a visual selection.");
@@ -355,7 +355,7 @@ static void stroke(const char *arg) {
   cmd_set("");
 }
 
-static void text_stamp(const char *arg) {
+void text_stamp(const char *arg) {
   cairo_surface_t *measure_surf =
       cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 1, 1);
   cairo_t *mcr = cairo_create(measure_surf);

@@ -457,7 +457,7 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
-static void app_quit(const char *arg) {
+void app_quit(const char *arg) {
   (void)arg;
   if (canvas_dirty)
     cmd_flash(
@@ -468,7 +468,7 @@ static void app_quit(const char *arg) {
     gtk_main_quit();
 }
 
-static void force_quit(const char *arg) {
+void force_quit(const char *arg) {
   (void)arg;
   if (tab_count > 1)
     tab_close_current();
@@ -476,7 +476,7 @@ static void force_quit(const char *arg) {
     gtk_main_quit();
 }
 
-static void tabnew(const char *arg) {
+void tabnew(const char *arg) {
   if (tab_count >= TAB_MAX) {
     cmd_flash("Max tabs reached.");
     return;
@@ -509,7 +509,7 @@ static void tabnew(const char *arg) {
   cmd_set("");
 }
 
-static void new_canvas(const char *arg) {
+void new_canvas(const char *arg) {
   (void)arg;
   gboolean force = (cmd_buf[4] == '!');
   if (!force && canvas_dirty) {

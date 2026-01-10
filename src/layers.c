@@ -115,7 +115,7 @@ void layers_flatten(void) {
   snprintf(layer_name[0], 32, "Layer 1");
 }
 
-static void newlayer(const char *arg) {
+void newlayer(const char *arg) {
   (void)arg;
   if (layer_count >= LAYER_MAX) {
     cmd_flash("Layer limit reached.");
@@ -151,7 +151,7 @@ static void newlayer(const char *arg) {
   cmd_flash(msg);
 }
 
-static void seltolay(const char *arg) {
+void seltolay(const char *arg) {
   (void)arg;
   if (!visual_mode) {
     cmd_flash("No selection. Enter visual mode first.");
@@ -200,7 +200,7 @@ static void seltolay(const char *arg) {
   cmd_flash(msg);
 }
 
-static void mergedown(const char *arg) {
+void mergedown(const char *arg) {
   (void)arg;
   if (layer_active == 0) {
     cmd_flash("Already at bottom layer.");
@@ -265,7 +265,7 @@ static void mergedown(const char *arg) {
   cmd_flash("Merged down.");
 }
 
-static void layer(const char *arg) {
+void layer(const char *arg) {
   int n = atoi(arg) - 1;
   if (n < 0 || n >= layer_count) {
     cmd_flash("Invalid layer number.");
@@ -281,7 +281,7 @@ static void layer(const char *arg) {
   cmd_flash(msg);
 }
 
-static void layervis(const char *arg) {
+void layervis(const char *arg) {
   int n = atoi(arg) - 1;
   if (n < 0 || n >= layer_count) {
     cmd_flash("Invalid layer number.");
@@ -295,7 +295,7 @@ static void layervis(const char *arg) {
   cmd_flash(msg);
 }
 
-static void layerblend(const char *arg) {
+void layerblend(const char *arg) {
   BlendMode found = BLEND_MODE_COUNT;
   for (int m = 0; m < BLEND_MODE_COUNT; m++) {
     if (strcasecmp(arg, blend_mode_names[m]) == 0) {
@@ -323,7 +323,7 @@ static void layerblend(const char *arg) {
   cmd_flash(msg);
 }
 
-static void layeropacity(const char *arg) {
+void layeropacity(const char *arg) {
   int v = atoi(arg);
   if (v < 0 || v > 100) {
     cmd_flash("Opacity must be 0-100.");

@@ -167,7 +167,7 @@ gboolean parse_color(const char *val, unsigned int *out_rgb) {
   return FALSE;
 }
 
-static void delp(const char *arg) {
+void delp(const char *arg) {
   int idx = atoi(arg);
   if (idx == 0) {
     cmd_flash("Cannot delete background color (index 0).");
@@ -188,7 +188,7 @@ static void delp(const char *arg) {
   cmd_flash("Entry deleted.");
 }
 
-static void colorpicker(const char *arg) {
+void colorpicker(const char *arg) {
   (void)arg;
   gboolean set_bg = (strstr(cmd_buf, "bg") != NULL);
   guint32 current = set_bg ? bg_color : fg_color;
@@ -236,7 +236,7 @@ static void colorpicker(const char *arg) {
   cmd_set("");
 }
 
-static void savep(const char *arg) {
+void savep(const char *arg) {
   FILE *f = fopen(arg, "w");
   if (!f) {
     cmd_flash("Cannot open file.");
@@ -251,7 +251,7 @@ static void savep(const char *arg) {
   cmd_flash("Palette saved.");
 }
 
-static void loadp(const char *arg) {
+void loadp(const char *arg) {
   FILE *f = fopen(arg, "r");
   if (!f) {
     cmd_flash("Cannot open file.");
@@ -277,7 +277,7 @@ static void loadp(const char *arg) {
   cmd_flash("Palette loaded.");
 }
 
-static void importp(const char *arg) {
+void importp(const char *arg) {
   cairo_surface_t *surf = cairo_image_surface_create_from_png(arg);
   if (cairo_surface_status(surf) != CAIRO_STATUS_SUCCESS) {
     cmd_flash("Cannot open file.");

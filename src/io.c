@@ -206,7 +206,7 @@ void cmd_open(const char *filename) {
   cmd_set("");
 }
 
-static void file_write(const char *arg) {
+void file_write(const char *arg) {
   if (*arg) {
     if (cmd_write(arg)) {
       snprintf(last_filename, sizeof(last_filename), "%s", arg);
@@ -220,7 +220,7 @@ static void file_write(const char *arg) {
   }
 }
 
-static void file_write_quit(const char *arg) {
+void file_write_quit(const char *arg) {
   if (*arg) {
     if (cmd_write(arg)) {
       snprintf(last_filename, sizeof(last_filename), "%s", arg);
@@ -237,7 +237,7 @@ static void file_write_quit(const char *arg) {
   }
 }
 
-static void file_edit(const char *arg) {
+void file_edit(const char *arg) {
   gboolean force = (cmd_buf[2] == '!');
   if (!force && canvas_dirty) {
     cmd_flash("Unsaved changes. Use :e! to discard or :w to save first.");
@@ -250,7 +250,7 @@ static void file_edit(const char *arg) {
     cmd_flash("No filename.");
 }
 
-static void file_export(const char *arg) {
+void file_export(const char *arg) {
   char fname[4096];
   int scale = 1;
   const char *sp = strrchr(arg, ' ');

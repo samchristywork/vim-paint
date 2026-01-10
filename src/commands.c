@@ -7,7 +7,7 @@
 #include "palette.h"
 #include "undo.h"
 
-static void exec_set(const char *arg) {
+void exec_set(const char *arg) {
   const char *opt = cmd_buf + 5;
   (void)arg;
   if (strcmp(opt, "grid") == 0) {
@@ -293,7 +293,7 @@ static void exec_set(const char *arg) {
   }
 }
 
-static void exec_guide(const char *arg) {
+void exec_guide(const char *arg) {
   if (strcmp(arg, "clear") == 0) {
     guide_count = 0;
     gtk_widget_queue_draw(main_canvas);
@@ -342,7 +342,7 @@ static void exec_guide(const char *arg) {
   cmd_flash("Usage: :guide h|v N  |  :guide clear  |  :guide snap");
 }
 
-static void exec_help(const char *arg) {
+void exec_help(const char *arg) {
   (void)arg;
   GtkWidget *dlg = gtk_message_dialog_new(
       GTK_WINDOW(main_window),

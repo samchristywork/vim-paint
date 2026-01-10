@@ -3,9 +3,9 @@
 #include "main.h"
 #include "undo.h"
 
-static gboolean drag_painting = FALSE;
-static gboolean drag_selecting = FALSE;
-static guint32 drag_color = 0;
+gboolean drag_painting = FALSE;
+gboolean drag_selecting = FALSE;
+guint32 drag_color = 0;
 
 gboolean on_button_press(GtkWidget *widget, GdkEventButton *event,
                          gpointer data) {
