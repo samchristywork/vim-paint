@@ -188,8 +188,7 @@ void resize(const char *arg) {
   }
   if (layer_count > 1)
     layers_flatten();
-  guint32 *before_snap =
-      malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
+  guint32 *before_snap = malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
   guint32 *np = calloc((size_t)nw * nh, sizeof(guint32));
   if (!before_snap || !np) {
     free(before_snap);
@@ -250,8 +249,7 @@ void center(const char *arg) {
     cmd_flash("Already centered.");
     return;
   }
-  guint32 *before_snap =
-      malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
+  guint32 *before_snap = malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
   guint32 *np = calloc((size_t)CANVAS_W * CANVAS_H, sizeof(guint32));
   if (!before_snap || !np) {
     free(before_snap);
@@ -303,8 +301,7 @@ void crop(const char *arg) {
     return;
   }
   int nW = max_x - min_x + 1, nH = max_y - min_y + 1;
-  guint32 *before_snap =
-      malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
+  guint32 *before_snap = malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
   guint32 *np = calloc((size_t)nW * nH, sizeof(guint32));
   if (!before_snap || !np) {
     free(before_snap);
@@ -418,16 +415,49 @@ void text_stamp(const char *arg) {
 }
 
 gboolean exec_transform(const char *cmd, const char *arg) {
-  if (strncmp(cmd, ":find color ", 12) == 0)        { find_color(arg); return TRUE; }
-  if (strncmp(cmd, ":goto ", 6) == 0 && *arg)       { go_to(arg);      return TRUE; }
-  if (strncmp(cmd, ":scale ", 7) == 0 && *arg)      { scale(arg);      return TRUE; }
-  if (strcmp(cmd, ":fliph") == 0)                   { fliph(arg);      return TRUE; }
-  if (strcmp(cmd, ":flipv") == 0)                   { flipv(arg);      return TRUE; }
-  if (strcmp(cmd, ":rotate") == 0)                  { rotate(arg);     return TRUE; }
-  if (strncmp(cmd, ":resize ", 8) == 0 && *arg)     { resize(arg);     return TRUE; }
-  if (strcmp(cmd, ":center") == 0)                  { center(arg);     return TRUE; }
-  if (strcmp(cmd, ":crop") == 0)                    { crop(arg);       return TRUE; }
-  if (strcmp(cmd, ":stroke") == 0)                  { stroke(arg);     return TRUE; }
-  if (strncmp(cmd, ":text ", 6) == 0 && *arg)       { text_stamp(arg); return TRUE; }
+  if (strncmp(cmd, ":find color ", 12) == 0) {
+    find_color(arg);
+    return TRUE;
+  }
+  if (strncmp(cmd, ":goto ", 6) == 0 && *arg) {
+    go_to(arg);
+    return TRUE;
+  }
+  if (strncmp(cmd, ":scale ", 7) == 0 && *arg) {
+    scale(arg);
+    return TRUE;
+  }
+  if (strcmp(cmd, ":fliph") == 0) {
+    fliph(arg);
+    return TRUE;
+  }
+  if (strcmp(cmd, ":flipv") == 0) {
+    flipv(arg);
+    return TRUE;
+  }
+  if (strcmp(cmd, ":rotate") == 0) {
+    rotate(arg);
+    return TRUE;
+  }
+  if (strncmp(cmd, ":resize ", 8) == 0 && *arg) {
+    resize(arg);
+    return TRUE;
+  }
+  if (strcmp(cmd, ":center") == 0) {
+    center(arg);
+    return TRUE;
+  }
+  if (strcmp(cmd, ":crop") == 0) {
+    crop(arg);
+    return TRUE;
+  }
+  if (strcmp(cmd, ":stroke") == 0) {
+    stroke(arg);
+    return TRUE;
+  }
+  if (strncmp(cmd, ":text ", 6) == 0 && *arg) {
+    text_stamp(arg);
+    return TRUE;
+  }
   return FALSE;
 }

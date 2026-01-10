@@ -32,8 +32,7 @@ gboolean cmdline_key(GtkWidget *widget, GdkEventKey *event, gpointer data) {
                                                       : CMD_HISTORY_MAX;
       if (next < avail) {
         cmd_history_idx = next;
-        int hidx =
-            (cmd_history_count - 1 - cmd_history_idx) % CMD_HISTORY_MAX;
+        int hidx = (cmd_history_count - 1 - cmd_history_idx) % CMD_HISTORY_MAX;
         snprintf(cmd_buf, sizeof(cmd_buf), "%s", cmd_history[hidx]);
         cmd_len = strlen(cmd_buf);
         cmd_set(cmd_buf);
@@ -60,9 +59,9 @@ gboolean cmdline_key(GtkWidget *widget, GdkEventKey *event, gpointer data) {
       cmd_set(cmd_buf);
     }
   } else if (event->keyval == GDK_KEY_Tab) {
-    static const char *const file_pfxs[] = {
-        ":loadp ", ":savep ", ":export ", ":importp ", ":wq ",
-        ":w ",     ":e! ",    ":e ",      NULL};
+    static const char *const file_pfxs[] = {":loadp ",   ":savep ", ":export ",
+                                            ":importp ", ":wq ",    ":w ",
+                                            ":e! ",      ":e ",     NULL};
     const char *pfx = NULL;
     for (int i = 0; file_pfxs[i]; i++) {
       size_t plen = strlen(file_pfxs[i]);
@@ -89,9 +88,8 @@ gboolean cmdline_key(GtkWidget *widget, GdkEventKey *event, gpointer data) {
         tab_glob_idx = (tab_glob_idx + 1) % (int)tab_glob.gl_pathc;
       }
       if (tab_glob_valid) {
-        int written =
-            snprintf(cmd_buf, sizeof(cmd_buf), "%s%s", tab_cmd_prefix,
-                     tab_glob.gl_pathv[tab_glob_idx]);
+        int written = snprintf(cmd_buf, sizeof(cmd_buf), "%s%s", tab_cmd_prefix,
+                               tab_glob.gl_pathv[tab_glob_idx]);
         if (written >= (int)sizeof(cmd_buf)) {
           tab_reset();
           cmd_flash("Path too long.");

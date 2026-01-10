@@ -240,9 +240,8 @@ void mergedown(const char *arg) {
                     (d >> 8 & 0xff) / 255.0 * da * inv) /
                        ra * 255 +
                    0.5);
-    dst[i] =
-        PACK_RGBA(CLAMP(rr, 0, 255), CLAMP(rg, 0, 255), CLAMP(rb, 0, 255),
-                  CLAMP((int)(ra * 255 + 0.5), 0, 255));
+    dst[i] = PACK_RGBA(CLAMP(rr, 0, 255), CLAMP(rg, 0, 255), CLAMP(rb, 0, 255),
+                       CLAMP((int)(ra * 255 + 0.5), 0, 255));
   }
   free(layer_bufs[layer_active]);
   for (int li = layer_active; li < layer_count - 1; li++) {
@@ -338,12 +337,33 @@ void layeropacity(const char *arg) {
 }
 
 gboolean exec_layers(const char *cmd, const char *arg) {
-  if (strcmp(cmd, ":newlayer") == 0)                      { newlayer(arg);     return TRUE; }
-  if (strcmp(cmd, ":seltolay") == 0)                      { seltolay(arg);     return TRUE; }
-  if (strcmp(cmd, ":mergedown") == 0)                     { mergedown(arg);    return TRUE; }
-  if (strncmp(cmd, ":layer ", 7) == 0 && *arg)            { layer(arg);        return TRUE; }
-  if (strncmp(cmd, ":layervis ", 10) == 0 && *arg)        { layervis(arg);     return TRUE; }
-  if (strncmp(cmd, ":layerblend ", 12) == 0 && *arg)      { layerblend(arg);   return TRUE; }
-  if (strncmp(cmd, ":layeropacity ", 14) == 0 && *arg)    { layeropacity(arg); return TRUE; }
+  if (strcmp(cmd, ":newlayer") == 0) {
+    newlayer(arg);
+    return TRUE;
+  }
+  if (strcmp(cmd, ":seltolay") == 0) {
+    seltolay(arg);
+    return TRUE;
+  }
+  if (strcmp(cmd, ":mergedown") == 0) {
+    mergedown(arg);
+    return TRUE;
+  }
+  if (strncmp(cmd, ":layer ", 7) == 0 && *arg) {
+    layer(arg);
+    return TRUE;
+  }
+  if (strncmp(cmd, ":layervis ", 10) == 0 && *arg) {
+    layervis(arg);
+    return TRUE;
+  }
+  if (strncmp(cmd, ":layerblend ", 12) == 0 && *arg) {
+    layerblend(arg);
+    return TRUE;
+  }
+  if (strncmp(cmd, ":layeropacity ", 14) == 0 && *arg) {
+    layeropacity(arg);
+    return TRUE;
+  }
   return FALSE;
 }

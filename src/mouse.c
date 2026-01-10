@@ -82,8 +82,7 @@ gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event,
   return TRUE;
 }
 
-gboolean on_scroll(GtkWidget *widget, GdkEventScroll *event,
-                   gpointer data) {
+gboolean on_scroll(GtkWidget *widget, GdkEventScroll *event, gpointer data) {
   static double accum = 0;
   double dy = 0;
   if (event->direction == GDK_SCROLL_UP) {

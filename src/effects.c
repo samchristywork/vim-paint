@@ -216,8 +216,7 @@ void dither(const char *arg) {
   guint32 px2 = PACK_RGBA(r2, g2, b2, 255);
   int x0, y0, x1, y1;
   get_vis_rect(&x0, &y0, &x1, &y1);
-  guint32 *before_snap =
-      malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
+  guint32 *before_snap = malloc((size_t)CANVAS_W * CANVAS_H * sizeof(guint32));
   if (!before_snap) {
     cmd_flash("Out of memory.");
     return;
@@ -388,17 +387,39 @@ void blur(const char *arg) {
 }
 
 gboolean exec_effects(const char *cmd, const char *arg) {
-  if (strncmp(cmd, ":replace ", 9) == 0 && *arg)   { replace(arg);   return TRUE; }
-  if (strncmp(cmd, ":gradient ", 10) == 0 && *arg) { gradient(arg);  return TRUE; }
-  if (strncmp(cmd, ":gradtool", 9) == 0)           { gradtool(arg);  return TRUE; }
+  if (strncmp(cmd, ":replace ", 9) == 0 && *arg) {
+    replace(arg);
+    return TRUE;
+  }
+  if (strncmp(cmd, ":gradient ", 10) == 0 && *arg) {
+    gradient(arg);
+    return TRUE;
+  }
+  if (strncmp(cmd, ":gradtool", 9) == 0) {
+    gradtool(arg);
+    return TRUE;
+  }
   if (strcmp(cmd, ":brushdefine") == 0 ||
-      strncmp(cmd, ":brushdefine ", 13) == 0)       { brushdefine(arg); return TRUE; }
-  if (strncmp(cmd, ":hue ", 5) == 0 ||
-      strncmp(cmd, ":sat ", 5) == 0 ||
-      strncmp(cmd, ":bright ", 8) == 0)             { hsl(arg);      return TRUE; }
-  if (strncmp(cmd, ":dither ", 8) == 0 && *arg)    { dither(arg);   return TRUE; }
-  if (strcmp(cmd, ":invert") == 0)                  { invert(arg);   return TRUE; }
-  if (strcmp(cmd, ":blur") == 0 ||
-      strncmp(cmd, ":blur ", 6) == 0)               { blur(arg);     return TRUE; }
+      strncmp(cmd, ":brushdefine ", 13) == 0) {
+    brushdefine(arg);
+    return TRUE;
+  }
+  if (strncmp(cmd, ":hue ", 5) == 0 || strncmp(cmd, ":sat ", 5) == 0 ||
+      strncmp(cmd, ":bright ", 8) == 0) {
+    hsl(arg);
+    return TRUE;
+  }
+  if (strncmp(cmd, ":dither ", 8) == 0 && *arg) {
+    dither(arg);
+    return TRUE;
+  }
+  if (strcmp(cmd, ":invert") == 0) {
+    invert(arg);
+    return TRUE;
+  }
+  if (strcmp(cmd, ":blur") == 0 || strncmp(cmd, ":blur ", 6) == 0) {
+    blur(arg);
+    return TRUE;
+  }
   return FALSE;
 }

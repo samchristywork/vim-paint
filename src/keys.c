@@ -1,15 +1,14 @@
 #include "keys.h"
-#include "draw.h"
 #include "cmdline.h"
 #include "commands.h"
+#include "draw.h"
 #include "io.h"
 #include "layers.h"
 #include "main.h"
 #include "palette.h"
 #include "undo.h"
 
-gboolean on_key_press(GtkWidget *widget, GdkEventKey *event,
-                      gpointer data) {
+gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
   if (cmd_mode)
     return cmdline_key(widget, event, data);
 

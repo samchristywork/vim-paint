@@ -62,10 +62,10 @@ int layer_count = 1;
 int layer_active = 0;
 BlendMode layer_blend[LAYER_MAX];
 
-const char *blend_mode_names[] = {
-    "normal",     "multiply",   "screen",      "overlay",
-    "darken",     "lighten",    "color-dodge", "color-burn",
-    "hard-light", "soft-light", "difference",  "exclusion"};
+const char *blend_mode_names[] = {"normal",      "multiply",   "screen",
+                                  "overlay",     "darken",     "lighten",
+                                  "color-dodge", "color-burn", "hard-light",
+                                  "soft-light",  "difference", "exclusion"};
 
 TabState tabs[TAB_MAX];
 int tab_count = 1;

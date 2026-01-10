@@ -91,8 +91,7 @@ void set_palette_rgb(int slot, unsigned int rgb) {
   palette[slot][2] = (rgb & 0xff) / 255.0;
 }
 
-void rgb_to_hsl(double r, double g, double b, double *h, double *s,
-                double *l) {
+void rgb_to_hsl(double r, double g, double b, double *h, double *s, double *l) {
   double mx = r > g ? (r > b ? r : b) : (g > b ? g : b);
   double mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
   *l = (mx + mn) / 2.0;
@@ -125,8 +124,7 @@ double hue_to_rgb(double p, double q, double t) {
   return p;
 }
 
-void hsl_to_rgb(double h, double s, double l, double *r, double *g,
-                double *b) {
+void hsl_to_rgb(double h, double s, double l, double *r, double *g, double *b) {
   if (s == 0.0) {
     *r = *g = *b = l;
     return;
@@ -214,8 +212,7 @@ void colorpicker(const char *arg) {
       double pr = r / 255.0, pg = g / 255.0, pb = b / 255.0;
       int found = -1;
       for (int i = 0; i < PALETTE_SIZE; i++) {
-        if (palette[i][0] == pr && palette[i][1] == pg &&
-            palette[i][2] == pb) {
+        if (palette[i][0] == pr && palette[i][1] == pg && palette[i][2] == pb) {
           found = i;
           break;
         }
@@ -339,13 +336,26 @@ void importp(const char *arg) {
 }
 
 gboolean exec_palette(const char *cmd, const char *arg) {
-  if (strncmp(cmd, ":savep ", 7) == 0 && *arg)    { savep(arg);       return TRUE; }
-  if (strncmp(cmd, ":loadp ", 7) == 0 && *arg)    { loadp(arg);       return TRUE; }
-  if (strncmp(cmd, ":importp ", 9) == 0 && *arg)  { importp(arg);     return TRUE; }
-  if (strncmp(cmd, ":delp ", 6) == 0 && *arg)     { delp(arg);        return TRUE; }
-  if (strcmp(cmd, ":colorpicker") == 0 ||
-      strcmp(cmd, ":cp") == 0 ||
-      strcmp(cmd, ":colorpicker bg") == 0 ||
-      strcmp(cmd, ":cp bg") == 0)                 { colorpicker(arg); return TRUE; }
+  if (strncmp(cmd, ":savep ", 7) == 0 && *arg) {
+    savep(arg);
+    return TRUE;
+  }
+  if (strncmp(cmd, ":loadp ", 7) == 0 && *arg) {
+    loadp(arg);
+    return TRUE;
+  }
+  if (strncmp(cmd, ":importp ", 9) == 0 && *arg) {
+    importp(arg);
+    return TRUE;
+  }
+  if (strncmp(cmd, ":delp ", 6) == 0 && *arg) {
+    delp(arg);
+    return TRUE;
+  }
+  if (strcmp(cmd, ":colorpicker") == 0 || strcmp(cmd, ":cp") == 0 ||
+      strcmp(cmd, ":colorpicker bg") == 0 || strcmp(cmd, ":cp bg") == 0) {
+    colorpicker(arg);
+    return TRUE;
+  }
   return FALSE;
 }

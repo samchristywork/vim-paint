@@ -95,7 +95,10 @@ typedef enum {
   BLEND_MODE_COUNT
 } BlendMode;
 
-typedef struct { const char *name; unsigned int rgb; } NamedColor;
+typedef struct {
+  const char *name;
+  unsigned int rgb;
+} NamedColor;
 
 extern int CANVAS_W;
 extern int CANVAS_H;

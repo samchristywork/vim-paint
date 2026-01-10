@@ -300,8 +300,7 @@ void file_export(const char *arg) {
           }
       }
     cairo_surface_mark_dirty(surf);
-    gboolean ok =
-        cairo_surface_write_to_png(surf, arg) == CAIRO_STATUS_SUCCESS;
+    gboolean ok = cairo_surface_write_to_png(surf, arg) == CAIRO_STATUS_SUCCESS;
     cairo_surface_destroy(surf);
     cmd_flash(ok ? "Exported." : "Export failed.");
   } else {
@@ -310,13 +309,23 @@ void file_export(const char *arg) {
 }
 
 gboolean exec_io(const char *cmd, const char *arg) {
-  if (strcmp(cmd, ":w") == 0 ||
-      (strncmp(cmd, ":w ", 3) == 0 && *arg))                { file_write(arg);      return TRUE; }
-  if (strcmp(cmd, ":wq") == 0 ||
-      (strncmp(cmd, ":wq ", 4) == 0 && *arg))               { file_write_quit(arg); return TRUE; }
+  if (strcmp(cmd, ":w") == 0 || (strncmp(cmd, ":w ", 3) == 0 && *arg)) {
+    file_write(arg);
+    return TRUE;
+  }
+  if (strcmp(cmd, ":wq") == 0 || (strncmp(cmd, ":wq ", 4) == 0 && *arg)) {
+    file_write_quit(arg);
+    return TRUE;
+  }
   if (strcmp(cmd, ":e") == 0 || strcmp(cmd, ":e!") == 0 ||
       (strncmp(cmd, ":e ", 3) == 0 && *arg) ||
-      (strncmp(cmd, ":e! ", 4) == 0 && *arg))               { file_edit(arg);       return TRUE; }
-  if (strncmp(cmd, ":export ", 8) == 0 && *arg)             { file_export(arg);     return TRUE; }
+      (strncmp(cmd, ":e! ", 4) == 0 && *arg)) {
+    file_edit(arg);
+    return TRUE;
+  }
+  if (strncmp(cmd, ":export ", 8) == 0 && *arg) {
+    file_export(arg);
+    return TRUE;
+  }
   return FALSE;
 }

@@ -1,10 +1,10 @@
 #include "commands.h"
 #include "effects.h"
-#include "transform.h"
 #include "io.h"
 #include "layers.h"
 #include "main.h"
 #include "palette.h"
+#include "transform.h"
 #include "undo.h"
 
 void exec_set(const char *arg) {
@@ -210,8 +210,7 @@ void exec_set(const char *arg) {
       double pb = (rgb & 0xff) / 255.0;
       int found = -1;
       for (int i = 0; i < PALETTE_SIZE; i++) {
-        if (palette[i][0] == pr && palette[i][1] == pg &&
-            palette[i][2] == pb) {
+        if (palette[i][0] == pr && palette[i][1] == pg && palette[i][2] == pb) {
           found = i;
           break;
         }
@@ -225,8 +224,8 @@ void exec_set(const char *arg) {
           found = palette_size;
           set_palette_rgb(found, rgb);
           palette_size++;
-          fg_color = PACK_RGBA((rgb >> 16) & 0xff, (rgb >> 8) & 0xff,
-                               rgb & 0xff, 255);
+          fg_color =
+              PACK_RGBA((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff, 255);
           gtk_widget_queue_draw(palette_bar);
           flash_color(found);
         }
@@ -458,16 +457,31 @@ void cmd_execute(void) {
     p++;
   const char *arg = p;
 
-  if (exec_app(cmd_buf, arg))       return;
-  if (exec_io(cmd_buf, arg))        return;
-  if (exec_effects(cmd_buf, arg))   return;
-  if (exec_transform(cmd_buf, arg)) return;
-  if (exec_layers(cmd_buf, arg))    return;
-  if (exec_palette(cmd_buf, arg))   return;
+  if (exec_app(cmd_buf, arg))
+    return;
+  if (exec_io(cmd_buf, arg))
+    return;
+  if (exec_effects(cmd_buf, arg))
+    return;
+  if (exec_transform(cmd_buf, arg))
+    return;
+  if (exec_layers(cmd_buf, arg))
+    return;
+  if (exec_palette(cmd_buf, arg))
+    return;
 
-  if (strncmp(cmd_buf, ":set ", 5) == 0) { exec_set(arg);   return; }
-  if (strncmp(cmd_buf, ":guide ", 7) == 0 && *arg) { exec_guide(arg); return; }
-  if (strcmp(cmd_buf, ":help") == 0) { exec_help(arg); return; }
+  if (strncmp(cmd_buf, ":set ", 5) == 0) {
+    exec_set(arg);
+    return;
+  }
+  if (strncmp(cmd_buf, ":guide ", 7) == 0 && *arg) {
+    exec_guide(arg);
+    return;
+  }
+  if (strcmp(cmd_buf, ":help") == 0) {
+    exec_help(arg);
+    return;
+  }
 
   cmd_flash("Unknown command.");
 }

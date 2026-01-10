@@ -1,8 +1,8 @@
 #include "main.h"
 #include "io.h"
 #include "keys.h"
-#include "mouse.h"
 #include "layers.h"
+#include "mouse.h"
 #include "palette.h"
 #include "render.h"
 #include "undo.h"
@@ -537,10 +537,21 @@ void new_canvas(const char *arg) {
 }
 
 gboolean exec_app(const char *cmd, const char *arg) {
-  if (strcmp(cmd, ":q") == 0)                      { app_quit(arg);   return TRUE; }
-  if (strcmp(cmd, ":q!") == 0)                     { force_quit(arg); return TRUE; }
-  if (strncmp(cmd, ":tabnew", 7) == 0)             { tabnew(arg);     return TRUE; }
-  if (strcmp(cmd, ":new") == 0 ||
-      strcmp(cmd, ":new!") == 0)                   { new_canvas(arg); return TRUE; }
+  if (strcmp(cmd, ":q") == 0) {
+    app_quit(arg);
+    return TRUE;
+  }
+  if (strcmp(cmd, ":q!") == 0) {
+    force_quit(arg);
+    return TRUE;
+  }
+  if (strncmp(cmd, ":tabnew", 7) == 0) {
+    tabnew(arg);
+    return TRUE;
+  }
+  if (strcmp(cmd, ":new") == 0 || strcmp(cmd, ":new!") == 0) {
+    new_canvas(arg);
+    return TRUE;
+  }
   return FALSE;
 }
