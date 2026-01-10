@@ -2,6 +2,7 @@
 #include "cmdline.h"
 #include "commands.h"
 #include "draw.h"
+#include "find.h"
 #include "io.h"
 #include "layers.h"
 #include "main.h"

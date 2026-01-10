@@ -1,5 +1,6 @@
 #include "commands.h"
 #include "effects.h"
+#include "find.h"
 #include "io.h"
 #include "layers.h"
 #include "main.h"
@@ -460,6 +461,8 @@ void cmd_execute(void) {
   if (exec_app(cmd_buf, arg))
     return;
   if (exec_io(cmd_buf, arg))
+    return;
+  if (exec_find(cmd_buf, arg))
     return;
   if (exec_effects(cmd_buf, arg))
     return;

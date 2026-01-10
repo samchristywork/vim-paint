@@ -112,54 +112,6 @@ void paint_brush(int x, int y, guint32 color) {
     }
 }
 
-void find_right(void) {
-  for (int fx = cursor_x + 1; fx < CANVAS_W; fx++)
-    if (PX(cursor_y, fx)) {
-      cursor_x = fx;
-      return;
-    }
-  for (int fx = 0; fx < cursor_x; fx++)
-    if (PX(cursor_y, fx)) {
-      cursor_x = fx;
-      return;
-    }
-}
-void find_left(void) {
-  for (int fx = cursor_x - 1; fx >= 0; fx--)
-    if (PX(cursor_y, fx)) {
-      cursor_x = fx;
-      return;
-    }
-  for (int fx = CANVAS_W - 1; fx > cursor_x; fx--)
-    if (PX(cursor_y, fx)) {
-      cursor_x = fx;
-      return;
-    }
-}
-void find_down(void) {
-  for (int fy = cursor_y + 1; fy < CANVAS_H; fy++)
-    if (PX(fy, cursor_x)) {
-      cursor_y = fy;
-      return;
-    }
-  for (int fy = 0; fy < cursor_y; fy++)
-    if (PX(fy, cursor_x)) {
-      cursor_y = fy;
-      return;
-    }
-}
-void find_up(void) {
-  for (int fy = cursor_y - 1; fy >= 0; fy--)
-    if (PX(fy, cursor_x)) {
-      cursor_y = fy;
-      return;
-    }
-  for (int fy = CANVAS_H - 1; fy > cursor_y; fy--)
-    if (PX(fy, cursor_x)) {
-      cursor_y = fy;
-      return;
-    }
-}
 
 guint32 fill_color_at(int x, int y, guint32 fg) {
   switch (fill_pattern) {
@@ -219,23 +171,6 @@ void flood_fill(int sx, int sy, guint32 fill_color) {
   commit_canvas_snapshot(before_snap, CANVAS_W, CANVAS_H);
 }
 
-int snap_coord(int coord, gboolean horizontal) {
-  if (!guide_snap || guide_count == 0)
-    return coord;
-  int best = coord, bestd = 3;
-  for (int i = 0; i < guide_count; i++) {
-    if (guides[i].horizontal != horizontal)
-      continue;
-    int d = guides[i].coord - coord;
-    if (d < 0)
-      d = -d;
-    if (d < bestd) {
-      bestd = d;
-      best = guides[i].coord;
-    }
-  }
-  return best;
-}
 
 void apply_gradient_linear(int x0, int y0, int x1, int y1, guint32 c1,
                            guint32 c2) {
