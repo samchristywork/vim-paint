@@ -3,6 +3,52 @@
 #include "palette.h"
 #include "undo.h"
 
+void rgb_to_hsl(double r, double g, double b, double *h, double *s, double *l) {
+  double mx = r > g ? (r > b ? r : b) : (g > b ? g : b);
+  double mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
+  *l = (mx + mn) / 2.0;
+  if (mx == mn) {
+    *h = *s = 0.0;
+    return;
+  }
+  double d = mx - mn;
+  *s = *l > 0.5 ? d / (2.0 - mx - mn) : d / (mx + mn);
+  if (mx == r)
+    *h = (g - b) / d + (g < b ? 6.0 : 0.0);
+  else if (mx == g)
+    *h = (b - r) / d + 2.0;
+  else
+    *h = (r - g) / d + 4.0;
+  *h *= 60.0;
+}
+
+static double hue_to_rgb(double p, double q, double t) {
+  if (t < 0)
+    t += 1;
+  if (t > 1)
+    t -= 1;
+  if (t < 1.0 / 6)
+    return p + (q - p) * 6 * t;
+  if (t < 0.5)
+    return q;
+  if (t < 2.0 / 3)
+    return p + (q - p) * (2.0 / 3 - t) * 6;
+  return p;
+}
+
+void hsl_to_rgb(double h, double s, double l, double *r, double *g, double *b) {
+  if (s == 0.0) {
+    *r = *g = *b = l;
+    return;
+  }
+  h /= 360.0;
+  double q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  double p = 2 * l - q;
+  *r = hue_to_rgb(p, q, h + 1.0 / 3);
+  *g = hue_to_rgb(p, q, h);
+  *b = hue_to_rgb(p, q, h - 1.0 / 3);
+}
+
 void get_vis_rect(int *x0, int *y0, int *x1, int *y1) {
   *x0 = 0;
   *y0 = 0;
