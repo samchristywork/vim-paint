@@ -206,7 +206,7 @@ void cmd_open(const char *filename) {
   cmd_set("");
 }
 
-void exec_write(const char *arg) {
+static void file_write(const char *arg) {
   if (*arg) {
     if (cmd_write(arg)) {
       snprintf(last_filename, sizeof(last_filename), "%s", arg);
@@ -220,7 +220,7 @@ void exec_write(const char *arg) {
   }
 }
 
-void exec_write_quit(const char *arg) {
+static void file_write_quit(const char *arg) {
   if (*arg) {
     if (cmd_write(arg)) {
       snprintf(last_filename, sizeof(last_filename), "%s", arg);
@@ -237,7 +237,7 @@ void exec_write_quit(const char *arg) {
   }
 }
 
-void exec_edit(const char *arg) {
+static void file_edit(const char *arg) {
   gboolean force = (cmd_buf[2] == '!');
   if (!force && canvas_dirty) {
     cmd_flash("Unsaved changes. Use :e! to discard or :w to save first.");
@@ -250,7 +250,7 @@ void exec_edit(const char *arg) {
     cmd_flash("No filename.");
 }
 
-void exec_export(const char *arg) {
+static void file_export(const char *arg) {
   char fname[4096];
   int scale = 1;
   const char *sp = strrchr(arg, ' ');
@@ -307,4 +307,16 @@ void exec_export(const char *arg) {
   } else {
     cmd_flash("Unsupported format. Use .png or .bmp.");
   }
+}
+
+gboolean exec_io(const char *cmd, const char *arg) {
+  if (strcmp(cmd, ":w") == 0 ||
+      (strncmp(cmd, ":w ", 3) == 0 && *arg))                { file_write(arg);      return TRUE; }
+  if (strcmp(cmd, ":wq") == 0 ||
+      (strncmp(cmd, ":wq ", 4) == 0 && *arg))               { file_write_quit(arg); return TRUE; }
+  if (strcmp(cmd, ":e") == 0 || strcmp(cmd, ":e!") == 0 ||
+      (strncmp(cmd, ":e ", 3) == 0 && *arg) ||
+      (strncmp(cmd, ":e! ", 4) == 0 && *arg))               { file_edit(arg);       return TRUE; }
+  if (strncmp(cmd, ":export ", 8) == 0 && *arg)             { file_export(arg);     return TRUE; }
+  return FALSE;
 }

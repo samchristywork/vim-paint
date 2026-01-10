@@ -10,10 +10,6 @@ void rgb_to_hsl(double r, double g, double b, double *h, double *s, double *l);
 double hue_to_rgb(double p, double q, double t);
 void hsl_to_rgb(double h, double s, double l, double *r, double *g, double *b);
 gboolean parse_color(const char *val, unsigned int *out_rgb);
-void exec_delp(const char *arg);
-void exec_colorpicker(const char *arg);
-void exec_savep(const char *arg);
-void exec_loadp(const char *arg);
-void exec_importp(const char *arg);
+gboolean exec_palette(const char *cmd, const char *arg);
 
 #endif

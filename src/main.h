@@ -17,9 +17,6 @@ gboolean on_flash_expire(gpointer data);
 void cmd_flash(const char *text);
 void usage(const char *prog, int exitcode);
 int main(int argc, char *argv[]);
-void exec_quit(const char *arg);
-void exec_force_quit(const char *arg);
-void exec_tabnew(const char *arg);
-void exec_new(const char *arg);
+gboolean exec_app(const char *cmd, const char *arg);
 
 #endif

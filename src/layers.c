@@ -115,7 +115,7 @@ void layers_flatten(void) {
   snprintf(layer_name[0], 32, "Layer 1");
 }
 
-void exec_newlayer(const char *arg) {
+static void newlayer(const char *arg) {
   (void)arg;
   if (layer_count >= LAYER_MAX) {
     cmd_flash("Layer limit reached.");
@@ -151,7 +151,7 @@ void exec_newlayer(const char *arg) {
   cmd_flash(msg);
 }
 
-void exec_seltolay(const char *arg) {
+static void seltolay(const char *arg) {
   (void)arg;
   if (!visual_mode) {
     cmd_flash("No selection. Enter visual mode first.");
@@ -200,7 +200,7 @@ void exec_seltolay(const char *arg) {
   cmd_flash(msg);
 }
 
-void exec_mergedown(const char *arg) {
+static void mergedown(const char *arg) {
   (void)arg;
   if (layer_active == 0) {
     cmd_flash("Already at bottom layer.");
@@ -265,7 +265,7 @@ void exec_mergedown(const char *arg) {
   cmd_flash("Merged down.");
 }
 
-void exec_layer(const char *arg) {
+static void layer(const char *arg) {
   int n = atoi(arg) - 1;
   if (n < 0 || n >= layer_count) {
     cmd_flash("Invalid layer number.");
@@ -281,7 +281,7 @@ void exec_layer(const char *arg) {
   cmd_flash(msg);
 }
 
-void exec_layervis(const char *arg) {
+static void layervis(const char *arg) {
   int n = atoi(arg) - 1;
   if (n < 0 || n >= layer_count) {
     cmd_flash("Invalid layer number.");
@@ -295,7 +295,7 @@ void exec_layervis(const char *arg) {
   cmd_flash(msg);
 }
 
-void exec_layerblend(const char *arg) {
+static void layerblend(const char *arg) {
   BlendMode found = BLEND_MODE_COUNT;
   for (int m = 0; m < BLEND_MODE_COUNT; m++) {
     if (strcasecmp(arg, blend_mode_names[m]) == 0) {
@@ -323,7 +323,7 @@ void exec_layerblend(const char *arg) {
   cmd_flash(msg);
 }
 
-void exec_layeropacity(const char *arg) {
+static void layeropacity(const char *arg) {
   int v = atoi(arg);
   if (v < 0 || v > 100) {
     cmd_flash("Opacity must be 0-100.");
@@ -335,4 +335,15 @@ void exec_layeropacity(const char *arg) {
   char msg[64];
   snprintf(msg, sizeof(msg), "Layer %d opacity: %d%%", layer_active + 1, v);
   cmd_flash(msg);
+}
+
+gboolean exec_layers(const char *cmd, const char *arg) {
+  if (strcmp(cmd, ":newlayer") == 0)                      { newlayer(arg);     return TRUE; }
+  if (strcmp(cmd, ":seltolay") == 0)                      { seltolay(arg);     return TRUE; }
+  if (strcmp(cmd, ":mergedown") == 0)                     { mergedown(arg);    return TRUE; }
+  if (strncmp(cmd, ":layer ", 7) == 0 && *arg)            { layer(arg);        return TRUE; }
+  if (strncmp(cmd, ":layervis ", 10) == 0 && *arg)        { layervis(arg);     return TRUE; }
+  if (strncmp(cmd, ":layerblend ", 12) == 0 && *arg)      { layerblend(arg);   return TRUE; }
+  if (strncmp(cmd, ":layeropacity ", 14) == 0 && *arg)    { layeropacity(arg); return TRUE; }
+  return FALSE;
 }

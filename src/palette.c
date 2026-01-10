@@ -167,7 +167,7 @@ gboolean parse_color(const char *val, unsigned int *out_rgb) {
   return FALSE;
 }
 
-void exec_delp(const char *arg) {
+static void delp(const char *arg) {
   int idx = atoi(arg);
   if (idx == 0) {
     cmd_flash("Cannot delete background color (index 0).");
@@ -188,7 +188,7 @@ void exec_delp(const char *arg) {
   cmd_flash("Entry deleted.");
 }
 
-void exec_colorpicker(const char *arg) {
+static void colorpicker(const char *arg) {
   (void)arg;
   gboolean set_bg = (strstr(cmd_buf, "bg") != NULL);
   guint32 current = set_bg ? bg_color : fg_color;
@@ -236,7 +236,7 @@ void exec_colorpicker(const char *arg) {
   cmd_set("");
 }
 
-void exec_savep(const char *arg) {
+static void savep(const char *arg) {
   FILE *f = fopen(arg, "w");
   if (!f) {
     cmd_flash("Cannot open file.");
@@ -251,7 +251,7 @@ void exec_savep(const char *arg) {
   cmd_flash("Palette saved.");
 }
 
-void exec_loadp(const char *arg) {
+static void loadp(const char *arg) {
   FILE *f = fopen(arg, "r");
   if (!f) {
     cmd_flash("Cannot open file.");
@@ -277,7 +277,7 @@ void exec_loadp(const char *arg) {
   cmd_flash("Palette loaded.");
 }
 
-void exec_importp(const char *arg) {
+static void importp(const char *arg) {
   cairo_surface_t *surf = cairo_image_surface_create_from_png(arg);
   if (cairo_surface_status(surf) != CAIRO_STATUS_SUCCESS) {
     cmd_flash("Cannot open file.");
@@ -336,4 +336,16 @@ void exec_importp(const char *arg) {
     gtk_widget_queue_draw(main_canvas);
     cmd_flash(msg);
   }
+}
+
+gboolean exec_palette(const char *cmd, const char *arg) {
+  if (strncmp(cmd, ":savep ", 7) == 0 && *arg)    { savep(arg);       return TRUE; }
+  if (strncmp(cmd, ":loadp ", 7) == 0 && *arg)    { loadp(arg);       return TRUE; }
+  if (strncmp(cmd, ":importp ", 9) == 0 && *arg)  { importp(arg);     return TRUE; }
+  if (strncmp(cmd, ":delp ", 6) == 0 && *arg)     { delp(arg);        return TRUE; }
+  if (strcmp(cmd, ":colorpicker") == 0 ||
+      strcmp(cmd, ":cp") == 0 ||
+      strcmp(cmd, ":colorpicker bg") == 0 ||
+      strcmp(cmd, ":cp bg") == 0)                 { colorpicker(arg); return TRUE; }
+  return FALSE;
 }

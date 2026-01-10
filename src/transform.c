@@ -5,7 +5,7 @@
 #include "palette.h"
 #include "undo.h"
 
-void exec_find_color(const char *arg) {
+static void find_color(const char *arg) {
   (void)arg;
   const char *val = cmd_buf + 12;
   unsigned int rgb;
@@ -48,7 +48,7 @@ void exec_find_color(const char *arg) {
   cmd_set("");
 }
 
-void exec_goto(const char *arg) {
+static void go_to(const char *arg) {
   int gx = 0, gy = 0;
   if (sscanf(arg, "%d,%d", &gx, &gy) != 2)
     sscanf(arg, "%d %d", &gx, &gy);
@@ -63,7 +63,7 @@ void exec_goto(const char *arg) {
   cmd_set("");
 }
 
-void exec_scale(const char *arg) {
+static void scale(const char *arg) {
   int n = atoi(arg);
   if (n < 2 || n > 8) {
     cmd_flash("Usage: :scale N  (N = 2..8, requires visual selection)");
@@ -106,7 +106,7 @@ void exec_scale(const char *arg) {
   cmd_set("");
 }
 
-void exec_fliph(const char *arg) {
+static void fliph(const char *arg) {
   (void)arg;
   begin_undo_action();
   for (int y = 0; y < CANVAS_H; y++)
@@ -125,7 +125,7 @@ void exec_fliph(const char *arg) {
   cmd_set("");
 }
 
-void exec_flipv(const char *arg) {
+static void flipv(const char *arg) {
   (void)arg;
   begin_undo_action();
   for (int y = 0; y < CANVAS_H / 2; y++)
@@ -144,7 +144,7 @@ void exec_flipv(const char *arg) {
   cmd_set("");
 }
 
-void exec_rotate(const char *arg) {
+static void rotate(const char *arg) {
   (void)arg;
   if (layer_count > 1)
     layers_flatten();
@@ -178,7 +178,7 @@ void exec_rotate(const char *arg) {
   cmd_set("");
 }
 
-void exec_resize(const char *arg) {
+static void resize(const char *arg) {
   int nw = 0, nh = 0;
   if (sscanf(arg, "%dx%d", &nw, &nh) != 2)
     sscanf(arg, "%d %d", &nw, &nh);
@@ -225,7 +225,7 @@ void exec_resize(const char *arg) {
   }
 }
 
-void exec_center(const char *arg) {
+static void center(const char *arg) {
   (void)arg;
   int min_x = CANVAS_W, max_x = -1, min_y = CANVAS_H, max_y = -1;
   for (int y = 0; y < CANVAS_H; y++)
@@ -276,7 +276,7 @@ void exec_center(const char *arg) {
   cmd_set("");
 }
 
-void exec_crop(const char *arg) {
+static void crop(const char *arg) {
   (void)arg;
   if (layer_count > 1)
     layers_flatten();
@@ -330,7 +330,7 @@ void exec_crop(const char *arg) {
   cmd_set("");
 }
 
-void exec_stroke(const char *arg) {
+static void stroke(const char *arg) {
   (void)arg;
   if (!visual_mode) {
     cmd_flash(":stroke requires a visual selection.");
@@ -355,7 +355,7 @@ void exec_stroke(const char *arg) {
   cmd_set("");
 }
 
-void exec_text(const char *arg) {
+static void text_stamp(const char *arg) {
   cairo_surface_t *measure_surf =
       cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 1, 1);
   cairo_t *mcr = cairo_create(measure_surf);
@@ -415,4 +415,19 @@ void exec_text(const char *arg) {
   snprintf(tmsg, sizeof(tmsg), "Text [%s %.4gpt]", text_font_family,
            text_font_size);
   cmd_flash(tmsg);
+}
+
+gboolean exec_transform(const char *cmd, const char *arg) {
+  if (strncmp(cmd, ":find color ", 12) == 0)        { find_color(arg); return TRUE; }
+  if (strncmp(cmd, ":goto ", 6) == 0 && *arg)       { go_to(arg);      return TRUE; }
+  if (strncmp(cmd, ":scale ", 7) == 0 && *arg)      { scale(arg);      return TRUE; }
+  if (strcmp(cmd, ":fliph") == 0)                   { fliph(arg);      return TRUE; }
+  if (strcmp(cmd, ":flipv") == 0)                   { flipv(arg);      return TRUE; }
+  if (strcmp(cmd, ":rotate") == 0)                  { rotate(arg);     return TRUE; }
+  if (strncmp(cmd, ":resize ", 8) == 0 && *arg)     { resize(arg);     return TRUE; }
+  if (strcmp(cmd, ":center") == 0)                  { center(arg);     return TRUE; }
+  if (strcmp(cmd, ":crop") == 0)                    { crop(arg);       return TRUE; }
+  if (strcmp(cmd, ":stroke") == 0)                  { stroke(arg);     return TRUE; }
+  if (strncmp(cmd, ":text ", 6) == 0 && *arg)       { text_stamp(arg); return TRUE; }
+  return FALSE;
 }

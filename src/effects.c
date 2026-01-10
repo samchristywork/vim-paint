@@ -16,7 +16,7 @@ static void get_vis_rect(int *x0, int *y0, int *x1, int *y1) {
   }
 }
 
-void exec_replace(const char *arg) {
+static void replace(const char *arg) {
   char from_s[64] = "", to_s[64] = "";
   if (sscanf(arg, "%63s %63s", from_s, to_s) != 2) {
     cmd_flash("Usage: :replace <from> <to>");
@@ -45,7 +45,7 @@ void exec_replace(const char *arg) {
   cmd_set("");
 }
 
-void exec_gradient(const char *arg) {
+static void gradient(const char *arg) {
   char c1s[64] = "", c2s[64] = "", dir[4] = "";
   if (sscanf(arg, "%63s %63s %3s", c1s, c2s, dir) != 3 ||
       (strcmp(dir, "h") != 0 && strcmp(dir, "v") != 0)) {
@@ -88,7 +88,7 @@ void exec_gradient(const char *arg) {
   cmd_set("");
 }
 
-void exec_gradtool(const char *arg) {
+static void gradtool(const char *arg) {
   unsigned int rgb1 = 0, rgb2 = 0;
   if (*arg) {
     char c1s[64] = "", c2s[64] = "";
@@ -108,7 +108,7 @@ void exec_gradtool(const char *arg) {
   cmd_flash("Click and drag to apply gradient (Esc to cancel)");
 }
 
-void exec_brushdefine(const char *arg) {
+static void brushdefine(const char *arg) {
   if (*arg) {
     memset(custom_brush_pixels, 0, sizeof(custom_brush_pixels));
     int row = 0, maxcol = 0;
@@ -163,7 +163,7 @@ void exec_brushdefine(const char *arg) {
   cmd_flash(msg);
 }
 
-void exec_hsl(const char *arg) {
+static void hsl(const char *arg) {
   double delta = atof(arg);
   int is_hue = (cmd_buf[1] == 'h');
   int is_sat = (cmd_buf[1] == 's');
@@ -198,7 +198,7 @@ void exec_hsl(const char *arg) {
   cmd_set("");
 }
 
-void exec_dither(const char *arg) {
+static void dither(const char *arg) {
   char c1s[64] = "", c2s[64] = "", pat[16] = "";
   if (sscanf(arg, "%63s %63s %15s", c1s, c2s, pat) != 3 ||
       (strcmp(pat, "ordered") != 0 && strcmp(pat, "fs") != 0)) {
@@ -308,7 +308,7 @@ void exec_dither(const char *arg) {
   cmd_set("");
 }
 
-void exec_invert(const char *arg) {
+static void invert(const char *arg) {
   (void)arg;
   int x0, y0, x1, y1;
   get_vis_rect(&x0, &y0, &x1, &y1);
@@ -331,7 +331,7 @@ void exec_invert(const char *arg) {
   cmd_set("");
 }
 
-void exec_blur(const char *arg) {
+static void blur(const char *arg) {
   int radius = 1;
   if (*arg) {
     radius = atoi(arg);
@@ -385,4 +385,20 @@ void exec_blur(const char *arg) {
   visual_mode = FALSE;
   gtk_widget_queue_draw(main_canvas);
   cmd_set("");
+}
+
+gboolean exec_effects(const char *cmd, const char *arg) {
+  if (strncmp(cmd, ":replace ", 9) == 0 && *arg)   { replace(arg);   return TRUE; }
+  if (strncmp(cmd, ":gradient ", 10) == 0 && *arg) { gradient(arg);  return TRUE; }
+  if (strncmp(cmd, ":gradtool", 9) == 0)           { gradtool(arg);  return TRUE; }
+  if (strcmp(cmd, ":brushdefine") == 0 ||
+      strncmp(cmd, ":brushdefine ", 13) == 0)       { brushdefine(arg); return TRUE; }
+  if (strncmp(cmd, ":hue ", 5) == 0 ||
+      strncmp(cmd, ":sat ", 5) == 0 ||
+      strncmp(cmd, ":bright ", 8) == 0)             { hsl(arg);      return TRUE; }
+  if (strncmp(cmd, ":dither ", 8) == 0 && *arg)    { dither(arg);   return TRUE; }
+  if (strcmp(cmd, ":invert") == 0)                  { invert(arg);   return TRUE; }
+  if (strcmp(cmd, ":blur") == 0 ||
+      strncmp(cmd, ":blur ", 6) == 0)               { blur(arg);     return TRUE; }
+  return FALSE;
 }

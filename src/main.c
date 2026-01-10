@@ -457,7 +457,7 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
-void exec_quit(const char *arg) {
+static void app_quit(const char *arg) {
   (void)arg;
   if (canvas_dirty)
     cmd_flash(
@@ -468,7 +468,7 @@ void exec_quit(const char *arg) {
     gtk_main_quit();
 }
 
-void exec_force_quit(const char *arg) {
+static void force_quit(const char *arg) {
   (void)arg;
   if (tab_count > 1)
     tab_close_current();
@@ -476,7 +476,7 @@ void exec_force_quit(const char *arg) {
     gtk_main_quit();
 }
 
-void exec_tabnew(const char *arg) {
+static void tabnew(const char *arg) {
   if (tab_count >= TAB_MAX) {
     cmd_flash("Max tabs reached.");
     return;
@@ -509,7 +509,7 @@ void exec_tabnew(const char *arg) {
   cmd_set("");
 }
 
-void exec_new(const char *arg) {
+static void new_canvas(const char *arg) {
   (void)arg;
   gboolean force = (cmd_buf[4] == '!');
   if (!force && canvas_dirty) {
@@ -534,4 +534,13 @@ void exec_new(const char *arg) {
   zoom_resize();
   gtk_widget_queue_draw(main_canvas);
   cmd_set("");
+}
+
+gboolean exec_app(const char *cmd, const char *arg) {
+  if (strcmp(cmd, ":q") == 0)                      { app_quit(arg);   return TRUE; }
+  if (strcmp(cmd, ":q!") == 0)                     { force_quit(arg); return TRUE; }
+  if (strncmp(cmd, ":tabnew", 7) == 0)             { tabnew(arg);     return TRUE; }
+  if (strcmp(cmd, ":new") == 0 ||
+      strcmp(cmd, ":new!") == 0)                   { new_canvas(arg); return TRUE; }
+  return FALSE;
 }
