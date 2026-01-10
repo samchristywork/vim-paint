@@ -1,5 +1,5 @@
-#ifndef VIMPAINT_FILEIO_H
-#define VIMPAINT_FILEIO_H
+#ifndef VIMPAINT_IO_H
+#define VIMPAINT_IO_H
 
 #include "state.h"
 

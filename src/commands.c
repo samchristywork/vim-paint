@@ -1,7 +1,7 @@
 #include "commands.h"
 #include "effects.h"
 #include "transform.h"
-#include "fileio.h"
+#include "io.h"
 #include "layers.h"
 #include "main.h"
 #include "palette.h"
