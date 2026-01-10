@@ -1,6 +1,6 @@
 #include "find.h"
+#include "effects.h"
 #include "main.h"
-#include "palette.h"
 
 void find_right(void) {
   for (int fx = cursor_x + 1; fx < CANVAS_W; fx++)

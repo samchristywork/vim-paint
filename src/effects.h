@@ -5,6 +5,7 @@
 
 void rgb_to_hsl(double r, double g, double b, double *h, double *s, double *l);
 void hsl_to_rgb(double h, double s, double l, double *r, double *g, double *b);
+gboolean parse_color(const char *val, unsigned int *out_rgb);
 gboolean exec_effects(const char *cmd, const char *arg);
 
 #endif
