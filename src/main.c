@@ -386,8 +386,7 @@ gboolean exec_app(const char *cmd, const char *arg) {
   return FALSE;
 }
 
-int main(int argc, char *argv[]) {
-  int explicit_w = 0, explicit_h = 0;
+void parse_args(int argc, char *argv[], int *explicit_w, int *explicit_h) {
   int opt;
   while ((opt = getopt(argc, argv, "W:H:z:h")) != -1) {
     switch (opt) {
@@ -395,11 +394,11 @@ int main(int argc, char *argv[]) {
       int v = atoi(optarg);
       if (v > 0 && v <= 16384) {
         CANVAS_W = v;
-        explicit_w = 1;
+        *explicit_w = 1;
       } else if (v > 16384) {
         fprintf(stderr, "Warning: -W %d clamped to 16384\n", v);
         CANVAS_W = 16384;
-        explicit_w = 1;
+        *explicit_w = 1;
       }
       break;
     }
@@ -407,11 +406,11 @@ int main(int argc, char *argv[]) {
       int v = atoi(optarg);
       if (v > 0 && v <= 16384) {
         CANVAS_H = v;
-        explicit_h = 1;
+        *explicit_h = 1;
       } else if (v > 16384) {
         fprintf(stderr, "Warning: -H %d clamped to 16384\n", v);
         CANVAS_H = 16384;
-        explicit_h = 1;
+        *explicit_h = 1;
       }
       break;
     }
@@ -428,11 +427,10 @@ int main(int argc, char *argv[]) {
       usage(argv[0], 1);
     }
   }
+}
 
-  char **startup_files = (optind < argc) ? &argv[optind] : NULL;
-  int startup_count = argc - optind;
-
-  /* Size the initial canvas to match the first file if it is a valid PNG. */
+void init_canvas(char **startup_files, int startup_count,
+                        int explicit_w, int explicit_h) {
   if (startup_count > 0) {
     cairo_surface_t *probe =
         cairo_image_surface_create_from_png(startup_files[0]);
@@ -461,13 +459,9 @@ int main(int argc, char *argv[]) {
   snprintf(layer_name[0], 32, "Layer 1");
   layer_count = 1;
   layer_active = 0;
+}
 
-  /* Pass only program name + positional args to gtk_init */
-  char **gtk_argv = argv + optind - 1;
-  gtk_argv[0] = argv[0];
-  int gtk_argc = argc - optind + 1;
-  gtk_init(&gtk_argc, &gtk_argv);
-
+void build_ui(void) {
   main_window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
   GtkWidget *window = main_window;
   gtk_window_set_title(GTK_WINDOW(window), "vim-paint");
@@ -509,38 +503,57 @@ int main(int argc, char *argv[]) {
                    G_CALLBACK(on_palette_click), NULL);
   g_signal_connect(window, "key-press-event", G_CALLBACK(on_key_press),
                    main_canvas);
+}
 
-  gtk_widget_show_all(window);
+void open_startup_files(char **files, int count) {
+  if (count == 0)
+    return;
+  cmd_open(files[0]);
+  for (int i = 1; i < count && tab_count < TAB_MAX; i++) {
+    tab_save(tab_current);
+    guint32 *np = calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, sizeof(guint32));
+    if (!np)
+      break;
+    free(pixels);
+    pixels = np;
+    CANVAS_W = DEFAULT_CANVAS_W;
+    CANVAS_H = DEFAULT_CANVAS_H;
+    cursor_x = 0;
+    cursor_y = 0;
+    canvas_dirty = FALSE;
+    visual_mode = FALSE;
+    insert_mode = FALSE;
+    last_filename[0] = '\0';
+    tab_count++;
+    tab_current = tab_count - 1;
+    tab_save(tab_current);
+    cmd_open(files[i]);
+  }
+  if (tab_count > 1)
+    tab_switch(0);
+}
+
+int main(int argc, char *argv[]) {
+  int explicit_w = 0, explicit_h = 0;
+  parse_args(argc, argv, &explicit_w, &explicit_h);
+
+  char **startup_files = (optind < argc) ? &argv[optind] : NULL;
+  int startup_count = argc - optind;
+
+  init_canvas(startup_files, startup_count, explicit_w, explicit_h);
+
+  /* Pass only program name + positional args to gtk_init */
+  char **gtk_argv = argv + optind - 1;
+  gtk_argv[0] = argv[0];
+  int gtk_argc = argc - optind + 1;
+  gtk_init(&gtk_argc, &gtk_argv);
+
+  build_ui();
+  gtk_widget_show_all(main_window);
   status_update();
 
-  if (startup_count > 0) {
-    cmd_open(startup_files[0]);
-    for (int i = 1; i < startup_count && tab_count < TAB_MAX; i++) {
-      tab_save(tab_current);
-      guint32 *np =
-          calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, sizeof(guint32));
-      if (!np)
-        break;
-      free(pixels);
-      pixels = np;
-      CANVAS_W = DEFAULT_CANVAS_W;
-      CANVAS_H = DEFAULT_CANVAS_H;
-      cursor_x = 0;
-      cursor_y = 0;
-      canvas_dirty = FALSE;
-      visual_mode = FALSE;
-      insert_mode = FALSE;
-      last_filename[0] = '\0';
-      tab_count++;
-      tab_current = tab_count - 1;
-      tab_save(tab_current);
-      cmd_open(startup_files[i]);
-    }
-    if (tab_count > 1)
-      tab_switch(0);
-  }
+  open_startup_files(startup_files, startup_count);
 
   gtk_main();
-
   return 0;
 }
