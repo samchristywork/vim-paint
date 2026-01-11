@@ -2,7 +2,7 @@
 #include "commands.h"
 #include "main.h"
 
-static void tab_reset(void) {
+void tab_reset(void) {
   if (tab_glob_valid) {
     globfree(&tab_glob);
     tab_glob_valid = FALSE;

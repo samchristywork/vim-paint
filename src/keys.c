@@ -9,22 +9,22 @@
 #include "palette.h"
 #include "undo.h"
 
-gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
-  if (cmd_mode)
-    return cmdline_key(widget, event, data);
+static gboolean pending_g = FALSE;
+static gboolean pending_d = FALSE;
+static gboolean pending_f = FALSE;
+static gboolean pending_q = FALSE;
+static gboolean pending_at = FALSE;
+static int d_count = 1;
+static int f_count = 1;
+static int count = 0;
+static guint last_action = 0;
+static int last_radius = 0;
+static gboolean last_was_visual = FALSE;
+static int last_visual_dx = 0, last_visual_dy = 0;
+static int last_find_dir = 0;
+static int gg_count = 0;
 
-  if (event->is_modifier)
-    return FALSE;
-
-  static gboolean pending_g = FALSE;
-  static gboolean pending_d = FALSE;
-  static gboolean pending_f = FALSE;
-  static gboolean pending_q = FALSE;
-  static gboolean pending_at = FALSE;
-  static int d_count = 1;
-  static int f_count = 1;
-
-  /* Stop recording: q while already recording */
+gboolean key_macros(GtkWidget *widget, GdkEventKey *event, gpointer data) {
   if (macro_recording && event->keyval == GDK_KEY_q &&
       !(event->state & (GDK_CONTROL_MASK | GDK_MOD1_MASK))) {
     macro_recording = FALSE;
@@ -35,7 +35,6 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     return TRUE;
   }
 
-  /* Append to macro buffer while recording */
   if (macro_recording && !macro_playing) {
     if (macro_len[macro_reg] < MACRO_MAX_EVENTS) {
       macro_buf[macro_reg][macro_len[macro_reg]].keyval = event->keyval;
@@ -46,7 +45,6 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     }
   }
 
-  /* q<letter>: start recording */
   if (pending_q) {
     pending_q = FALSE;
     if (event->keyval >= GDK_KEY_a && event->keyval <= GDK_KEY_z) {
@@ -58,7 +56,6 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     return TRUE;
   }
 
-  /* @<letter>: replay macro */
   if (pending_at) {
     pending_at = FALSE;
     if (!macro_playing && event->keyval >= GDK_KEY_a &&
@@ -80,28 +77,11 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     return TRUE;
   }
 
-  if (event->keyval == GDK_KEY_colon) {
-    pending_g = FALSE;
-    pending_d = FALSE;
-    pending_f = FALSE;
-    pending_q = FALSE;
-    pending_at = FALSE;
-    cmd_mode = TRUE;
-    cmd_buf[0] = ':';
-    cmd_buf[1] = '\0';
-    cmd_len = 1;
-    cmd_set(cmd_buf);
-    return TRUE;
-  }
-  static int count = 0;
-  static guint last_action = 0;
-  static int last_radius = 0;
-  static gboolean last_was_visual = FALSE;
-  static int last_visual_dx = 0, last_visual_dy = 0;
-  static int last_find_dir =
-      0; /* +1 = forward (f), -1 = backward (F), 0 = none */
-  static int gg_count = 0;
+  return FALSE;
+}
 
+gboolean key_pending(GtkWidget *widget, GdkEventKey *event, gpointer data) {
+  (void)widget;
   if (pending_g) {
     pending_g = FALSE;
     if (event->keyval == GDK_KEY_g) {
@@ -127,35 +107,15 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     int y0 = cursor_y, y1 = cursor_y;
     gboolean whole_row = FALSE;
     switch (event->keyval) {
-    case GDK_KEY_d:
-      whole_row = TRUE;
-      break;
-    case GDK_KEY_h:
-      x0 = MAX(cursor_x - d_count, 0);
-      break;
-    case GDK_KEY_l:
-      x1 = MIN(cursor_x + d_count, CANVAS_W - 1);
-      break;
-    case GDK_KEY_w:
-      x1 = MIN(cursor_x + 5 * d_count, CANVAS_W - 1);
-      break;
-    case GDK_KEY_b:
-      x0 = MAX(cursor_x - 5 * d_count, 0);
-      break;
-    case GDK_KEY_0:
-      x0 = 0;
-      break;
-    case GDK_KEY_dollar:
-      x1 = CANVAS_W - 1;
-      break;
-    case GDK_KEY_j:
-      whole_row = TRUE;
-      y1 = MIN(cursor_y + d_count, CANVAS_H - 1);
-      break;
-    case GDK_KEY_k:
-      whole_row = TRUE;
-      y0 = MAX(cursor_y - d_count, 0);
-      break;
+    case GDK_KEY_d:  whole_row = TRUE; break;
+    case GDK_KEY_h:  x0 = MAX(cursor_x - d_count, 0); break;
+    case GDK_KEY_l:  x1 = MIN(cursor_x + d_count, CANVAS_W - 1); break;
+    case GDK_KEY_w:  x1 = MIN(cursor_x + 5 * d_count, CANVAS_W - 1); break;
+    case GDK_KEY_b:  x0 = MAX(cursor_x - 5 * d_count, 0); break;
+    case GDK_KEY_0:  x0 = 0; break;
+    case GDK_KEY_dollar: x1 = CANVAS_W - 1; break;
+    case GDK_KEY_j:  whole_row = TRUE; y1 = MIN(cursor_y + d_count, CANVAS_H - 1); break;
+    case GDK_KEY_k:  whole_row = TRUE; y0 = MAX(cursor_y - d_count, 0); break;
     default:
       status_update();
       gtk_widget_queue_draw(GTK_WIDGET(data));
@@ -200,63 +160,13 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     return TRUE;
   }
 
-  /* Ctrl+1–9: select palette slot directly */
-  if ((event->state & GDK_CONTROL_MASK) && event->keyval >= GDK_KEY_1 &&
-      event->keyval <= GDK_KEY_9) {
-    int slot = event->keyval - GDK_KEY_0;
-    if (slot < PALETTE_SIZE) {
-      int pr, pg, pb;
-      palette_to_rgb(slot, &pr, &pg, &pb);
-      fg_color = PACK_RGBA(pr, pg, pb, 255);
-      gtk_widget_queue_draw(palette_bar);
-      flash_color(slot);
-    } else {
-      cmd_flash("No such palette slot.");
-    }
-    return TRUE;
-  }
+  return FALSE;
+}
 
-  /* Accumulate numeric prefix; treat 0 as line-start only when count is 0 */
-  if (event->keyval >= GDK_KEY_1 && event->keyval <= GDK_KEY_9) {
-    count = count * 10 + (event->keyval - GDK_KEY_0);
-    return TRUE;
-  }
-  if (event->keyval == GDK_KEY_0 && count > 0) {
-    count = count * 10;
-    return TRUE;
-  }
-
-  int orig_count = count;
-  int n = count > 0 ? count : 1;
-  int radius = count;
-  count = 0;
-
-  if (event->keyval == GDK_KEY_v) {
-    visual_mode = !visual_mode;
-    visual_anchor_x = cursor_x;
-    visual_anchor_y = cursor_y;
-    status_update();
-    gtk_widget_queue_draw(GTK_WIDGET(data));
-    return TRUE;
-  }
-
-  if (event->keyval == GDK_KEY_Escape) {
-    visual_mode = FALSE;
-    insert_mode = FALSE;
-    gradient_tool = FALSE;
-    grad_dragging = FALSE;
-    pending_g = FALSE;
-    pending_d = FALSE;
-    pending_f = FALSE;
-    pending_q = FALSE;
-    pending_at = FALSE;
-    macro_recording = FALSE;
-    status_update();
-    gtk_widget_queue_draw(GTK_WIDGET(data));
-    return TRUE;
-  }
-
-  if (visual_mode && event->keyval == GDK_KEY_y) {
+gboolean key_visual(GtkWidget *widget, GdkEventKey *event, gpointer data,
+                            int n) {
+  (void)widget;
+  if (event->keyval == GDK_KEY_y) {
     int x0 = MIN(cursor_x, visual_anchor_x);
     int x1 = MAX(cursor_x, visual_anchor_x);
     int y0 = MIN(cursor_y, visual_anchor_y);
@@ -281,15 +191,14 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     return TRUE;
   }
 
-  if (visual_mode && event->keyval == GDK_KEY_T) {
+  if (event->keyval == GDK_KEY_T) {
     snprintf(cmd_buf, sizeof(cmd_buf), ":seltolay");
     cmd_execute();
     gtk_widget_queue_draw(GTK_WIDGET(data));
     return TRUE;
   }
 
-  if (visual_mode &&
-      (event->keyval == GDK_KEY_r || event->keyval == GDK_KEY_x)) {
+  if (event->keyval == GDK_KEY_r || event->keyval == GDK_KEY_x) {
     int x0 = MIN(cursor_x, visual_anchor_x);
     int x1 = MAX(cursor_x, visual_anchor_x);
     int y0 = MIN(cursor_y, visual_anchor_y);
@@ -310,7 +219,7 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     return TRUE;
   }
 
-  if (visual_mode && event->keyval == GDK_KEY_backslash) {
+  if (event->keyval == GDK_KEY_backslash) {
     begin_undo_action();
     draw_line(visual_anchor_x, visual_anchor_y, cursor_x, cursor_y, fg_color);
     commit_undo_action();
@@ -324,15 +233,13 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     return TRUE;
   }
 
-  if (visual_mode &&
-      (event->keyval == GDK_KEY_H || event->keyval == GDK_KEY_V)) {
+  if (event->keyval == GDK_KEY_H || event->keyval == GDK_KEY_V) {
     int x0 = MIN(cursor_x, visual_anchor_x);
     int x1 = MAX(cursor_x, visual_anchor_x);
     int y0 = MIN(cursor_y, visual_anchor_y);
     int y1 = MAX(cursor_y, visual_anchor_y);
     begin_undo_action();
     if (event->keyval == GDK_KEY_H) {
-      /* Flip selection horizontally */
       for (int ey = y0; ey <= y1; ey++) {
         for (int ex = x0; ex <= x0 + (x1 - x0) / 2; ex++) {
           int ex2 = x1 - (ex - x0);
@@ -346,7 +253,6 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
         }
       }
     } else {
-      /* Flip selection vertically */
       for (int ey = y0; ey <= y0 + (y1 - y0) / 2; ey++) {
         int ey2 = y1 - (ey - y0);
         if (ey == ey2)
@@ -367,7 +273,7 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     return TRUE;
   }
 
-  if (visual_mode && event->keyval == GDK_KEY_R) {
+  if (event->keyval == GDK_KEY_R) {
     int x0 = MIN(cursor_x, visual_anchor_x);
     int x1 = MAX(cursor_x, visual_anchor_x);
     int y0 = MIN(cursor_y, visual_anchor_y);
@@ -381,7 +287,6 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
       gtk_widget_queue_draw(GTK_WIDGET(data));
       return TRUE;
     }
-    /* 90° CW: dst[dr][dc] = src[H-1-dc][dr], new dims = H wide × W tall */
     for (int dr = 0; dr < W; dr++)
       for (int dc = 0; dc < H; dc++)
         tmp[dr * H + dc] = PX(y0 + (H - 1 - dc), x0 + dr);
@@ -397,40 +302,107 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     return TRUE;
   }
 
-  if (visual_mode &&
-      (event->keyval == GDK_KEY_plus || event->keyval == GDK_KEY_equal)) {
+  if (event->keyval == GDK_KEY_plus || event->keyval == GDK_KEY_equal) {
     int amount = MAX(1, n);
-    int x0 = CLAMP(MIN(cursor_x, visual_anchor_x) - amount, 0, CANVAS_W - 1);
-    int x1 = CLAMP(MAX(cursor_x, visual_anchor_x) + amount, 0, CANVAS_W - 1);
-    int y0 = CLAMP(MIN(cursor_y, visual_anchor_y) - amount, 0, CANVAS_H - 1);
-    int y1 = CLAMP(MAX(cursor_y, visual_anchor_y) + amount, 0, CANVAS_H - 1);
-    visual_anchor_x = x0;
-    visual_anchor_y = y0;
-    cursor_x = x1;
-    cursor_y = y1;
+    visual_anchor_x = CLAMP(MIN(cursor_x, visual_anchor_x) - amount, 0, CANVAS_W - 1);
+    visual_anchor_y = CLAMP(MIN(cursor_y, visual_anchor_y) - amount, 0, CANVAS_H - 1);
+    cursor_x = CLAMP(MAX(cursor_x, visual_anchor_x) + amount, 0, CANVAS_W - 1);
+    cursor_y = CLAMP(MAX(cursor_y, visual_anchor_y) + amount, 0, CANVAS_H - 1);
     status_update();
     gtk_widget_queue_draw(GTK_WIDGET(data));
     return TRUE;
   }
 
-  if (visual_mode && event->keyval == GDK_KEY_minus) {
+  if (event->keyval == GDK_KEY_minus) {
     int amount = MAX(1, n);
     int x0 = MIN(cursor_x, visual_anchor_x);
     int x1 = MAX(cursor_x, visual_anchor_x);
     int y0 = MIN(cursor_y, visual_anchor_y);
     int y1 = MAX(cursor_y, visual_anchor_y);
-    x0 = MIN(x0 + amount, (x0 + x1) / 2);
-    x1 = MAX(x1 - amount, (x0 + x1) / 2);
-    y0 = MIN(y0 + amount, (y0 + y1) / 2);
-    y1 = MAX(y1 - amount, (y0 + y1) / 2);
-    visual_anchor_x = x0;
-    visual_anchor_y = y0;
-    cursor_x = x1;
-    cursor_y = y1;
+    visual_anchor_x = MIN(x0 + amount, (x0 + x1) / 2);
+    visual_anchor_y = MIN(y0 + amount, (y0 + y1) / 2);
+    cursor_x = MAX(x1 - amount, (x0 + x1) / 2);
+    cursor_y = MAX(y1 - amount, (y0 + y1) / 2);
     status_update();
     gtk_widget_queue_draw(GTK_WIDGET(data));
     return TRUE;
   }
+
+  return FALSE;
+}
+
+gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
+  if (cmd_mode)
+    return cmdline_key(widget, event, data);
+
+  if (event->is_modifier)
+    return FALSE;
+
+  if (key_macros(widget, event, data))
+    return TRUE;
+
+  if (event->keyval == GDK_KEY_colon) {
+    pending_g = pending_d = pending_f = pending_q = pending_at = FALSE;
+    cmd_mode = TRUE;
+    cmd_buf[0] = ':';
+    cmd_buf[1] = '\0';
+    cmd_len = 1;
+    cmd_set(cmd_buf);
+    return TRUE;
+  }
+
+  if (key_pending(widget, event, data))
+    return TRUE;
+
+  if ((event->state & GDK_CONTROL_MASK) && event->keyval >= GDK_KEY_1 &&
+      event->keyval <= GDK_KEY_9) {
+    int slot = event->keyval - GDK_KEY_0;
+    if (slot < PALETTE_SIZE) {
+      int pr, pg, pb;
+      palette_to_rgb(slot, &pr, &pg, &pb);
+      fg_color = PACK_RGBA(pr, pg, pb, 255);
+      gtk_widget_queue_draw(palette_bar);
+      flash_color(slot);
+    } else {
+      cmd_flash("No such palette slot.");
+    }
+    return TRUE;
+  }
+
+  if (event->keyval >= GDK_KEY_1 && event->keyval <= GDK_KEY_9) {
+    count = count * 10 + (event->keyval - GDK_KEY_0);
+    return TRUE;
+  }
+  if (event->keyval == GDK_KEY_0 && count > 0) {
+    count = count * 10;
+    return TRUE;
+  }
+
+  int orig_count = count;
+  int n = count > 0 ? count : 1;
+  int radius = count;
+  count = 0;
+
+  if (event->keyval == GDK_KEY_v) {
+    visual_mode = !visual_mode;
+    visual_anchor_x = cursor_x;
+    visual_anchor_y = cursor_y;
+    status_update();
+    gtk_widget_queue_draw(GTK_WIDGET(data));
+    return TRUE;
+  }
+
+  if (event->keyval == GDK_KEY_Escape) {
+    visual_mode = insert_mode = gradient_tool = grad_dragging = FALSE;
+    pending_g = pending_d = pending_f = pending_q = pending_at = FALSE;
+    macro_recording = FALSE;
+    status_update();
+    gtk_widget_queue_draw(GTK_WIDGET(data));
+    return TRUE;
+  }
+
+  if (visual_mode && key_visual(widget, event, data, n))
+    return TRUE;
 
   if (event->keyval == GDK_KEY_s && (event->state & GDK_CONTROL_MASK)) {
     if (*last_filename)
@@ -592,31 +564,22 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     f_count = n;
     return TRUE;
   case GDK_KEY_n:
-    if (last_find_dir == 1)
-      find_right();
-    else if (last_find_dir == -1)
-      find_left();
-    else if (last_find_dir == 2)
-      find_down();
-    else if (last_find_dir == -2)
-      find_up();
+    if (last_find_dir == 1)       find_right();
+    else if (last_find_dir == -1) find_left();
+    else if (last_find_dir == 2)  find_down();
+    else if (last_find_dir == -2) find_up();
     break;
   case GDK_KEY_N:
-    if (last_find_dir == 1)
-      find_left();
-    else if (last_find_dir == -1)
-      find_right();
-    else if (last_find_dir == 2)
-      find_up();
-    else if (last_find_dir == -2)
-      find_down();
+    if (last_find_dir == 1)       find_left();
+    else if (last_find_dir == -1) find_right();
+    else if (last_find_dir == 2)  find_up();
+    else if (last_find_dir == -2) find_down();
     break;
   case GDK_KEY_d:
     pending_d = TRUE;
     d_count = n;
     return TRUE;
   case GDK_KEY_c: {
-    /* Find the palette slot that matches fg_color, then cycle forward */
     if (PALETTE_SIZE <= 1)
       break;
     int cur_slot = -1;
@@ -663,7 +626,6 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
   }
   case GDK_KEY_e: {
     if (visual_mode) {
-      /* ellipse outline fitting selection */
       int vx0 = MIN(cursor_x, visual_anchor_x);
       int vx1 = MAX(cursor_x, visual_anchor_x);
       int vy0 = MIN(cursor_y, visual_anchor_y);
@@ -678,14 +640,12 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     if (_ex >= 0 && _ex < CANVAS_W && _ey >= 0 && _ey < CANVAS_H)              \
       paint_pixel(_ex, _ey, fg_color);                                         \
   } while (0)
-      /* scan x: fills left/right arcs */
       for (int oex = -erx; oex <= erx; oex++) {
         double t = 1.0 - (double)oex * oex / ((double)erx * erx);
         int dy = (int)round(ery * sqrt(MAX(0.0, t)));
         EPSET(ecx + oex, ecy + dy);
         EPSET(ecx + oex, ecy - dy);
       }
-      /* scan y: fills top/bottom arcs */
       for (int oey = -ery; oey <= ery; oey++) {
         double t = 1.0 - (double)oey * oey / ((double)ery * ery);
         int dx = (int)round(erx * sqrt(MAX(0.0, t)));
@@ -698,7 +658,7 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
       gtk_widget_queue_draw(main_canvas);
       status_update();
     } else {
-      fg_color = PX(cursor_y, cursor_x); /* eyedropper */
+      fg_color = PX(cursor_y, cursor_x);
       gtk_widget_queue_draw(palette_bar);
       guchar er = (fg_color >> 24) & 0xff;
       guchar eg = (fg_color >> 16) & 0xff;
@@ -716,27 +676,14 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
       paint_pixel(cx, cy, fg_color);
     } else {
       int bx = r, by = 0, err = 0;
-#define CPSET(px, py)                                                          \
-  do {                                                                         \
-    paint_pixel((px), (py), fg_color);                                         \
-  } while (0)
+#define CPSET(px, py) paint_pixel((px), (py), fg_color)
       while (bx >= by) {
-        CPSET(cx + bx, cy + by);
-        CPSET(cx + by, cy + bx);
-        CPSET(cx - by, cy + bx);
-        CPSET(cx - bx, cy + by);
-        CPSET(cx - bx, cy - by);
-        CPSET(cx - by, cy - bx);
-        CPSET(cx + by, cy - bx);
-        CPSET(cx + bx, cy - by);
-        if (err <= 0) {
-          by++;
-          err += 2 * by + 1;
-        }
-        if (err > 0) {
-          bx--;
-          err -= 2 * bx + 1;
-        }
+        CPSET(cx + bx, cy + by); CPSET(cx + by, cy + bx);
+        CPSET(cx - by, cy + bx); CPSET(cx - bx, cy + by);
+        CPSET(cx - bx, cy - by); CPSET(cx - by, cy - bx);
+        CPSET(cx + by, cy - bx); CPSET(cx + bx, cy - by);
+        if (err <= 0) { by++; err += 2 * by + 1; }
+        if (err > 0)  { bx--; err -= 2 * bx + 1; }
       }
 #undef CPSET
     }
@@ -748,8 +695,8 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     begin_undo_action();
     for (int ey = cy - r; ey <= cy + r; ey++)
       for (int ex = cx - r; ex <= cx + r; ex++)
-        if ((ex - cx) * (ex - cx) + (ey - cy) * (ey - cy) <= r * r && ex >= 0 &&
-            ex < CANVAS_W && ey >= 0 && ey < CANVAS_H)
+        if ((ex - cx) * (ex - cx) + (ey - cy) * (ey - cy) <= r * r &&
+            ex >= 0 && ex < CANVAS_W && ey >= 0 && ey < CANVAS_H)
           paint_pixel(ex, ey, fg_color);
     commit_undo_action();
     break;
@@ -771,12 +718,9 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
       rx = MAX(1, radius);
       ry = ellipse_ry > 0 ? ellipse_ry : rx;
     }
-    if (rx < 1)
-      rx = 1;
-    if (ry < 1)
-      ry = 1;
+    if (rx < 1) rx = 1;
+    if (ry < 1) ry = 1;
     begin_undo_action();
-    /* filled ellipse: scan lines */
     for (int ey = cy - ry; ey <= cy + ry; ey++) {
       if (ey < 0 || ey >= CANVAS_H)
         continue;
