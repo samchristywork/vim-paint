@@ -15,7 +15,6 @@ void zoom_resize(void) {
   gtk_window_resize(GTK_WINDOW(main_window), 1, 1);
 }
 
-
 void flash_color(int idx) {
   char buf[64];
   int r, g, b;
@@ -288,6 +287,105 @@ void usage(const char *prog, int exitcode) {
   exit(exitcode);
 }
 
+void app_quit(const char *arg) {
+  (void)arg;
+  if (canvas_dirty)
+    cmd_flash(
+        "Unsaved changes. Use :q! to force quit or :wq to save and quit.");
+  else if (tab_count > 1)
+    tab_close_current();
+  else
+    gtk_main_quit();
+}
+
+void force_quit(const char *arg) {
+  (void)arg;
+  if (tab_count > 1)
+    tab_close_current();
+  else
+    gtk_main_quit();
+}
+
+void tabnew(const char *arg) {
+  if (tab_count >= TAB_MAX) {
+    cmd_flash("Max tabs reached.");
+    return;
+  }
+  tab_save(tab_current);
+  guint32 *np = calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, sizeof(guint32));
+  if (!np) {
+    cmd_flash("Out of memory.");
+    return;
+  }
+  free(pixels);
+  pixels = np;
+  CANVAS_W = DEFAULT_CANVAS_W;
+  CANVAS_H = DEFAULT_CANVAS_H;
+  cursor_x = cursor_y = 0;
+  canvas_dirty = FALSE;
+  visual_mode = FALSE;
+  insert_mode = FALSE;
+  last_filename[0] = '\0';
+  clear_history();
+  tab_count++;
+  tab_current = tab_count - 1;
+  tab_save(tab_current);
+  if (*arg)
+    cmd_open(arg);
+  zoom_resize();
+  title_refresh();
+  status_update();
+  gtk_widget_queue_draw(main_canvas);
+  cmd_set("");
+}
+
+void new_canvas(const char *arg) {
+  (void)arg;
+  gboolean force = (cmd_buf[4] == '!');
+  if (!force && canvas_dirty) {
+    cmd_flash("Unsaved changes. Use :new! to discard or :w to save first.");
+    return;
+  }
+  guint32 *np = calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, sizeof(guint32));
+  if (!np) {
+    cmd_flash("Out of memory.");
+    return;
+  }
+  free(pixels);
+  pixels = np;
+  CANVAS_W = DEFAULT_CANVAS_W;
+  CANVAS_H = DEFAULT_CANVAS_H;
+  clear_history();
+  canvas_dirty = FALSE;
+  last_filename[0] = '\0';
+  cursor_x = 0;
+  cursor_y = 0;
+  gtk_window_set_title(GTK_WINDOW(main_window), "vim-paint");
+  zoom_resize();
+  gtk_widget_queue_draw(main_canvas);
+  cmd_set("");
+}
+
+gboolean exec_app(const char *cmd, const char *arg) {
+  if (strcmp(cmd, ":q") == 0) {
+    app_quit(arg);
+    return TRUE;
+  }
+  if (strcmp(cmd, ":q!") == 0) {
+    force_quit(arg);
+    return TRUE;
+  }
+  if (strncmp(cmd, ":tabnew", 7) == 0) {
+    tabnew(arg);
+    return TRUE;
+  }
+  if (strcmp(cmd, ":new") == 0 || strcmp(cmd, ":new!") == 0) {
+    new_canvas(arg);
+    return TRUE;
+  }
+  return FALSE;
+}
+
 int main(int argc, char *argv[]) {
   int explicit_w = 0, explicit_h = 0;
   int opt;
@@ -445,103 +543,4 @@ int main(int argc, char *argv[]) {
   gtk_main();
 
   return 0;
-}
-
-void app_quit(const char *arg) {
-  (void)arg;
-  if (canvas_dirty)
-    cmd_flash(
-        "Unsaved changes. Use :q! to force quit or :wq to save and quit.");
-  else if (tab_count > 1)
-    tab_close_current();
-  else
-    gtk_main_quit();
-}
-
-void force_quit(const char *arg) {
-  (void)arg;
-  if (tab_count > 1)
-    tab_close_current();
-  else
-    gtk_main_quit();
-}
-
-void tabnew(const char *arg) {
-  if (tab_count >= TAB_MAX) {
-    cmd_flash("Max tabs reached.");
-    return;
-  }
-  tab_save(tab_current);
-  guint32 *np = calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, sizeof(guint32));
-  if (!np) {
-    cmd_flash("Out of memory.");
-    return;
-  }
-  free(pixels);
-  pixels = np;
-  CANVAS_W = DEFAULT_CANVAS_W;
-  CANVAS_H = DEFAULT_CANVAS_H;
-  cursor_x = cursor_y = 0;
-  canvas_dirty = FALSE;
-  visual_mode = FALSE;
-  insert_mode = FALSE;
-  last_filename[0] = '\0';
-  clear_history();
-  tab_count++;
-  tab_current = tab_count - 1;
-  tab_save(tab_current);
-  if (*arg)
-    cmd_open(arg);
-  zoom_resize();
-  title_refresh();
-  status_update();
-  gtk_widget_queue_draw(main_canvas);
-  cmd_set("");
-}
-
-void new_canvas(const char *arg) {
-  (void)arg;
-  gboolean force = (cmd_buf[4] == '!');
-  if (!force && canvas_dirty) {
-    cmd_flash("Unsaved changes. Use :new! to discard or :w to save first.");
-    return;
-  }
-  guint32 *np = calloc(DEFAULT_CANVAS_W * DEFAULT_CANVAS_H, sizeof(guint32));
-  if (!np) {
-    cmd_flash("Out of memory.");
-    return;
-  }
-  free(pixels);
-  pixels = np;
-  CANVAS_W = DEFAULT_CANVAS_W;
-  CANVAS_H = DEFAULT_CANVAS_H;
-  clear_history();
-  canvas_dirty = FALSE;
-  last_filename[0] = '\0';
-  cursor_x = 0;
-  cursor_y = 0;
-  gtk_window_set_title(GTK_WINDOW(main_window), "vim-paint");
-  zoom_resize();
-  gtk_widget_queue_draw(main_canvas);
-  cmd_set("");
-}
-
-gboolean exec_app(const char *cmd, const char *arg) {
-  if (strcmp(cmd, ":q") == 0) {
-    app_quit(arg);
-    return TRUE;
-  }
-  if (strcmp(cmd, ":q!") == 0) {
-    force_quit(arg);
-    return TRUE;
-  }
-  if (strncmp(cmd, ":tabnew", 7) == 0) {
-    tabnew(arg);
-    return TRUE;
-  }
-  if (strcmp(cmd, ":new") == 0 || strcmp(cmd, ":new!") == 0) {
-    new_canvas(arg);
-    return TRUE;
-  }
-  return FALSE;
 }

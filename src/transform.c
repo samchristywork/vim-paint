@@ -5,7 +5,6 @@
 #include "palette.h"
 #include "undo.h"
 
-
 void go_to(const char *arg) {
   int gx = 0, gy = 0;
   if (sscanf(arg, "%d,%d", &gx, &gy) != 2)

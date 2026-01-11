@@ -107,15 +107,35 @@ gboolean key_pending(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     int y0 = cursor_y, y1 = cursor_y;
     gboolean whole_row = FALSE;
     switch (event->keyval) {
-    case GDK_KEY_d:  whole_row = TRUE; break;
-    case GDK_KEY_h:  x0 = MAX(cursor_x - d_count, 0); break;
-    case GDK_KEY_l:  x1 = MIN(cursor_x + d_count, CANVAS_W - 1); break;
-    case GDK_KEY_w:  x1 = MIN(cursor_x + 5 * d_count, CANVAS_W - 1); break;
-    case GDK_KEY_b:  x0 = MAX(cursor_x - 5 * d_count, 0); break;
-    case GDK_KEY_0:  x0 = 0; break;
-    case GDK_KEY_dollar: x1 = CANVAS_W - 1; break;
-    case GDK_KEY_j:  whole_row = TRUE; y1 = MIN(cursor_y + d_count, CANVAS_H - 1); break;
-    case GDK_KEY_k:  whole_row = TRUE; y0 = MAX(cursor_y - d_count, 0); break;
+    case GDK_KEY_d:
+      whole_row = TRUE;
+      break;
+    case GDK_KEY_h:
+      x0 = MAX(cursor_x - d_count, 0);
+      break;
+    case GDK_KEY_l:
+      x1 = MIN(cursor_x + d_count, CANVAS_W - 1);
+      break;
+    case GDK_KEY_w:
+      x1 = MIN(cursor_x + 5 * d_count, CANVAS_W - 1);
+      break;
+    case GDK_KEY_b:
+      x0 = MAX(cursor_x - 5 * d_count, 0);
+      break;
+    case GDK_KEY_0:
+      x0 = 0;
+      break;
+    case GDK_KEY_dollar:
+      x1 = CANVAS_W - 1;
+      break;
+    case GDK_KEY_j:
+      whole_row = TRUE;
+      y1 = MIN(cursor_y + d_count, CANVAS_H - 1);
+      break;
+    case GDK_KEY_k:
+      whole_row = TRUE;
+      y0 = MAX(cursor_y - d_count, 0);
+      break;
     default:
       status_update();
       gtk_widget_queue_draw(GTK_WIDGET(data));
@@ -164,7 +184,7 @@ gboolean key_pending(GtkWidget *widget, GdkEventKey *event, gpointer data) {
 }
 
 gboolean key_visual(GtkWidget *widget, GdkEventKey *event, gpointer data,
-                            int n) {
+                    int n) {
   (void)widget;
   if (event->keyval == GDK_KEY_y) {
     int x0 = MIN(cursor_x, visual_anchor_x);
@@ -304,8 +324,10 @@ gboolean key_visual(GtkWidget *widget, GdkEventKey *event, gpointer data,
 
   if (event->keyval == GDK_KEY_plus || event->keyval == GDK_KEY_equal) {
     int amount = MAX(1, n);
-    visual_anchor_x = CLAMP(MIN(cursor_x, visual_anchor_x) - amount, 0, CANVAS_W - 1);
-    visual_anchor_y = CLAMP(MIN(cursor_y, visual_anchor_y) - amount, 0, CANVAS_H - 1);
+    visual_anchor_x =
+        CLAMP(MIN(cursor_x, visual_anchor_x) - amount, 0, CANVAS_W - 1);
+    visual_anchor_y =
+        CLAMP(MIN(cursor_y, visual_anchor_y) - amount, 0, CANVAS_H - 1);
     cursor_x = CLAMP(MAX(cursor_x, visual_anchor_x) + amount, 0, CANVAS_W - 1);
     cursor_y = CLAMP(MAX(cursor_y, visual_anchor_y) + amount, 0, CANVAS_H - 1);
     status_update();
@@ -564,16 +586,24 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     f_count = n;
     return TRUE;
   case GDK_KEY_n:
-    if (last_find_dir == 1)       find_right();
-    else if (last_find_dir == -1) find_left();
-    else if (last_find_dir == 2)  find_down();
-    else if (last_find_dir == -2) find_up();
+    if (last_find_dir == 1)
+      find_right();
+    else if (last_find_dir == -1)
+      find_left();
+    else if (last_find_dir == 2)
+      find_down();
+    else if (last_find_dir == -2)
+      find_up();
     break;
   case GDK_KEY_N:
-    if (last_find_dir == 1)       find_left();
-    else if (last_find_dir == -1) find_right();
-    else if (last_find_dir == 2)  find_up();
-    else if (last_find_dir == -2) find_down();
+    if (last_find_dir == 1)
+      find_left();
+    else if (last_find_dir == -1)
+      find_right();
+    else if (last_find_dir == 2)
+      find_up();
+    else if (last_find_dir == -2)
+      find_down();
     break;
   case GDK_KEY_d:
     pending_d = TRUE;
@@ -678,12 +708,22 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
       int bx = r, by = 0, err = 0;
 #define CPSET(px, py) paint_pixel((px), (py), fg_color)
       while (bx >= by) {
-        CPSET(cx + bx, cy + by); CPSET(cx + by, cy + bx);
-        CPSET(cx - by, cy + bx); CPSET(cx - bx, cy + by);
-        CPSET(cx - bx, cy - by); CPSET(cx - by, cy - bx);
-        CPSET(cx + by, cy - bx); CPSET(cx + bx, cy - by);
-        if (err <= 0) { by++; err += 2 * by + 1; }
-        if (err > 0)  { bx--; err -= 2 * bx + 1; }
+        CPSET(cx + bx, cy + by);
+        CPSET(cx + by, cy + bx);
+        CPSET(cx - by, cy + bx);
+        CPSET(cx - bx, cy + by);
+        CPSET(cx - bx, cy - by);
+        CPSET(cx - by, cy - bx);
+        CPSET(cx + by, cy - bx);
+        CPSET(cx + bx, cy - by);
+        if (err <= 0) {
+          by++;
+          err += 2 * by + 1;
+        }
+        if (err > 0) {
+          bx--;
+          err -= 2 * bx + 1;
+        }
       }
 #undef CPSET
     }
@@ -695,8 +735,8 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     begin_undo_action();
     for (int ey = cy - r; ey <= cy + r; ey++)
       for (int ex = cx - r; ex <= cx + r; ex++)
-        if ((ex - cx) * (ex - cx) + (ey - cy) * (ey - cy) <= r * r &&
-            ex >= 0 && ex < CANVAS_W && ey >= 0 && ey < CANVAS_H)
+        if ((ex - cx) * (ex - cx) + (ey - cy) * (ey - cy) <= r * r && ex >= 0 &&
+            ex < CANVAS_W && ey >= 0 && ey < CANVAS_H)
           paint_pixel(ex, ey, fg_color);
     commit_undo_action();
     break;
@@ -718,8 +758,10 @@ gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
       rx = MAX(1, radius);
       ry = ellipse_ry > 0 ? ellipse_ry : rx;
     }
-    if (rx < 1) rx = 1;
-    if (ry < 1) ry = 1;
+    if (rx < 1)
+      rx = 1;
+    if (ry < 1)
+      ry = 1;
     begin_undo_action();
     for (int ey = cy - ry; ey <= cy + ry; ey++) {
       if (ey < 0 || ey >= CANVAS_H)

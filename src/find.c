@@ -4,30 +4,54 @@
 
 void find_right(void) {
   for (int fx = cursor_x + 1; fx < CANVAS_W; fx++)
-    if (PX(cursor_y, fx)) { cursor_x = fx; return; }
+    if (PX(cursor_y, fx)) {
+      cursor_x = fx;
+      return;
+    }
   for (int fx = 0; fx < cursor_x; fx++)
-    if (PX(cursor_y, fx)) { cursor_x = fx; return; }
+    if (PX(cursor_y, fx)) {
+      cursor_x = fx;
+      return;
+    }
 }
 
 void find_left(void) {
   for (int fx = cursor_x - 1; fx >= 0; fx--)
-    if (PX(cursor_y, fx)) { cursor_x = fx; return; }
+    if (PX(cursor_y, fx)) {
+      cursor_x = fx;
+      return;
+    }
   for (int fx = CANVAS_W - 1; fx > cursor_x; fx--)
-    if (PX(cursor_y, fx)) { cursor_x = fx; return; }
+    if (PX(cursor_y, fx)) {
+      cursor_x = fx;
+      return;
+    }
 }
 
 void find_down(void) {
   for (int fy = cursor_y + 1; fy < CANVAS_H; fy++)
-    if (PX(fy, cursor_x)) { cursor_y = fy; return; }
+    if (PX(fy, cursor_x)) {
+      cursor_y = fy;
+      return;
+    }
   for (int fy = 0; fy < cursor_y; fy++)
-    if (PX(fy, cursor_x)) { cursor_y = fy; return; }
+    if (PX(fy, cursor_x)) {
+      cursor_y = fy;
+      return;
+    }
 }
 
 void find_up(void) {
   for (int fy = cursor_y - 1; fy >= 0; fy--)
-    if (PX(fy, cursor_x)) { cursor_y = fy; return; }
+    if (PX(fy, cursor_x)) {
+      cursor_y = fy;
+      return;
+    }
   for (int fy = CANVAS_H - 1; fy > cursor_y; fy--)
-    if (PX(fy, cursor_x)) { cursor_y = fy; return; }
+    if (PX(fy, cursor_x)) {
+      cursor_y = fy;
+      return;
+    }
 }
 
 int snap_coord(int coord, gboolean horizontal) {
@@ -92,6 +116,9 @@ void find_color(const char *arg) {
 }
 
 gboolean exec_find(const char *cmd, const char *arg) {
-  if (strncmp(cmd, ":find color ", 12) == 0) { find_color(arg); return TRUE; }
+  if (strncmp(cmd, ":find color ", 12) == 0) {
+    find_color(arg);
+    return TRUE;
+  }
   return FALSE;
 }

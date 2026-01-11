@@ -91,8 +91,6 @@ void set_palette_rgb(int slot, unsigned int rgb) {
   palette[slot][2] = (rgb & 0xff) / 255.0;
 }
 
-
-
 void delp(const char *arg) {
   int idx = atoi(arg);
   if (idx == 0) {

@@ -112,7 +112,6 @@ void paint_brush(int x, int y, guint32 color) {
     }
 }
 
-
 guint32 fill_color_at(int x, int y, guint32 fg) {
   switch (fill_pattern) {
   case FILL_CHECKER:
@@ -170,7 +169,6 @@ void flood_fill(int sx, int sy, guint32 fill_color) {
   free(queue);
   commit_canvas_snapshot(before_snap, CANVAS_W, CANVAS_H);
 }
-
 
 void apply_gradient_linear(int x0, int y0, int x1, int y1, guint32 c1,
                            guint32 c2) {
