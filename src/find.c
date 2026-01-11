@@ -48,7 +48,7 @@ int snap_coord(int coord, gboolean horizontal) {
   return best;
 }
 
-static void find_color(const char *arg) {
+void find_color(const char *arg) {
   (void)arg;
   const char *val = cmd_buf + 12;
   unsigned int rgb;
