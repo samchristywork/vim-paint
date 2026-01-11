@@ -4,7 +4,7 @@ LIBS := $(shell pkg-config --libs gtk+-3.0)
 
 SRCS := src/state.c src/layers.c src/undo.c src/palette.c src/draw.c \
         src/find.c src/effects.c src/transform.c \
-        src/io.c src/commands.c src/render.c src/mouse.c src/cmdline.c src/keys.c src/main.c
+        src/io.c src/commands.c src/render.c src/mouse.c src/keys.c src/main.c
 OBJS := $(SRCS:src/%.c=build/%.o)
 
 all: build/vimpaint

@@ -4,5 +4,6 @@
 #include "state.h"
 
 void cmd_execute(void);
+gboolean cmdline_key(GtkWidget *widget, GdkEventKey *event, gpointer data);
 
 #endif

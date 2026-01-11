@@ -1,5 +1,4 @@
 #include "keys.h"
-#include "cmdline.h"
 #include "commands.h"
 #include "draw.h"
 #include "find.h"
