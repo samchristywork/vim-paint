@@ -4,7 +4,6 @@
 #include "state.h"
 
 void zoom_resize(void);
-void tab_reset(void);
 void flash_color(int idx);
 void update_title(const char *filename);
 void title_refresh(void);

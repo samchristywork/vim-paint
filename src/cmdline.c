@@ -2,6 +2,17 @@
 #include "commands.h"
 #include "main.h"
 
+static void tab_reset(void) {
+  if (tab_glob_valid) {
+    globfree(&tab_glob);
+    tab_glob_valid = FALSE;
+  }
+  tab_glob_idx = 0;
+  color_tab_valid = FALSE;
+  color_tab_count = 0;
+  color_tab_idx = 0;
+}
+
 gboolean cmdline_key(GtkWidget *widget, GdkEventKey *event, gpointer data) {
   if (event->keyval == GDK_KEY_Escape) {
     tab_reset();

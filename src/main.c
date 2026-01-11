@@ -15,16 +15,6 @@ void zoom_resize(void) {
   gtk_window_resize(GTK_WINDOW(main_window), 1, 1);
 }
 
-void tab_reset(void) {
-  if (tab_glob_valid) {
-    globfree(&tab_glob);
-    tab_glob_valid = FALSE;
-  }
-  tab_glob_idx = 0;
-  color_tab_valid = FALSE;
-  color_tab_count = 0;
-  color_tab_idx = 0;
-}
 
 void flash_color(int idx) {
   char buf[64];
